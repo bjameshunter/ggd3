@@ -1,0 +1,46 @@
+{
+  "name": "charts",
+  "version": "0.1.0",
+  "scripts": {
+    "test": "grunt"
+  },
+  "browser": {
+    "jQuery": "./node_modules/jquery/dist/jquery.js",
+    "lodash": "./node_modules/lodash/lodash.js",
+    "draggable": "./node_modules/jquery-ui/draggable.js",
+    "bootstrap": "./node_modules/bootstrap/dist/js/bootstrap.js"
+  },
+  "browserify": {
+    "scripts": {
+      "build": "browserify start.js -o charts.standalone.js",
+      "watch": "watchify start.js -o charts.standalone.js --debug --verbose"
+    },
+    "transform": [
+      "browserify-shim"
+    ]
+  },
+  "browserify-shim": "shim.js",
+  "dependencies": {
+    "angular": "^1.2.23",
+    "bootstrap": "^3.2.0",
+    "crossfilter": "^1.3.10",
+    "d3": "^3.4.11",
+    "jquery": "^2.1.1",
+    "jquery-ui": "^1.10.5",
+    "lodash": "^2.4.1"
+  },
+  "devDependencies": {
+    "assert": "^1.1.2",
+    "browserify": "^6.0.2",
+    "browserify-shim": "^3.7.0",
+    "exorcist": "^0.1.6",
+    "grunt": "^0.4.5",
+    "grunt-browserify": "^3.0.1",
+    "grunt-contrib-concat": "^0.5.0",
+    "grunt-contrib-jshint": "^0.10.0",
+    "grunt-contrib-uglify": "^0.6.0",
+    "grunt-contrib-watch": "^0.6.1",
+    "grunt-extract-sourcemap": "^0.1.12",
+    "vows": "^0.7.0"
+  }
+}

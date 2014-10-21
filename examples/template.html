@@ -1,0 +1,14 @@
+<html>
+<head>
+<link rel='stylesheet' href='../css/style.css'>
+<link rel='stylesheet' href='../node_modules/bootstrap/dist/css/bootstrap.css'>
+<script type='text/javascript' src='../charts.standalone.js'></script></head>
+</head>
+<body>
+<div id='chart01' class='chart-frame'></div>
+<script>
+var scatter = charts.chart.scatter();
+d3.select('#chart01').call(scatter.draw);
+</script>
+</body>
+</html>

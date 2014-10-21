@@ -1,0 +1,87 @@
+.x-axis path, .y-axis path, line {
+  fill:none;
+  shape-Rendering: crispEdges;
+  stroke: #222222;
+}
+svg {
+  font: 10px sans-serif;
+}
+.chart {
+  shape-Rendering: crispEdges;
+  stroke: #222222;
+}
+
+.brush .extent {
+  stroke: #fff;
+  fill-opacity: .125;
+  shape-rendering: crispEdges;
+}
+
+div.tooltip-container {
+  position: absolute;
+  border-style: solid;
+  border-width: 1px;
+  border-color: black;
+  border-radius: 5;
+  padding: 5px;
+  background: rgba(255, 255, 255, 0.9)
+}
+tooltip-container p {
+  opacity: 1;
+}
+rect.brushframe {
+  fill: none;
+}
+rect.node {
+  shape-Rendering: crispEdges;
+  stroke: #222222;
+}
+.yadjust {
+  fill: none;
+  pointer-events: all;
+  cursor: ns-resize;
+}
+.xadjust {
+  fill: none;
+  pointer-events: all;
+  cursor: ew-resize;
+}
+line.grid {
+  stroke-dasharray: 3,3;
+  stroke-opacity: 0.2;
+}
+circle.shade {
+  fill: gray !important;
+  opacity: 0.1 !important;
+}
+.hist {
+  stroke: black;
+}
+.geom-point {
+  stroke: none;
+}
+rect.geom {
+  shape-Rendering: crispEdges;
+  stroke: #222222;
+  stroke-opacity: 0.8;
+}
+.main-title {
+  position: relative;
+}
+.controls {
+  width: 120px;
+  float:right;
+  display: inline-block;
+}
+.btn-group-sm label{
+  width: 50%;
+}
+.chart-frame {
+  position:relative;
+  border-width: 1px;
+  border-style: solid;
+  padding: 20px;
+  margin: 20px;
+  display:inline-block;
+  float:left;
+}

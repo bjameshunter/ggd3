@@ -1,0 +1,11 @@
+{
+  "folders":
+  [
+    {
+      "follow_symlinks": true,
+      "path": "/home/dantao/Projects/lazy",
+      "file_exclude_patterns": ["npm-debug.log", "*.sublime-*"],
+      "folder_exclude_patterns": ["node_modules"]
+    }
+  ]
+}
