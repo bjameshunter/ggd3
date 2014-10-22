@@ -16,7 +16,7 @@ charts.geom.BaseGeom = function (specs){
     sizeRange: null,
     colorVar: null,
     color: d3.scale.category10(),
-    group: null,
+    groupVar: null,
     facet: null,
     toolTitle: function(d) {
       if(chart.facet()){

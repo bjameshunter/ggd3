@@ -1,3 +1,6 @@
 charts.geom.vline = function() {
-  return charts.geom.abLine
-}()
+  var v = new charts.geom.abLine()
+                  .orient('vertical')
+                  .stat('mean')
+  return v;
+}

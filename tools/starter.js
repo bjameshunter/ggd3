@@ -30,7 +30,7 @@ charts.util.BaseChart = function (newAttributes) {
     color: d3.scale.category10(),
     colorVar: null,
     colorFree: false,
-    group: null, // arbitrary groups, not necessarily color
+    groupVar: null, // arbitrary groups, not necessarily color
     toolTitle: null,
     toolContent: null,
     brush: true,

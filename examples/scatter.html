@@ -24,11 +24,13 @@ var point = new charts.geom.point()
                     // .xVar('gear')
                     // .yVar('mpg')
                     .colorVar('mpg')
-var line1 = new charts.geom.hline()
+var hline1 = new charts.geom.hline()
                   .yVals([100, 200]) 
-var line2 = new charts.geom.hline()
+var hline2 = new charts.geom.hline()
                   .yVals([300, 40])
-var line3 = new charts.geom.hline()
+var hline3 = new charts.geom.hline()
+
+var vline1 = new charts.geom.vline()
 // should be able to 
 // enter a single y value or array of yvalues
 // or array of objects with appropriate
@@ -36,7 +38,7 @@ var line3 = new charts.geom.hline()
 var div = d3.select('#chart01')
 var scatter = {
   "mtcars.csv": {"chart":charts.chart()
-                      .geom(["point", line3])
+                      .geom(["point", hline3, vline1])
                       .xVar("mpg")
                       .yVar('disp')
                       .sizeVar('drat')
@@ -51,7 +53,8 @@ var scatter = {
                     "wt", "qsec", "vs", "am", 
                     "gear", "carb"]},
   "iris.csv": {'chart':charts.chart()
-                    .geom(['point', 'hline'])
+                    .geom(['point', 'hline', 'vline'])
+                    .facet("Species")
                     .yVar('Petal.Length')
                     .xVar('Species')
                     .sizeVar('Sepal.Width')
@@ -106,7 +109,8 @@ function redraw(dataset) {
   yChoice.exit().remove()
   d3.csv("../data/" + dataset, function(error, data) {
     chart.data(data);
-    line3.yVals(_.sample(data, 3))
+    hline3.yVals(_.sample(data, 3))
+    vline1.xVals(_.sample(data, 3))
     div.call(chart.draw);
   })
 

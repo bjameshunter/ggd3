@@ -491,7 +491,7 @@ charts.util.BaseChart = function (newAttributes) {
     color: d3.scale.category10(),
     colorVar: null,
     colorFree: false,
-    group: null, // arbitrary groups, not necessarily color
+    groupVar: null, // arbitrary groups, not necessarily color
     toolTitle: null,
     toolContent: null,
     brush: true,
@@ -632,22 +632,24 @@ charts.tools.defineAxis = function(varName, obj){
   }
 
 
-// geom hline will only make sense on charts with continuous
-// y axes(date or numeric), so check that at the start and throw an 
-// error 
+// geom abline is a base for hline, vline, and smooth
+// to draw arbitrary intercept/slope
+// needs to handle drawing 
 charts.geom.abLine = function(specs) {
   // add attributes to basic chart or reset defaults
   // stat calculates a statistic for each group
   // y just draws a line at that y intercept
   var attributes = {
-    lineWidth: d3.scale.linear(),
-    lineWidthRange: [2,5],
-    lineOpacity: 0.5,
-    lineWidthVar: null,
-    stat: 'mean',
-    yVals: null,
-    xVals: null,
+    lineWidth: 2,
+    lineOpacity: 0.8,
+    stat: null,
+    yVals: [null],
+    xVals: [null],
     grid: false, // use this geom to make gridlines
+    orient: "ab",
+    yint: null,
+    xint: null,
+    slope: null,
   };
   // allow passing in of settings as an argument
   if(typeof specs === "object"){
@@ -670,17 +672,14 @@ charts.geom.abLine = function(specs) {
     function agg(arr) {
       var out = {};
       if(arr.length > 0){
-        if(!_.isNull(geom.colorVar())){
-          out[geom.colorVar()] = arr[0][geom.colorVar()]
-        }
-        if(!_.isNull(geom.group())){
-          out[geom.group()] = arr[0][geom.group()]
-        }
-        if(geom.x().scale.rangeBands){
-          out[geom.xVar()] = arr[0][geom.xVar()]
-        }
-        out[geom.yVar()] = fun(_.map(arr, function(d) {
-          return d[geom.yVar()];
+        // these data will be nested, so just get
+        // info from the first one
+        _.mapValues(arr[0], function(v, k){
+          out[k] = v;
+        })
+        var v = geom.orient() == 'horizontal' ? geom.yVar():geom.xVar();
+        out[v] = fun(_.map(arr, function(d) {
+          return d[v];
         }))
         return [out]
       }
@@ -689,13 +688,14 @@ charts.geom.abLine = function(specs) {
   }
   // function to recurse output of agg function and return
   // bottom leaf
-  // leaf will always contain an object with yVar
-  function aggGetter(d){
-    if(_.contains(_.keys(d), geom.yVar())){
+  // leaf will always contain an object with yVar or xVar
+  function recurseNest(d){
+    var v = geom.orient() == 'horizontal' ? geom.yVar():geom.xVar();
+    if(_.contains(_.keys(d), v)){
       return d;
     } else {
-      return _.flatten(_.map(d.values, function(v) {
-          return aggGetter(v)
+      return _.flatten(_.map(d.values, function(val) {
+          return recurseNest(val)
       }));
     }
   }
@@ -705,137 +705,200 @@ charts.geom.abLine = function(specs) {
     min: aggregator(d3.min)
   }
 
-  // allows a single number to be entered as size
-  geom.lineWidth()
-    .range(d3.extent(_.flatten([geom.lineWidthRange()])))
-  function getSize(d) {
-    if(_.isNull(geom.lineWidthVar())){
-      return 1;
-    }
-    return d[geom.lineWidthVar()];
-  }
-
-
   // use area generators for lines
   // allowing variables to set the width if desired
   // y0 and y1 flank the center position by the 
   // width of the line/2
   // width for ordinal x axis doesn't make sense
-  var areaOrd = d3.svg.area()
-                  .x0(function(d) { 
-                    console.log(d);
-                    return (geom.x().scale(d[geom.xVar()]) + 
-                           geom.x().scale.rangeBand()/4)})
-                  .x1(function(d) { 
-                    return (geom.x().scale(d[geom.xVar()]) + 
-                                        geom.x().scale.rangeBand()*3/4)})
-                  .y0(function(d) {
-                    return geom.y().scale(d[geom.yVar()])
-                  })
-                  .y1(function(d) {
-                    return geom.y().scale(d[geom.yVar()])
-                  })
-  // generator for continuous x axis
-  var area = d3.svg.area()
-      .x0(function(d) { 
-        return 0; })
-      .x1(function(d) { 
-        return chart.plotDim(chart.attributes).width; })
-      .y0(function(d) { 
-        return (geom.y().scale(d[geom.yVar()])); })
-      .y1(function(d) { 
-        return (geom.y().scale(d[geom.yVar()])); })
+  geom.selector = function() {
+    var selector = geom.grid() ? "geom-grid":"geom-"
+    if(geom.orient() == 'vertical') {
+      selector += 'vert';
+    } else if (geom.orient() === 'horizontal'){
+      selector += 'horiz';
+    } else if (geom.orient() === "ab"){
+      selector += "ab";
+    }
+    selector += " order-" + geom.order()
+    return selector;
+  }
+
+  geom.checkErrors = function(sel) {
+    switch(geom.orient()){
+      case "horizontal":
+        if(!_.isUndefined(geom.chart().y().scale.rangeBand)){
+          console.error("you are trying to draw a horizontal line on an ordinal y axis.")
+          return true
+        }
+        break;
+      case "vertical":
+        if(!_.isUndefined(geom.chart().x().scale.rangeBand)){
+          console.error("you are trying to draw a vertical line on an ordinal x axis.")
+          return true
+        }
+        break;
+      default:
+        return false;
+    }
+  }
+  geom.line = d3.svg.line()
+                .x(function(d) { 
+                  return d['xpos'];})
+                .y(function(d) { 
+                    return d['ypos'];});
+  function generateLineData(arr, orient) {
+    var s1 = orient == "x" ? geom.x().scale: geom.y().scale,
+        s2 = orient == "x" ? geom.y().scale: geom.x().scale,
+        v1 = orient == "x" ? geom.xVar(): geom.yVar(),
+        v2 = orient == "x" ? geom.yVar(): geom.xVar(),
+        p1 = orient == "x" ? 'xpos': "ypos",
+        p2 = orient == "x" ? "ypos": "xpos",
+        data = [],
+        hasRangeBand = !_.isUndefined(s2.rangeBand);
+    if(_.all(_.map(arr, _.isNumber))){
+      // array is a list of intercepts with no
+      // color or group variables of interest
+      // set color to something neutral
+      if(geom.chart().color() == geom.color()){
+        geom.color(d3.functor("gray"))
+      }
+      _.map(arr, function(d) {
+        if(hasRangeBand){
+          _.map(s2.domain(), function(oppAxisVal) {
+            var o1 = {};
+            o1[v1] = d;
+            o1[v2] = oppAxisVal;
+            o1[p1] = s1(d);
+            o1[p2] = s2(oppAxisVal) + s2.rangeBand()/4;
+            o2 = _.cloneDeep(o1);
+            o2[p2] = s2(oppAxisVal) + s2.rangeBand()*3/4;
+            data.push([o1,o2]);
+          });
+        } else {
+          o1 = {};
+          o1[v1] = d
+          o1[v2] = s2.domain()[0];
+          o1[p1] = s1(d);
+          o1[p2] = s2(s2.domain()[0]);
+          o2 = _.clone(o1);
+          o2[v2] = s2.domain()[1];
+          o2[p2] = s2(s2.domain()[1]);
+          data.push([o1, o2]);
+        }
+      })
+    } else if(_.all(_.map(arr, _.isObject))){
+      _.map(arr, function(d) {
+        if(hasRangeBand){
+          var o1 = _.clone(d);
+          o1[p1] = s1(d[v1]);
+          o1[p2] = s2(d[v2]) + s2.rangeBand()/4;
+          o2 = _.clone(o1);
+          o2[p2] = s2(d[v2]) + s2.rangeBand()*3/4;
+          data.push([o1,o2]);
+        } else {
+          var o1 = _.clone(d);
+          o1[p1] = s1(d[v1]);
+          o1[p2] = s2(s2.domain()[0]);
+          o2 = _.clone(o1);
+          o2[v2] = s2.domain()[1];
+          o2[p2] = s2(s2.domain()[1]);
+          data.push([o1, o2]);
+        }
+      })
+    } else {
+      // use data passed to geom to nest on relevent
+      // groupings and draw line based on geom.stat()
+      var nest = d3.nest()
+                  .rollup(stats[geom.stat()])
+      if(!_.isNull(geom.colorVar())){
+        nest.key(function(d) { return d[geom.colorVar()]});
+      }
+      if(!_.isNull(geom.groupVar())){
+        nest.key(function(d) { return d[geom.groupVar()]});
+      }
+      if(hasRangeBand){
+        nest.key(function(d) { return d[v2]});
+      }
+      var tmp = _.flatten(_.map(nest.entries(geom.data()[0].values), 
+                       recurseNest));
+      _.map(tmp, function(o1) {
+        if(hasRangeBand){
+            o1[p2] = s2(o1[v2]) + s2.rangeBand()/4;
+            o1[p1] = s1(o1[v1]);
+            var o2 = _.clone(o1);
+            o2[p2] = s2(o2[v2]) + s2.rangeBand()*3/4;
+        } else {
+          o1[p1] = s1(o1[v1]);
+          o1[p2] = s2(s2.domain()[0]);
+          var o2 = _.clone(o1);
+          o2[p2] = s2(s2.domain()[1]);
+        }
+            data.push([o1, o2]);
+      })
+    }
+    console.log(data)
+    geom.lineData = data;
+  }
+  geom.prepData = function() {
+    // nest to group the colors and groups and aggregate
+    // needs refactoring, too hungover.
+    // needs to handle array of intercepts,
+    // array of objects w/ agg function
+    // and array of objects no agg function
+    geom.lineData = [];
+    var plotDim = geom.chart().plotDim(geom.chart().attributes);
+    switch(geom.orient()){
+      case "horizontal":
+        generateLineData(geom.yVals(), "y")
+          // data to be nested by all relevent variables
+          // and aggregated according to geom.stat()
+        break;
+      case "vertical":
+        generateLineData(geom.xVals(), "x")
+
+        break;
+      case "ab":
+
+        break;
+      }
+    }
+
 
   geom.draw = function(sel) {
     // throw an error if y-axis is not continuous
-    if(!_.isUndefined(geom.chart().y().scale.rangeBand)){
-      console.error("you are trying to draw a horizontal line on an ordinal y axis.")
-      sel.select('.chart').selectAll('path.geom-hline')
+    var selector = geom.selector()
+    // remove the paths if the geom isn't appropriate
+    if(geom.checkErrors()) {
+      sel.select('.chart').selectAll('path.' + selector.replace(" ", "."))
         .transition().duration(geom.transitionTime())
         .style('opacity', 0)
         .remove()
       return
     }
     geom.prepAxes(sel);
-    // nest to group the colors and groups and aggregate
-    // needs refactoring, too hungover.
-    if(!_.isNull(geom.yVals())){
-      if(_.isArray(geom.yVals())){
-        if(_.all(_.map(geom.yVals(), _.isObject))){
-          // user passed an array of objects for data
-          var data = geom.yVals()
-        } else {
-          // if it's an array of y-intercepts, all
-          // that is needed is to add the 
-          if(geom.x().scale.rangeBand){
-            var xes = _.unique(_.map(geom.data()[0].values,
-                           function(d) {
-                            return d[geom.xVar()];
-                           })),
-            data = _.flatten(_.map(geom.yVals(), function(y) {
-              return _.map(xes, function(x) {
-                var out = {};
-                out[geom.xVar()] = x;
-                out[geom.yVar()] = y
-                return out
-              })
-            }))
-          } else {
-            var data = _.map(geom.yVals(), function(y) {
-              var out = {};
-              out[geom.yVar()] = y;
-              return out
-            })
-          }
-        }
-      }
-    } else {
-      var nest = d3.nest()
-      if(!_.isNull(geom.group())){
-        nest.key(function(d) { return d[geom.group()]})
-      }
-      if(!_.isNull(geom.colorVar())){
-        nest.key(function(d) { return d[geom.colorVar()];})
-      }
-      if(geom.x().scale.rangeBand){
-        nest.key(function(d) { return d[geom.xVar()]; })
-      }
-      nest.rollup(stats[geom.stat()]);
-      var data = nest
-              .entries(geom.data()[0].values)
-      data = _.flatten(_.map(data, aggGetter))
-    }
+    geom.prepData();
     // do this because we want to append a line per
     // entry in data. the generators expect arrays
-    data = _.map(data, function(d) {
-      return [d]
-    })
-    if(geom.x().scale.rangeBand){
-      var generator = areaOrd;
-    } else {
-      var generator = area;
-    }
-    var selector = geom.grid() ? "geom-grid":"geom-hline"
-    selector += " order-" + geom.order()
+
     var paths = sel.select('.chart')
-                  .selectAll("path." + selector)
-                  .data(data);
+                  .selectAll("path." + selector.replace(" ", "."))
+                  .data(geom.lineData);
     paths
       .transition().duration(geom.transitionTime())
-      .attr('d', generator)
+      .attr('d', geom.line)
       .attr('stroke', function(d) {
       return geom.color()(d[0][geom.colorVar()])
         });
     paths.enter().append('path')
       .style('opacity', 0)
       .attr('class', selector)
-      .attr('d', function(d) {
-        return generator(d)})
+      .attr('d', geom.line)
       .attr('stroke', function(d) {
       return geom.color()(d[0][geom.colorVar()])
         })
       .transition().duration(geom.transitionTime())
-      .style('opacity', 1)
+      .style('opacity', geom.lineOpacity())
+      .style('stroke-width', geom.lineWidth())
     paths.exit()
       .transition().duration(geom.transitionTime())
       .style(geom.transitionStyle())
@@ -864,7 +927,7 @@ charts.geom.BaseGeom = function (specs){
     sizeRange: null,
     colorVar: null,
     color: d3.scale.category10(),
-    group: null,
+    groupVar: null,
     facet: null,
     toolTitle: function(d) {
       if(chart.facet()){
@@ -977,12 +1040,14 @@ charts.geom.BaseGeom = function (specs){
 }
 
 
-// geom hline will only make sense on charts with continuous
-// y axes(date or numeric), so check that at the start and throw an 
-// error 
+
 charts.geom.hline = function() {
-  return charts.geom.abLine
-}()
+  var h = new charts.geom.abLine()
+                  .orient('horizontal')
+                  .stat('mean');
+  return h;
+}
+
 // geoms take optional data, the default is found 
 // on the selection that calls them.
 // geoms get put in a chart definition. If they are objects,
@@ -1076,8 +1141,12 @@ charts.geom.point = function(specs) {
   
 
 charts.geom.vline = function() {
-  return charts.geom.abline
-}()
+  var v = new charts.geom.abLine()
+                  .orient('vertical')
+                  .stat('mean')
+  return v;
+}
+
   if(typeof module === "object" && module.exports){
     // package loaded as node module
     // charts.chart.scatter = require('./scatter.js').scatter;
