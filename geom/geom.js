@@ -16,6 +16,7 @@ charts.geom.BaseGeom = function (specs){
     sizeRange: null,
     colorVar: null,
     color: d3.scale.category10(),
+    lineWidth: 5,
     groupVar: null,
     facet: null,
     toolTitle: function(d) {
@@ -35,10 +36,6 @@ charts.geom.BaseGeom = function (specs){
     transitionStyle: {opacity: 0},
     newData: true,
     geom: null, // just add more geoms!?
-    // sure - check if it has parent geoms, take their
-    // width/height, if not, use chart width / height
-    // can also declare a null geom on which we mount
-    // other geoms.
     first: false,
     order: 0
   };

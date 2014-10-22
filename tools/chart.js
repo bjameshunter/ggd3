@@ -34,7 +34,7 @@ charts.chart = function(specs){
       var geoms = chart.geom(),
           // array of features geoms inherit
           inherit = ["sizeVar", "sizeRange",
-          "xVar", "yVar", "colorVar", "facet"]; 
+          "xVar", "yVar", "colorVar", "facet", "lineWidth"]; 
       for(var i = 0; i < geoms.length; i++){
         if(typeof geoms[i] !== "object"){
           // default geom

@@ -6,11 +6,11 @@ charts.geom.abLine = function(specs) {
   // stat calculates a statistic for each group
   // y just draws a line at that y intercept
   var attributes = {
-    lineWidth: 2,
+    lineWidth: null,
     lineOpacity: 0.8,
     stat: null,
-    yVals: [null],
-    xVals: [null],
+    vals: [null],
+    // vals: [null],
     grid: false, // use this geom to make gridlines
     orient: "ab",
     yint: null,
@@ -112,6 +112,7 @@ charts.geom.abLine = function(specs) {
                   return d['xpos'];})
                 .y(function(d) { 
                     return d['ypos'];});
+  var usingFacet = false;
   function generateLineData(arr, orient) {
     var s1 = orient == "x" ? geom.x().scale: geom.y().scale,
         s2 = orient == "x" ? geom.y().scale: geom.x().scale,
@@ -152,6 +153,7 @@ charts.geom.abLine = function(specs) {
           data.push([o1, o2]);
         }
       })
+      usingFacet=false;
     } else if(_.all(_.map(arr, _.isObject))){
       _.map(arr, function(d) {
         if(hasRangeBand){
@@ -171,7 +173,9 @@ charts.geom.abLine = function(specs) {
           data.push([o1, o2]);
         }
       })
+      usingFacet = true
     } else {
+      // vals is null
       // use data passed to geom to nest on relevent
       // groupings and draw line based on geom.stat()
       var nest = d3.nest()
@@ -201,6 +205,7 @@ charts.geom.abLine = function(specs) {
         }
         data.push([o1, o2]);
       })
+      usingFacet = true;
     }
     console.log(data)
     geom.lineData = data;
@@ -215,13 +220,12 @@ charts.geom.abLine = function(specs) {
     var plotDim = geom.chart().plotDim(geom.chart().attributes);
     switch(geom.orient()){
       case "horizontal":
-        generateLineData(geom.yVals(), "y")
+        generateLineData(geom.vals(), "y")
           // data to be nested by all relevent variables
           // and aggregated according to geom.stat()
         break;
       case "vertical":
-        generateLineData(geom.xVals(), "x")
-
+        generateLineData(geom.vals(), "x")
         break;
       case "ab":
 
@@ -243,6 +247,13 @@ charts.geom.abLine = function(specs) {
     }
     geom.prepAxes(sel);
     geom.prepData();
+    if(usingFacet){
+      if(!_.isNull(geom.facet())){
+        geom.lineData = _.filter(geom.lineData, function(d) {
+          return (d[0][geom.facet()] + '-' + geom.chart().id()) == sel.attr('id')
+        })
+      }
+    }
     // do this because we want to append a line per
     // entry in data. the generators expect arrays
 

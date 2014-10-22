@@ -2,7 +2,7 @@ charts.util.Frame = function Frame(selection, chart) {
   // returns a array of svg selections or a single svg
   // each with a clipPath with id set to "<facet>-clip"
 
-  var id = selection.attr('id'),
+  var id = chart.id(),
       div = selection.selectAll('div.outer')
               .data([1]),
       facet = chart.facets(),
@@ -30,7 +30,7 @@ charts.util.Frame = function Frame(selection, chart) {
       .attr('fill', 'orange');
   $(div.node()).draggable({containment: "parent"});
   }
-  function setup(svg){
+  function setup(svg, d){
     var defs = svg.selectAll('defs')
                 .data([1]),
         gch = svg.selectAll('g.chart')
@@ -53,24 +53,24 @@ charts.util.Frame = function Frame(selection, chart) {
     defs.enter()
       .append('defs')
       .append('clipPath')
-      .attr('id', function(d) {
+      .attr('id', function() {
         return d + "-" + "clip";
       })
       .append('rect')
-      .attr('width', plotDim.width + 1)
+      .attr('width', plotDim.width + 2)
       .attr('height', plotDim.height + 1);
     gch
       .attr('class', 'chart')
       .attr('transform', 'translate(' + 
             plotDim.translate + ")")
-      .attr('clip-path', function(d) {
+      .attr('clip-path', function() {
         return 'url(#' + d + "-clip)";
       });
     gch.enter().append('g')
       .attr('class', 'chart')
       .attr('transform', 'translate(' + 
             plotDim.translate + ")")
-      .attr('clip-path', function(d) {
+      .attr('clip-path', function() {
         return 'url(#' + d + "-clip)";
       });
     gy.attr('transform', "translate(" + 
@@ -118,7 +118,7 @@ charts.util.Frame = function Frame(selection, chart) {
     .each(function(d) {
       d3.select(this)
         .attr({width:chart.width(), height:chart.height()})
-        .call(setup);
+        .call(setup, d);
     });
   svg.enter()
     .append('svg')
@@ -130,7 +130,7 @@ charts.util.Frame = function Frame(selection, chart) {
         .attr('id', function(d) {
           return d + '-' + id;
         })
-        .call(setup);
+        .call(setup, d);
     });
   // transitioning through different datasets presents
   // a headache I don't want right now.

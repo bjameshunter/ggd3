@@ -91,7 +91,7 @@ charts.chart = function(specs){
       var geoms = chart.geom(),
           // array of features geoms inherit
           inherit = ["sizeVar", "sizeRange",
-          "xVar", "yVar", "colorVar", "facet"]; 
+          "xVar", "yVar", "colorVar", "facet", "lineWidth"]; 
       for(var i = 0; i < geoms.length; i++){
         if(typeof geoms[i] !== "object"){
           // default geom
@@ -231,7 +231,7 @@ charts.util.Frame = function Frame(selection, chart) {
   // returns a array of svg selections or a single svg
   // each with a clipPath with id set to "<facet>-clip"
 
-  var id = selection.attr('id'),
+  var id = chart.id(),
       div = selection.selectAll('div.outer')
               .data([1]),
       facet = chart.facets(),
@@ -259,7 +259,7 @@ charts.util.Frame = function Frame(selection, chart) {
       .attr('fill', 'orange');
   $(div.node()).draggable({containment: "parent"});
   }
-  function setup(svg){
+  function setup(svg, d){
     var defs = svg.selectAll('defs')
                 .data([1]),
         gch = svg.selectAll('g.chart')
@@ -282,24 +282,24 @@ charts.util.Frame = function Frame(selection, chart) {
     defs.enter()
       .append('defs')
       .append('clipPath')
-      .attr('id', function(d) {
+      .attr('id', function() {
         return d + "-" + "clip";
       })
       .append('rect')
-      .attr('width', plotDim.width + 1)
+      .attr('width', plotDim.width + 2)
       .attr('height', plotDim.height + 1);
     gch
       .attr('class', 'chart')
       .attr('transform', 'translate(' + 
             plotDim.translate + ")")
-      .attr('clip-path', function(d) {
+      .attr('clip-path', function() {
         return 'url(#' + d + "-clip)";
       });
     gch.enter().append('g')
       .attr('class', 'chart')
       .attr('transform', 'translate(' + 
             plotDim.translate + ")")
-      .attr('clip-path', function(d) {
+      .attr('clip-path', function() {
         return 'url(#' + d + "-clip)";
       });
     gy.attr('transform', "translate(" + 
@@ -347,7 +347,7 @@ charts.util.Frame = function Frame(selection, chart) {
     .each(function(d) {
       d3.select(this)
         .attr({width:chart.width(), height:chart.height()})
-        .call(setup);
+        .call(setup, d);
     });
   svg.enter()
     .append('svg')
@@ -359,7 +359,7 @@ charts.util.Frame = function Frame(selection, chart) {
         .attr('id', function(d) {
           return d + '-' + id;
         })
-        .call(setup);
+        .call(setup, d);
     });
   // transitioning through different datasets presents
   // a headache I don't want right now.
@@ -478,6 +478,7 @@ charts.util.BaseChart = function (newAttributes) {
     sizeVar: null,
     sizeRange: [3, 10],
     sizeFree: false,
+    lineWidth: 2,
     color: d3.scale.category10(),
     colorVar: null,
     colorFree: false,
@@ -630,11 +631,11 @@ charts.geom.abLine = function(specs) {
   // stat calculates a statistic for each group
   // y just draws a line at that y intercept
   var attributes = {
-    lineWidth: 2,
+    lineWidth: null,
     lineOpacity: 0.8,
     stat: null,
-    yVals: [null],
-    xVals: [null],
+    vals: [null],
+    // vals: [null],
     grid: false, // use this geom to make gridlines
     orient: "ab",
     yint: null,
@@ -736,6 +737,7 @@ charts.geom.abLine = function(specs) {
                   return d['xpos'];})
                 .y(function(d) { 
                     return d['ypos'];});
+  var usingFacet = false;
   function generateLineData(arr, orient) {
     var s1 = orient == "x" ? geom.x().scale: geom.y().scale,
         s2 = orient == "x" ? geom.y().scale: geom.x().scale,
@@ -776,6 +778,7 @@ charts.geom.abLine = function(specs) {
           data.push([o1, o2]);
         }
       })
+      usingFacet=false;
     } else if(_.all(_.map(arr, _.isObject))){
       _.map(arr, function(d) {
         if(hasRangeBand){
@@ -795,7 +798,9 @@ charts.geom.abLine = function(specs) {
           data.push([o1, o2]);
         }
       })
+      usingFacet = true
     } else {
+      // vals is null
       // use data passed to geom to nest on relevent
       // groupings and draw line based on geom.stat()
       var nest = d3.nest()
@@ -823,8 +828,9 @@ charts.geom.abLine = function(specs) {
           var o2 = _.clone(o1);
           o2[p2] = s2(s2.domain()[1]);
         }
-            data.push([o1, o2]);
+        data.push([o1, o2]);
       })
+      usingFacet = true;
     }
     console.log(data)
     geom.lineData = data;
@@ -839,13 +845,12 @@ charts.geom.abLine = function(specs) {
     var plotDim = geom.chart().plotDim(geom.chart().attributes);
     switch(geom.orient()){
       case "horizontal":
-        generateLineData(geom.yVals(), "y")
+        generateLineData(geom.vals(), "y")
           // data to be nested by all relevent variables
           // and aggregated according to geom.stat()
         break;
       case "vertical":
-        generateLineData(geom.xVals(), "x")
-
+        generateLineData(geom.vals(), "x")
         break;
       case "ab":
 
@@ -867,6 +872,13 @@ charts.geom.abLine = function(specs) {
     }
     geom.prepAxes(sel);
     geom.prepData();
+    if(usingFacet){
+      if(!_.isNull(geom.facet())){
+        geom.lineData = _.filter(geom.lineData, function(d) {
+          return (d[0][geom.facet()] + '-' + geom.chart().id()) == sel.attr('id')
+        })
+      }
+    }
     // do this because we want to append a line per
     // entry in data. the generators expect arrays
 
@@ -917,6 +929,7 @@ charts.geom.BaseGeom = function (specs){
     sizeRange: null,
     colorVar: null,
     color: d3.scale.category10(),
+    lineWidth: 5,
     groupVar: null,
     facet: null,
     toolTitle: function(d) {
@@ -936,10 +949,6 @@ charts.geom.BaseGeom = function (specs){
     transitionStyle: {opacity: 0},
     newData: true,
     geom: null, // just add more geoms!?
-    // sure - check if it has parent geoms, take their
-    // width/height, if not, use chart width / height
-    // can also declare a null geom on which we mount
-    // other geoms.
     first: false,
     order: 0
   };

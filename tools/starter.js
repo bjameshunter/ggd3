@@ -27,6 +27,7 @@ charts.util.BaseChart = function (newAttributes) {
     sizeVar: null,
     sizeRange: [3, 10],
     sizeFree: false,
+    lineWidth: 2,
     color: d3.scale.category10(),
     colorVar: null,
     colorFree: false,
