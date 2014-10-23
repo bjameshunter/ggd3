@@ -138,5 +138,6 @@ charts.util.Frame = function Frame(selection, chart) {
     // .transition().duration(500)
     // .style('opacity', 0)
     .remove();
+  chart.svgs = svg;
 
 };

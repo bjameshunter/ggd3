@@ -12,7 +12,9 @@ charts.geom.point = function(specs) {
     // string or function indicating how to get point id
     dataPointId: null,
     // should brushing highlight ids or highlight scale domain?
-    highlightId: null
+    highlightId: null,
+    canvas: null, // for over 1000, rewrite draw w/ canvas
+    canvasThreshold: 1000
   };
   // allow passing in of settings as an argument
   if(typeof specs === "object"){
@@ -60,9 +62,6 @@ charts.geom.point = function(specs) {
       fill: function(d) {return d3.functor(geom.color())(d[geom.colorVar()])}
     }
   }
-  // by now, the geom should have xVar and yVar
-  // which means we can look them up in dtypes and 
-  // make an axis/scale
 
   geom.draw = function(sel) {
     geom.prepAxes(sel)
@@ -70,8 +69,13 @@ charts.geom.point = function(specs) {
     geom.positionY = position(geom.y().scale, 'y');
     // better to nest data beforehand, pass it to geom
     // to be able to set axes free or fixed.
-    var data = geom.data()[0].values,
-    circles = sel.select(".chart")
+    var data = geom.data()[0].values
+    if(data > chart.canvasThreshold){
+      sel.call(geom.drawCanvas);
+      return;
+    }
+
+    var circles = sel.select(".chart")
                 .selectAll('circle.geom-point')
                 .data(data);
     circles.transition().duration(geom.transitionTime())
@@ -86,6 +90,9 @@ charts.geom.point = function(specs) {
       .attr("r", 0)
       .remove();
   };
+  geom.drawCanvas = function(sel) {
+
+  }
   return geom;
 };
   

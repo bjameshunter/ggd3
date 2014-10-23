@@ -128,13 +128,44 @@ charts.chart = function(specs){
                          [chart.sizeRange()])))
       // add setting color here      
     }
-    chart.draw = function(sel) {
+    // zoom should be called on the first geom's axis
+    // if it is continuous and requested by user
+    var makeZoom = function() {
+      var zoomer = d3.behavior.zoom()[axis](scale)
+      geom.svgs.each(function() {
+
+
+      })
+
+    }
+    // do I add a chart.prepareChart method to 
+    // set stuff up after adding all the settings?
+    // chart.prepareChart() {
+    //     chart.setGeoms();
+    //     chart.prepAxes(sel);
+    //     chart.makeZoome();
+    // etc.
+
+    // }
+    chart.draw = function(sel, facet) {
+      // sel is the topmost level element
+      // div on which chart.draw is called.
+      // when updating a single plot within a 
+      // faceted chart, something else needs to be
+      // done.
+      // filer chart.svgs for those being updated?
+      // then reset chart.svgs to original value?
       sel.each(function() {
         // get x and y domains
         // if not xFree and yFree, set chart-level axes;
         var data = chart.data();
+        // find out when this needs to be called
         charts.util.Frame(sel, chart);
-        chart.svgs = sel.selectAll('svg.plot')
+        if(!_.isUndefined(facet)) {
+          chart.svgs = chart.svgs.filter(function(d) {
+            return d == facet;
+          })
+        }
         // first set chart-level axes if we want them
         // if we don't, the first geom will set them
         chart.setGeoms();

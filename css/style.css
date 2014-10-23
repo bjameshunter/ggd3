@@ -85,3 +85,8 @@ rect.geom {
   display:inline-block;
   float:left;
 }
+
+path.geom-grid-horiz, path.geom-grid-vert {
+  stroke-dasharray: 3,1;
+  stroke-opacity: 0.4;
+}

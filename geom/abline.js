@@ -287,6 +287,12 @@ charts.geom.abLine = function(specs) {
     }
     geom.prepAxes(sel);
     geom.prepData();
+    // gridlines are defined in css
+    if(geom.grid()){
+      geom.lineOpacity(undefined);
+      geom.lineWidth(undefined)
+      geom.color(d3.functor(undefined));
+    }
     var plotDim = geom.chart().plotDim(geom.chart().attributes);
     if(usingFacet){
       if(!_.isNull(geom.facet())){
@@ -314,8 +320,8 @@ charts.geom.abLine = function(specs) {
       return geom.color()(d[0][geom.colorVar()])
         })
       .transition().duration(geom.transitionTime())
-      .style('opacity', geom.lineOpacity())
-      .style('stroke-width', geom.lineWidth())
+      .style({'opacity': geom.lineOpacity(),
+          'stroke-width': geom.lineWidth()})
     paths.exit()
       .transition().duration(geom.transitionTime())
       .style(geom.transitionStyle())

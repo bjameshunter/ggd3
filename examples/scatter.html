@@ -41,7 +41,7 @@ var vline1 = new charts.geom.vline()
 var div = d3.select('#chart01')
 var scatter = {
   "mtcars.csv": {"chart":charts.chart()
-                      .geom(["point", hline3])
+                      .geom(["point", vline1])
                       .xVar("mpg")
                       .yVar('disp')
                       .sizeVar('drat')
