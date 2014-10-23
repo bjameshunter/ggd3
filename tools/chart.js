@@ -139,6 +139,45 @@ charts.chart = function(specs){
         // if we don't, the first geom will set them
         chart.setGeoms();
         chart.prepAxes(sel);
+
+        if(chart.grid()){
+          if(!_.isUndefined(chart.x().scale.ticks)) {
+            var grid = new charts.geom.vline()
+                          .vals(chart.x().scale.ticks())
+                          .chart(chart)
+                          .xVar(chart.xVar())
+                          .yVar(chart.yVar())
+                          .grid(true)
+            chart.svgs.each(function() {
+              d3.select(this).call(grid.draw)
+            })
+          } else {
+            chart.svgs.each(function() {
+              d3.select(this).selectAll('.geom-grid-vert')
+                .transition().duration(chart.transitionTime())
+                .style('opacity', 0)
+                .remove()
+            })
+          }
+          if(!_.isUndefined(chart.y().scale.ticks)) {
+            var grid = new charts.geom.hline()
+                          .vals(chart.y().scale.ticks())
+                          .chart(chart)
+                          .xVar(chart.xVar())
+                          .yVar(chart.yVar())
+                          .grid(true)
+            chart.svgs.each(function() {
+              d3.select(this).call(grid.draw)
+            })
+          } else {
+            chart.svgs.each(function() {
+              d3.select(this).selectAll('.geom-grid-horiz')
+                .transition().duration(chart.transitionTime())
+                .style('opacity', 0)
+                .remove()
+            })
+          }
+        }
         // doing all the data stuff before drawing
         // would allow cool things like ggplot free_space
         // each geom makes its own axis

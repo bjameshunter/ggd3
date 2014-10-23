@@ -196,6 +196,45 @@ charts.chart = function(specs){
         // if we don't, the first geom will set them
         chart.setGeoms();
         chart.prepAxes(sel);
+
+        if(chart.grid()){
+          if(!_.isUndefined(chart.x().scale.ticks)) {
+            var grid = new charts.geom.vline()
+                          .vals(chart.x().scale.ticks())
+                          .chart(chart)
+                          .xVar(chart.xVar())
+                          .yVar(chart.yVar())
+                          .grid(true)
+            chart.svgs.each(function() {
+              d3.select(this).call(grid.draw)
+            })
+          } else {
+            chart.svgs.each(function() {
+              d3.select(this).selectAll('.geom-grid-vert')
+                .transition().duration(chart.transitionTime())
+                .style('opacity', 0)
+                .remove()
+            })
+          }
+          if(!_.isUndefined(chart.y().scale.ticks)) {
+            var grid = new charts.geom.hline()
+                          .vals(chart.y().scale.ticks())
+                          .chart(chart)
+                          .xVar(chart.xVar())
+                          .yVar(chart.yVar())
+                          .grid(true)
+            chart.svgs.each(function() {
+              d3.select(this).call(grid.draw)
+            })
+          } else {
+            chart.svgs.each(function() {
+              d3.select(this).selectAll('.geom-grid-horiz')
+                .transition().duration(chart.transitionTime())
+                .style('opacity', 0)
+                .remove()
+            })
+          }
+        }
         // doing all the data stuff before drawing
         // would allow cool things like ggplot free_space
         // each geom makes its own axis
@@ -276,32 +315,6 @@ charts.util.Frame = function Frame(selection, chart) {
           [margin.left, margin.top]:
           [margin.left + plotDim.width, margin.top];
 
-    defs.select('rect')
-      .attr('width', plotDim.width)
-      .attr('height', plotDim.height);
-    defs.enter()
-      .append('defs')
-      .append('clipPath')
-      .attr('id', function() {
-        return d + "-" + "clip";
-      })
-      .append('rect')
-      .attr('width', plotDim.width + 2)
-      .attr('height', plotDim.height + 1);
-    gch
-      .attr('class', 'chart')
-      .attr('transform', 'translate(' + 
-            plotDim.translate + ")")
-      .attr('clip-path', function() {
-        return 'url(#' + d + "-clip)";
-      });
-    gch.enter().append('g')
-      .attr('class', 'chart')
-      .attr('transform', 'translate(' + 
-            plotDim.translate + ")")
-      .attr('clip-path', function() {
-        return 'url(#' + d + "-clip)";
-      });
     gy.attr('transform', "translate(" + 
             gyTranslate + ")");
     gy.enter().append('g')
@@ -330,6 +343,32 @@ charts.util.Frame = function Frame(selection, chart) {
                                margin.left, plotDim.height,
                                gyTranslate)
     }
+    defs.select('rect')
+      .attr('width', plotDim.width)
+      .attr('height', plotDim.height);
+    defs.enter()
+      .append('defs')
+      .append('clipPath')
+      .attr('id', function() {
+        return d + "-" + "clip";
+      })
+      .append('rect')
+      .attr('width', plotDim.width + 2)
+      .attr('height', plotDim.height + 1);
+    gch
+      .attr('class', 'chart')
+      .attr('transform', 'translate(' + 
+            plotDim.translate + ")")
+      .attr('clip-path', function() {
+        return 'url(#' + d + "-clip)";
+      });
+    gch.enter().append('g')
+      .attr('class', 'chart')
+      .attr('transform', 'translate(' + 
+            plotDim.translate + ")")
+      .attr('clip-path', function() {
+        return 'url(#' + d + "-clip)";
+      });
     if(chart.brush()){
       var br = svg.select('.chart')
                   .selectAll('rect.brushframe').data([1]);
@@ -638,9 +677,10 @@ charts.geom.abLine = function(specs) {
     // vals: [null],
     grid: false, // use this geom to make gridlines
     orient: "ab",
-    yint: null,
-    xint: null,
-    slope: null,
+    yints: null,
+    xints: null,
+    slopes: null,
+    singleColor: "grey"
   };
   // allow passing in of settings as an argument
   if(typeof specs === "object"){
@@ -704,9 +744,9 @@ charts.geom.abLine = function(specs) {
   geom.selector = function() {
     var selector = geom.grid() ? "geom-grid":"geom-"
     if(geom.orient() == 'vertical') {
-      selector += 'vert';
+      selector += '-vert';
     } else if (geom.orient() === 'horizontal'){
-      selector += 'horiz';
+      selector += '-horiz';
     } else if (geom.orient() === "ab"){
       selector += "ab";
     }
@@ -728,6 +768,13 @@ charts.geom.abLine = function(specs) {
           return true
         }
         break;
+      case "ab":
+        if(!_.isUndefined(geom.chart().x().scale.rangeBand) | 
+           !_.isUndefined(geom.chart().y().scale.rangeBand)){
+          console.error("both x and y must be continuous")
+          return true;
+        }
+        break;
       default:
         return false;
     }
@@ -739,6 +786,7 @@ charts.geom.abLine = function(specs) {
                     return d['ypos'];});
   var usingFacet = false;
   function generateLineData(arr, orient) {
+    var plotDim = geom.chart().plotDim(geom.chart().attributes);
     var s1 = orient == "x" ? geom.x().scale: geom.y().scale,
         s2 = orient == "x" ? geom.y().scale: geom.x().scale,
         v1 = orient == "x" ? geom.xVar(): geom.yVar(),
@@ -755,7 +803,7 @@ charts.geom.abLine = function(specs) {
         geom.color(d3.functor("gray"))
       }
       _.map(arr, function(d) {
-        if(hasRangeBand){
+        if(hasRangeBand & !geom.grid()){
           _.map(s2.domain(), function(oppAxisVal) {
             var o1 = {};
             o1[v1] = d;
@@ -771,17 +819,23 @@ charts.geom.abLine = function(specs) {
           o1[v1] = d
           o1[v2] = s2.domain()[0];
           o1[p1] = s1(d);
-          o1[p2] = s2(s2.domain()[0]);
+          o1[p2] = s2.range()[0];
           o2 = _.clone(o1);
           o2[v2] = s2.domain()[1];
-          o2[p2] = s2(s2.domain()[1]);
+          o2[p2] = s2.range()[1];
+          if(geom.grid() & !_.isUndefined(s2.rangeExtent)) {
+            o1[p2] = orient!="x" ? s2.rangeExtent()[0]:s2.rangeExtent()[1];
+            o2[p2] = orient=="x" ? s2.rangeExtent()[0]:s2.rangeExtent()[1];
+          }
           data.push([o1, o2]);
+
         }
       })
       usingFacet=false;
     } else if(_.all(_.map(arr, _.isObject))){
+      // they are objects
       _.map(arr, function(d) {
-        if(hasRangeBand){
+        if(hasRangeBand & !geom.grid()){
           var o1 = _.clone(d);
           o1[p1] = s1(d[v1]);
           o1[p2] = s2(d[v2]) + s2.rangeBand()/4;
@@ -832,7 +886,6 @@ charts.geom.abLine = function(specs) {
       })
       usingFacet = true;
     }
-    console.log(data)
     geom.lineData = data;
   }
   geom.prepData = function() {
@@ -842,7 +895,6 @@ charts.geom.abLine = function(specs) {
     // array of objects w/ agg function
     // and array of objects no agg function
     geom.lineData = [];
-    var plotDim = geom.chart().plotDim(geom.chart().attributes);
     switch(geom.orient()){
       case "horizontal":
         generateLineData(geom.vals(), "y")
@@ -853,6 +905,33 @@ charts.geom.abLine = function(specs) {
         generateLineData(geom.vals(), "x")
         break;
       case "ab":
+        // yints or xints and slopes
+        if(!_.isNull(geom.xints()) & !_.isNull(geom.yints())){
+          throw "specifying both yints and xints is not allowed"
+        }
+        // we don't want to use main color scale
+        if(geom.chart().color() == geom.color()){
+          geom.color(d3.functor(geom.singleColor()))
+        }
+        var intercepts = _.isNull(geom.xints()) ? geom.yints(): geom.xints(),
+            intName = _.isNull(geom.xints()) ? "ypos": "xpos",
+            otherName = !_.isNull(geom.xints()) ? "ypos": "xpos",
+            scale = _.isNull(geom.xints()) ? geom.x().scale: geom.y().scale,
+            scale2 = !_.isNull(geom.xints()) ? geom.x().scale: geom.y().scale,
+            domain = scale.domain();
+        if(intercepts.length !== geom.slopes().length){
+          throw "intercepts must be the same length as slopes"
+        }
+
+        var points = _.zip(intercepts,
+                           geom.slopes());
+        var data = _.map(points, function(p) {
+          return _.map(domain, function(d) {
+            return _.zipObject([intName, otherName], 
+                    [scale2(d*p[1] + p[0]), scale(d)])
+            })
+        });
+        geom.lineData = data;
 
         break;
       }
@@ -872,6 +951,7 @@ charts.geom.abLine = function(specs) {
     }
     geom.prepAxes(sel);
     geom.prepData();
+    var plotDim = geom.chart().plotDim(geom.chart().attributes);
     if(usingFacet){
       if(!_.isNull(geom.facet())){
         geom.lineData = _.filter(geom.lineData, function(d) {
@@ -881,10 +961,9 @@ charts.geom.abLine = function(specs) {
     }
     // do this because we want to append a line per
     // entry in data. the generators expect arrays
-
     var paths = sel.select('.chart')
-                  .selectAll("path." + selector.replace(" ", "."))
-                  .data(geom.lineData);
+    paths = paths.selectAll("path." + selector.replace(" ", "."))
+              .data(geom.lineData);
     paths
       .transition().duration(geom.transitionTime())
       .attr('d', geom.line)
@@ -1138,6 +1217,15 @@ charts.geom.point = function(specs) {
   return geom;
 };
   
+charts.geom.smooth = function() {
+  var v = new charts.geom.abLine()
+                  .orient('vertical')
+  // overwrite prepData
+  // to deliver linear or loess curves
+  // with optional SE area.
+  return v;
+}
+
 
 charts.geom.vline = function() {
   var v = new charts.geom.abLine()

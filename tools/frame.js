@@ -47,32 +47,6 @@ charts.util.Frame = function Frame(selection, chart) {
           [margin.left, margin.top]:
           [margin.left + plotDim.width, margin.top];
 
-    defs.select('rect')
-      .attr('width', plotDim.width)
-      .attr('height', plotDim.height);
-    defs.enter()
-      .append('defs')
-      .append('clipPath')
-      .attr('id', function() {
-        return d + "-" + "clip";
-      })
-      .append('rect')
-      .attr('width', plotDim.width + 2)
-      .attr('height', plotDim.height + 1);
-    gch
-      .attr('class', 'chart')
-      .attr('transform', 'translate(' + 
-            plotDim.translate + ")")
-      .attr('clip-path', function() {
-        return 'url(#' + d + "-clip)";
-      });
-    gch.enter().append('g')
-      .attr('class', 'chart')
-      .attr('transform', 'translate(' + 
-            plotDim.translate + ")")
-      .attr('clip-path', function() {
-        return 'url(#' + d + "-clip)";
-      });
     gy.attr('transform', "translate(" + 
             gyTranslate + ")");
     gy.enter().append('g')
@@ -101,6 +75,32 @@ charts.util.Frame = function Frame(selection, chart) {
                                margin.left, plotDim.height,
                                gyTranslate)
     }
+    defs.select('rect')
+      .attr('width', plotDim.width)
+      .attr('height', plotDim.height);
+    defs.enter()
+      .append('defs')
+      .append('clipPath')
+      .attr('id', function() {
+        return d + "-" + "clip";
+      })
+      .append('rect')
+      .attr('width', plotDim.width + 2)
+      .attr('height', plotDim.height + 1);
+    gch
+      .attr('class', 'chart')
+      .attr('transform', 'translate(' + 
+            plotDim.translate + ")")
+      .attr('clip-path', function() {
+        return 'url(#' + d + "-clip)";
+      });
+    gch.enter().append('g')
+      .attr('class', 'chart')
+      .attr('transform', 'translate(' + 
+            plotDim.translate + ")")
+      .attr('clip-path', function() {
+        return 'url(#' + d + "-clip)";
+      });
     if(chart.brush()){
       var br = svg.select('.chart')
                   .selectAll('rect.brushframe').data([1]);
