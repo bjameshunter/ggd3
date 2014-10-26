@@ -37,7 +37,8 @@ charts.geom.BaseGeom = function (specs){
     newData: true,
     geom: null, // just add more geoms!?
     first: false,
-    order: 0
+    order: 0,
+    newData:true
   };
   // overwrite or add new elements to default settings.
   if(typeof specs === "object"){

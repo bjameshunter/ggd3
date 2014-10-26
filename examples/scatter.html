@@ -7,9 +7,9 @@
 <body>
 <div>
 <select id="dataset" class='btn btn-primary'>
-  <option value="mtcars.csv" id='cars' selected>cars</option>
-  <option value="iris.csv" id='iris'>iris</option>
-  <option value="diamonds.csv" id='diamonds'>diamonds</option>
+  <option value="mtcars.csv" id='cars' >cars</option>
+  <option value="iris.csv" id='iris' selected>iris</option>
+  <option value="diamonds.csv" id='diamonds' >diamonds</option>
 </select>    
 <select id="xVar" class='btn btn-primary'>
 </select>    
@@ -21,19 +21,17 @@
 // geom objects are tricky. Charts don't pass them info
 // unless that variable is not declared on the geom.
 var point = new charts.geom.point()
-                    // .xVar('gear')
-                    // .yVar('mpg')
-                    .colorVar('mpg')
-var hline1 = new charts.geom.hline()
+var oneTwoH = new charts.geom.hline()
                   .vals([100, 200]) 
-var hline2 = new charts.geom.hline()
-                  .vals([300, 40])
-var hline3 = new charts.geom.abLine()
+var randomH = new charts.geom.hline()
+var slopes = new charts.geom.abLine()
                     .yints([20, 30, 40])
                     .slopes([10, 15, 20])
                     .singleColor('orange')
 
-var vline1 = new charts.geom.vline()
+var randomV = new charts.geom.vline()
+var ten20V = new charts.geom.vline()
+                    .vals([10,20])
 // should be able to 
 // enter a single y value or array of yvalues
 // or array of objects with appropriate
@@ -41,25 +39,29 @@ var vline1 = new charts.geom.vline()
 var div = d3.select('#chart01')
 var scatter = {
   "mtcars.csv": {"chart":charts.chart()
-                      .geom(["point", vline1])
+                      .geom([point, slopes, randomV, randomH])
                       .xVar("mpg")
                       .yVar('disp')
+                      .xFree(true)
+                      // .yFree(true)
                       .sizeVar('drat')
                       .sizeRange([3,10])
                       .colorVar('gear')
                       .facet('am')
                       .height(300)
                       .width(300)
-                      .axesPosition(['bottom','right'])
+                      .axesPosition(['bottom','left'])
                       .axesOrient(['bottom', 'left'])
                     ,"header":["mpg", "cyl", "disp", "hp", "drat", 
                     "wt", "qsec", "vs", "am", 
                     "gear", "carb"]},
   "iris.csv": {'chart':charts.chart()
-                    .geom(['point'])
+                    .geom([point, randomH, randomV])
                     .facet("Species")
                     .yVar('Petal.Length')
                     .lineWidth(1)
+                    .xFree(true)
+                    .yFree(true)
                     .xVar('Species')
                     .sizeVar('Sepal.Width')
                     .colorVar('Species')
@@ -71,7 +73,7 @@ var scatter = {
                     "Sepal.Width"]},
   
   "diamonds.csv": {"chart":charts.chart()
-                    .geom(['point'])
+                    .geom(['point', oneTwoH, randomV, randomH, slopes])
                     .xVar("cut")
                     .yVar('price')
                     .facet("color")
@@ -112,28 +114,33 @@ function redraw(dataset) {
     });
   yChoice.exit().remove()
   d3.csv("../data/" + dataset, function(error, data) {
-    chart.data(data);
-    hline3.vals(_.sample(data, 3))
-    vline1.vals(_.sample(data, 3))
+    chart.data(data)
+    randomV.vals(_.sample(data, 3))
+      .newData(true)
+    randomH.vals(_.sample(data, 3))
+      .newData(true)
     div.call(chart.draw);
   })
-
-
 };
 redraw($('#dataset')[0].value)
 $("#dataset").on('change', function() {
-  redraw(this.value)})
+  point.newData(true)
+    .color(d3.scale.category10())
+  randomH.newData(true)
+  randomV.newData(true)
+  ten20V.newData(true)
+  slopes.newData(true)
+  redraw(this.value)
+})
 
 xButton.on('change', function() {
-  for(var i = 0; i < chart.geom().length; i++){
-    chart.geom()[i].xVar(this.value)
-  }
+  chart.xVar(this.value)
+  chart.geom()[0].xVar(this.value)
   div.call(chart.draw);
 });
 yButton.on('change', function() {
-  for(var i = 0; i < chart.geom().length; i++){
-    chart.geom()[i].yVar(this.value)
-  }
+  chart.yVar(this.value)
+  chart.geom()[0].yVar(this.value)
   div.call(chart.draw);
 });
 </script>

@@ -91,7 +91,7 @@ charts.chart = function(specs){
       var geoms = chart.geom(),
           // array of features geoms inherit
           inherit = ["sizeVar", "sizeRange",
-          "xVar", "yVar", "colorVar", "facet", "lineWidth"]; 
+          "xVar", "yVar", "colorVar", "facet"]; 
       for(var i = 0; i < geoms.length; i++){
         if(typeof geoms[i] !== "object"){
           // default geom
@@ -103,23 +103,44 @@ charts.chart = function(specs){
             }
           })
         } else {
-          // allow chart-level declarations
-          // to pass to geom if not declared on geom
+          // when using same geom object across different
+          // charts and datasets, everything needs to be reset.
+          // this doesn't do that.
+          // always update chart and facet.
           var geom = chart.geom()[i]
-                        .chart(chart);
-          inherit.forEach(function(d) {
-            if(geom.hasOwnProperty(d) & _.isNull(geom[d]())){
-              geom[d](chart[d]());
-            }
-          })
+                        .chart(chart)
+                        .facet(chart.facet())
+          // with abLine, perhaps other geoms, 
+          // important attributes should be reset.
+          if(geom.newData()){
+            inherit.forEach(function(d) {
+              if(geom.hasOwnProperty(d)){
+                geom[d](chart[d]());
+              }
+            })
+          } else {
+            inherit.forEach(function(d) {
+              if(geom.hasOwnProperty(d) & _.isNull(geom[d]())){
+                geom[d](chart[d]());
+              }
+            })
+          }
         }
         geom.order(i);
         geoms[i] = geom;
-        chart.xVar(geoms[0].xVar())
-        chart.yVar(geoms[0].yVar())
-        geoms[0].first(true);
-        chart.geom(geoms);
+        if (i == 0){
+          chart.xVar(geoms[0].xVar());
+          chart.yVar(geoms[0].yVar());
+          chart.color(geoms[0].color());
+          chart.x(geoms[0].x());
+          chart.y(geoms[0].y());
+        }
       }
+      // always set chart x and y to first geoms x and y
+      // the geom will decide which to use based on 
+      // xFree and yFree
+      geoms[0].first(true);
+      chart.geom(geoms);
     };
     chart.reCalculate = function(){
       // iterates through dataset and 
@@ -159,25 +180,18 @@ charts.chart = function(specs){
             dtypes = chart.dtypes(),
             specs;
       }
-      // if x axis is fixed across facets
-      if(!chart.xFree()){
-        specs = charts.tools.defineAxis(chart.xVar(), chart);
-        if(specs.type == 'ordinal'){
-          sel.selectAll('.xadjust').remove();
-        }
-        chart.x(new charts.tools.Axis('x', chart, 
-                ex.xExtent, specs))
+      specs = charts.tools.defineAxis(chart.xVar(), chart);
+      if(specs.type == 'ordinal'){
+        sel.selectAll('.xadjust').remove();
       }
-      // if y axis is fixed across facets
-      if(!chart.yFree()){
-        specs = charts.tools.defineAxis(chart.yVar(), chart);
-        if(specs.type == 'ordinal'){
-          sel.selectAll('.yadjust').remove();
-        }
-        chart.y(new charts.tools.Axis('y', chart, 
-                ex.yExtent, specs))
+      chart.x(new charts.tools.Axis('x', chart, 
+              ex.xExtent, specs))
+      specs = charts.tools.defineAxis(chart.yVar(), chart);
+      if(specs.type == 'ordinal'){
+        sel.selectAll('.yadjust').remove();
       }
-      // always set sizeVar
+      chart.y(new charts.tools.Axis('y', chart, 
+              ex.yExtent, specs))
       chart.size().domain(ex.sExtent.length > 0 ? 
                           d3.extent(ex.sExtent):
                           d3.extent([1]))
@@ -207,16 +221,10 @@ charts.chart = function(specs){
     chart.draw = function(sel, facet) {
       // sel is the topmost level element
       // div on which chart.draw is called.
-      // when updating a single plot within a 
-      // faceted chart, something else needs to be
-      // done.
-      // filer chart.svgs for those being updated?
-      // then reset chart.svgs to original value?
       sel.each(function() {
-        // get x and y domains
-        // if not xFree and yFree, set chart-level axes;
+
         var data = chart.data();
-        // find out when this needs to be called
+
         charts.util.Frame(sel, chart);
         if(!_.isUndefined(facet)) {
           chart.svgs = chart.svgs.filter(function(d) {
@@ -230,51 +238,52 @@ charts.chart = function(specs){
 
         if(chart.grid()){
           if(!_.isUndefined(chart.x().scale.ticks)) {
-            var grid = new charts.geom.vline()
-                          .vals(chart.x().scale.ticks())
+
+            var xGrid = new charts.geom.vline()
                           .chart(chart)
                           .xVar(chart.xVar())
                           .yVar(chart.yVar())
                           .grid(true)
-            chart.svgs.each(function() {
-              d3.select(this).call(grid.draw)
-            })
-          } else {
-            chart.svgs.each(function() {
-              d3.select(this).selectAll('.geom-grid-vert')
-                .transition().duration(chart.transitionTime())
-                .style('opacity', 0)
-                .remove()
-            })
           }
           if(!_.isUndefined(chart.y().scale.ticks)) {
-            var grid = new charts.geom.hline()
-                          .vals(chart.y().scale.ticks())
+            var yGrid = new charts.geom.hline()
                           .chart(chart)
                           .xVar(chart.xVar())
                           .yVar(chart.yVar())
                           .grid(true)
-            chart.svgs.each(function() {
-              d3.select(this).call(grid.draw)
-            })
-          } else {
-            chart.svgs.each(function() {
-              d3.select(this).selectAll('.geom-grid-horiz')
-                .transition().duration(chart.transitionTime())
-                .style('opacity', 0)
-                .remove()
-            })
           }
         }
-        // doing all the data stuff before drawing
-        // would allow cool things like ggplot free_space
-        // each geom makes its own axis
-        // only the first in the series gets drawn.
-        // subsequent geoms will inherit first axes
+
         var geoms = chart.geom();
         chart.svgs
           .each(function(d, i) {
             var s = d3.select(this);
+            // by now, chart.x and chart. y
+            // should know whether they are free or not
+            if(!_.isUndefined(chart.x().scale.ticks)){
+              xGrid.vals(chart.x().scale.ticks())
+                .data(data.filter(function(e) {
+                return e.key == d;
+              }))
+              s.call(xGrid.draw)
+            } else {
+              s.selectAll(".geom-grid-vert")
+                .transition().duration(chart.transitionTime())
+                .style('opacity', 0)
+                .remove()
+            }
+            if(!_.isUndefined(chart.y().scale.ticks)){
+              yGrid.vals(chart.y().scale.ticks())
+                .data(data.filter(function(e) {
+                return e.key == d;
+              }))
+              s.call(yGrid.draw)
+            } else {
+              s.selectAll(".geom-grid-horiz")
+                .transition().duration(chart.transitionTime())
+                .style('opacity', 0)
+                .remove()
+            }
             geoms.forEach(function(geom){
               // reset data
               geom = geom.data(data.filter(function(e) {
@@ -524,7 +533,7 @@ charts.util.BaseChart = function (newAttributes) {
   var attributes = {
     width: 600,
     height: 400,
-    margin: {top:40, bottom:40, left:40, right:40},
+    margin: {top:40, bottom:40, left:50, right:50},
     id: 'chart_id',
     legend: true,
     facet: null,
@@ -549,8 +558,8 @@ charts.util.BaseChart = function (newAttributes) {
     sizeVar: null,
     sizeRange: [3, 10],
     sizeFree: false,
-    lineWidth: 2,
-    color: d3.scale.category10(),
+    lineWidth: 3,
+    color: null,
     colorVar: null,
     colorFree: false,
     groupVar: null, // arbitrary groups, not necessarily color
@@ -596,6 +605,7 @@ charts.util.BaseChart.prototype.plotDim = function(attributes) {
 charts.util.BaseChart.prototype.data = function(data){
       if(!arguments.length){ return this.attributes.data; }
       this.attributes.data = data;
+      this.newData(true);
       this.reCalculate();
       this.newData(false);
       return this;
@@ -617,8 +627,8 @@ charts.tools.zeroDomain = function(range, zero) {
   }
   return range;
 };
-charts.tools.makeZoomRect = function(sel, chart, classId,
-                                       width, height, trans) {
+
+charts.tools.makeZoomRect = function(sel, chart, classId, width, height, trans) {
   var adj = sel.selectAll('rect.' + classId)
                 .data([1]);
   adj.attr('width', width)
@@ -655,9 +665,10 @@ charts.tools.domain = function(data, expand,
   }
   return extent
 }
+// function to collect data relevent to axes
+// 
 charts.tools.prepAxes = function(obj){
-  // the geom, second time around, will not listen if the
-  // chart's variables are changed. Maybe this is a good thing.
+
   var out = {xExtent: [],
         yExtent: [],
         cExtent: [],
@@ -685,6 +696,7 @@ charts.tools.defineAxis = function(varName, obj){
     var chart = obj.chart ? obj.chart(): obj,
         dtype = chart.dtypes()[varName],
         t;
+    //weird shit is happening here.
     if(dtype[0] === "number"  & dtype[1] === "many"){
       t = 'linear';
     } else {
@@ -702,7 +714,7 @@ charts.geom.abLine = function(specs) {
   // stat calculates a statistic for each group
   // y just draws a line at that y intercept
   var attributes = {
-    lineWidth: null,
+    lineWidth: 2,
     lineOpacity: 0.8,
     stat: null,
     vals: [null],
@@ -712,7 +724,10 @@ charts.geom.abLine = function(specs) {
     yints: null,
     xints: null,
     slopes: null,
-    singleColor: "grey"
+    singleColor: "grey",
+    // b/c we're using this to draw grid, needs dummy
+    // dataset.
+    data: null
   };
   // allow passing in of settings as an argument
   if(typeof specs === "object"){
@@ -768,19 +783,15 @@ charts.geom.abLine = function(specs) {
     min: aggregator(d3.min)
   }
 
-  // use area generators for lines
-  // allowing variables to set the width if desired
-  // y0 and y1 flank the center position by the 
-  // width of the line/2
-  // width for ordinal x axis doesn't make sense
+  // decides how to link data to elements
   geom.selector = function() {
-    var selector = geom.grid() ? "geom-grid":"geom-"
+    var selector = geom.grid() ? "geom-grid":"geom"
     if(geom.orient() == 'vertical') {
       selector += '-vert';
     } else if (geom.orient() === 'horizontal'){
       selector += '-horiz';
     } else if (geom.orient() === "ab"){
-      selector += "ab";
+      selector += "-ab";
     }
     selector += " order-" + geom.order()
     return selector;
@@ -990,6 +1001,7 @@ charts.geom.abLine = function(specs) {
       geom.color(d3.functor(undefined));
     }
     var plotDim = geom.chart().plotDim(geom.chart().attributes);
+    // filter lineData for what's in the facet
     if(usingFacet){
       if(!_.isNull(geom.facet())){
         geom.lineData = _.filter(geom.lineData, function(d) {
@@ -1000,8 +1012,8 @@ charts.geom.abLine = function(specs) {
     // do this because we want to append a line per
     // entry in data. the generators expect arrays
     var paths = sel.select('.chart')
-    paths = paths.selectAll("path." + selector.replace(" ", "."))
-              .data(geom.lineData);
+                  .selectAll("path." + selector.replace(" ", "."))
+                  .data(geom.lineData);
     paths
       .transition().duration(geom.transitionTime())
       .attr('d', geom.line)
@@ -1067,7 +1079,8 @@ charts.geom.BaseGeom = function (specs){
     newData: true,
     geom: null, // just add more geoms!?
     first: false,
-    order: 0
+    order: 0,
+    newData:true
   };
   // overwrite or add new elements to default settings.
   if(typeof specs === "object"){
@@ -1236,28 +1249,66 @@ charts.geom.point = function(specs) {
     // better to nest data beforehand, pass it to geom
     // to be able to set axes free or fixed.
     var data = geom.data()[0].values
-    if(data > chart.canvasThreshold){
+    if(data.length > geom.canvasThreshold()){
       sel.call(geom.drawCanvas);
-      return;
+    } else {
+      var circles = sel.select(".chart")
+                  .selectAll('circle.geom-point')
+                  .data(data);
+      circles.transition().duration(geom.transitionTime())
+        .attr(drawPoint());
+      circles.enter().append('circle')
+        .attr('class', 'geom-point')
+        .attr(drawPoint())
+        .style('opacity', geom.pointOpacity());
+      circles.exit()
+        .transition().duration(geom.transitionTime())
+        .style("opacity", 0)
+        .attr("r", 0)
+        .remove();
     }
-
-    var circles = sel.select(".chart")
-                .selectAll('circle.geom-point')
-                .data(data);
-    circles.transition().duration(geom.transitionTime())
-      .attr(drawPoint());
-    circles.enter().append('circle')
-      .attr('class', 'geom-point')
-      .attr(drawPoint())
-      .style('opacity', geom.pointOpacity());
-    circles.exit()
-      .transition().duration(geom.transitionTime())
-      .style("opacity", 0)
-      .attr("r", 0)
-      .remove();
   };
   geom.drawCanvas = function(sel) {
+    var chart = geom.chart(),
+        data = geom.data()[0].values,
+        plotDim = chart.plotDim(chart.attributes),
+        i = 0,
+        d, cx, cy, r, fill;
+    if(sel.select('.f-object').empty()){
+      console.log("empty")
 
+      // geom.canvas.clearRect(0, 0, plotDim.width, plotDim.height)
+      geom.canvas = sel.insert("foreignObject", "*")
+                    .attr('class', "f-object")
+                    .attr('width', plotDim.width)
+                    .attr('height', plotDim.height)
+                    .append("xhtml:body")
+                    .append('div')
+                    .style('position', 'relative')
+                    .style('left', plotDim.translate[0])
+                    .style('top', plotDim.translate[1])
+                    .append("canvas")
+                    .attr('width', plotDim.width)
+                    .attr('height', plotDim.height)
+                    .node().getContext('2d')
+    } else {
+      geom.canvas = sel.select('canvas').node().getContext('2d')
+    }
+          
+    geom.canvas.clearRect(0, 0, plotDim.width, plotDim.height)
+    geom.canvas.globalAlpha = geom.pointOpacity();
+    data.forEach(function(d) {
+      cx = geom.positionX(d,geom.xVar()),
+      cy = geom.positionY(d,geom.yVar()),
+      r = d3.functor(geom.size())(getSize(d)),
+      fill = d3.functor(geom.color())(d[geom.colorVar()])
+      geom.canvas.moveTo(cx, cy);
+      geom.canvas.beginPath();
+      geom.canvas.arc(cx, cy, r, 0, 2 * Math.PI);
+      geom.canvas.fillStyle = fill;
+      geom.canvas.closePath()
+      geom.canvas.fill();
+    })
   }
   return geom;
 };

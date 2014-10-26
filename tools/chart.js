@@ -34,7 +34,7 @@ charts.chart = function(specs){
       var geoms = chart.geom(),
           // array of features geoms inherit
           inherit = ["sizeVar", "sizeRange",
-          "xVar", "yVar", "colorVar", "facet", "lineWidth"]; 
+          "xVar", "yVar", "colorVar", "facet"]; 
       for(var i = 0; i < geoms.length; i++){
         if(typeof geoms[i] !== "object"){
           // default geom
@@ -46,23 +46,44 @@ charts.chart = function(specs){
             }
           })
         } else {
-          // allow chart-level declarations
-          // to pass to geom if not declared on geom
+          // when using same geom object across different
+          // charts and datasets, everything needs to be reset.
+          // this doesn't do that.
+          // always update chart and facet.
           var geom = chart.geom()[i]
-                        .chart(chart);
-          inherit.forEach(function(d) {
-            if(geom.hasOwnProperty(d) & _.isNull(geom[d]())){
-              geom[d](chart[d]());
-            }
-          })
+                        .chart(chart)
+                        .facet(chart.facet())
+          // with abLine, perhaps other geoms, 
+          // important attributes should be reset.
+          if(geom.newData()){
+            inherit.forEach(function(d) {
+              if(geom.hasOwnProperty(d)){
+                geom[d](chart[d]());
+              }
+            })
+          } else {
+            inherit.forEach(function(d) {
+              if(geom.hasOwnProperty(d) & _.isNull(geom[d]())){
+                geom[d](chart[d]());
+              }
+            })
+          }
         }
         geom.order(i);
         geoms[i] = geom;
-        chart.xVar(geoms[0].xVar())
-        chart.yVar(geoms[0].yVar())
-        geoms[0].first(true);
-        chart.geom(geoms);
+        if (i == 0){
+          chart.xVar(geoms[0].xVar());
+          chart.yVar(geoms[0].yVar());
+          chart.color(geoms[0].color());
+          chart.x(geoms[0].x());
+          chart.y(geoms[0].y());
+        }
       }
+      // always set chart x and y to first geoms x and y
+      // the geom will decide which to use based on 
+      // xFree and yFree
+      geoms[0].first(true);
+      chart.geom(geoms);
     };
     chart.reCalculate = function(){
       // iterates through dataset and 
@@ -102,25 +123,18 @@ charts.chart = function(specs){
             dtypes = chart.dtypes(),
             specs;
       }
-      // if x axis is fixed across facets
-      if(!chart.xFree()){
-        specs = charts.tools.defineAxis(chart.xVar(), chart);
-        if(specs.type == 'ordinal'){
-          sel.selectAll('.xadjust').remove();
-        }
-        chart.x(new charts.tools.Axis('x', chart, 
-                ex.xExtent, specs))
+      specs = charts.tools.defineAxis(chart.xVar(), chart);
+      if(specs.type == 'ordinal'){
+        sel.selectAll('.xadjust').remove();
       }
-      // if y axis is fixed across facets
-      if(!chart.yFree()){
-        specs = charts.tools.defineAxis(chart.yVar(), chart);
-        if(specs.type == 'ordinal'){
-          sel.selectAll('.yadjust').remove();
-        }
-        chart.y(new charts.tools.Axis('y', chart, 
-                ex.yExtent, specs))
+      chart.x(new charts.tools.Axis('x', chart, 
+              ex.xExtent, specs))
+      specs = charts.tools.defineAxis(chart.yVar(), chart);
+      if(specs.type == 'ordinal'){
+        sel.selectAll('.yadjust').remove();
       }
-      // always set sizeVar
+      chart.y(new charts.tools.Axis('y', chart, 
+              ex.yExtent, specs))
       chart.size().domain(ex.sExtent.length > 0 ? 
                           d3.extent(ex.sExtent):
                           d3.extent([1]))
@@ -150,16 +164,10 @@ charts.chart = function(specs){
     chart.draw = function(sel, facet) {
       // sel is the topmost level element
       // div on which chart.draw is called.
-      // when updating a single plot within a 
-      // faceted chart, something else needs to be
-      // done.
-      // filer chart.svgs for those being updated?
-      // then reset chart.svgs to original value?
       sel.each(function() {
-        // get x and y domains
-        // if not xFree and yFree, set chart-level axes;
+
         var data = chart.data();
-        // find out when this needs to be called
+
         charts.util.Frame(sel, chart);
         if(!_.isUndefined(facet)) {
           chart.svgs = chart.svgs.filter(function(d) {
@@ -173,51 +181,52 @@ charts.chart = function(specs){
 
         if(chart.grid()){
           if(!_.isUndefined(chart.x().scale.ticks)) {
-            var grid = new charts.geom.vline()
-                          .vals(chart.x().scale.ticks())
+
+            var xGrid = new charts.geom.vline()
                           .chart(chart)
                           .xVar(chart.xVar())
                           .yVar(chart.yVar())
                           .grid(true)
-            chart.svgs.each(function() {
-              d3.select(this).call(grid.draw)
-            })
-          } else {
-            chart.svgs.each(function() {
-              d3.select(this).selectAll('.geom-grid-vert')
-                .transition().duration(chart.transitionTime())
-                .style('opacity', 0)
-                .remove()
-            })
           }
           if(!_.isUndefined(chart.y().scale.ticks)) {
-            var grid = new charts.geom.hline()
-                          .vals(chart.y().scale.ticks())
+            var yGrid = new charts.geom.hline()
                           .chart(chart)
                           .xVar(chart.xVar())
                           .yVar(chart.yVar())
                           .grid(true)
-            chart.svgs.each(function() {
-              d3.select(this).call(grid.draw)
-            })
-          } else {
-            chart.svgs.each(function() {
-              d3.select(this).selectAll('.geom-grid-horiz')
-                .transition().duration(chart.transitionTime())
-                .style('opacity', 0)
-                .remove()
-            })
           }
         }
-        // doing all the data stuff before drawing
-        // would allow cool things like ggplot free_space
-        // each geom makes its own axis
-        // only the first in the series gets drawn.
-        // subsequent geoms will inherit first axes
+
         var geoms = chart.geom();
         chart.svgs
           .each(function(d, i) {
             var s = d3.select(this);
+            // by now, chart.x and chart. y
+            // should know whether they are free or not
+            if(!_.isUndefined(chart.x().scale.ticks)){
+              xGrid.vals(chart.x().scale.ticks())
+                .data(data.filter(function(e) {
+                return e.key == d;
+              }))
+              s.call(xGrid.draw)
+            } else {
+              s.selectAll(".geom-grid-vert")
+                .transition().duration(chart.transitionTime())
+                .style('opacity', 0)
+                .remove()
+            }
+            if(!_.isUndefined(chart.y().scale.ticks)){
+              yGrid.vals(chart.y().scale.ticks())
+                .data(data.filter(function(e) {
+                return e.key == d;
+              }))
+              s.call(yGrid.draw)
+            } else {
+              s.selectAll(".geom-grid-horiz")
+                .transition().duration(chart.transitionTime())
+                .style('opacity', 0)
+                .remove()
+            }
             geoms.forEach(function(geom){
               // reset data
               geom = geom.data(data.filter(function(e) {

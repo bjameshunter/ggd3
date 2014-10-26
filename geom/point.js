@@ -70,28 +70,66 @@ charts.geom.point = function(specs) {
     // better to nest data beforehand, pass it to geom
     // to be able to set axes free or fixed.
     var data = geom.data()[0].values
-    if(data > chart.canvasThreshold){
+    if(data.length > geom.canvasThreshold()){
       sel.call(geom.drawCanvas);
-      return;
+    } else {
+      var circles = sel.select(".chart")
+                  .selectAll('circle.geom-point')
+                  .data(data);
+      circles.transition().duration(geom.transitionTime())
+        .attr(drawPoint());
+      circles.enter().append('circle')
+        .attr('class', 'geom-point')
+        .attr(drawPoint())
+        .style('opacity', geom.pointOpacity());
+      circles.exit()
+        .transition().duration(geom.transitionTime())
+        .style("opacity", 0)
+        .attr("r", 0)
+        .remove();
     }
-
-    var circles = sel.select(".chart")
-                .selectAll('circle.geom-point')
-                .data(data);
-    circles.transition().duration(geom.transitionTime())
-      .attr(drawPoint());
-    circles.enter().append('circle')
-      .attr('class', 'geom-point')
-      .attr(drawPoint())
-      .style('opacity', geom.pointOpacity());
-    circles.exit()
-      .transition().duration(geom.transitionTime())
-      .style("opacity", 0)
-      .attr("r", 0)
-      .remove();
   };
   geom.drawCanvas = function(sel) {
+    var chart = geom.chart(),
+        data = geom.data()[0].values,
+        plotDim = chart.plotDim(chart.attributes),
+        i = 0,
+        d, cx, cy, r, fill;
+    if(sel.select('.f-object').empty()){
+      console.log("empty")
 
+      // geom.canvas.clearRect(0, 0, plotDim.width, plotDim.height)
+      geom.canvas = sel.insert("foreignObject", "*")
+                    .attr('class', "f-object")
+                    .attr('width', plotDim.width)
+                    .attr('height', plotDim.height)
+                    .append("xhtml:body")
+                    .append('div')
+                    .style('position', 'relative')
+                    .style('left', plotDim.translate[0])
+                    .style('top', plotDim.translate[1])
+                    .append("canvas")
+                    .attr('width', plotDim.width)
+                    .attr('height', plotDim.height)
+                    .node().getContext('2d')
+    } else {
+      geom.canvas = sel.select('canvas').node().getContext('2d')
+    }
+          
+    geom.canvas.clearRect(0, 0, plotDim.width, plotDim.height)
+    geom.canvas.globalAlpha = geom.pointOpacity();
+    data.forEach(function(d) {
+      cx = geom.positionX(d,geom.xVar()),
+      cy = geom.positionY(d,geom.yVar()),
+      r = d3.functor(geom.size())(getSize(d)),
+      fill = d3.functor(geom.color())(d[geom.colorVar()])
+      geom.canvas.moveTo(cx, cy);
+      geom.canvas.beginPath();
+      geom.canvas.arc(cx, cy, r, 0, 2 * Math.PI);
+      geom.canvas.fillStyle = fill;
+      geom.canvas.closePath()
+      geom.canvas.fill();
+    })
   }
   return geom;
 };

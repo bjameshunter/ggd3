@@ -7,8 +7,8 @@ charts.tools.zeroDomain = function(range, zero) {
   }
   return range;
 };
-charts.tools.makeZoomRect = function(sel, chart, classId,
-                                       width, height, trans) {
+
+charts.tools.makeZoomRect = function(sel, chart, classId, width, height, trans) {
   var adj = sel.selectAll('rect.' + classId)
                 .data([1]);
   adj.attr('width', width)
@@ -45,9 +45,10 @@ charts.tools.domain = function(data, expand,
   }
   return extent
 }
+// function to collect data relevent to axes
+// 
 charts.tools.prepAxes = function(obj){
-  // the geom, second time around, will not listen if the
-  // chart's variables are changed. Maybe this is a good thing.
+
   var out = {xExtent: [],
         yExtent: [],
         cExtent: [],
@@ -75,6 +76,7 @@ charts.tools.defineAxis = function(varName, obj){
     var chart = obj.chart ? obj.chart(): obj,
         dtype = chart.dtypes()[varName],
         t;
+    //weird shit is happening here.
     if(dtype[0] === "number"  & dtype[1] === "many"){
       t = 'linear';
     } else {

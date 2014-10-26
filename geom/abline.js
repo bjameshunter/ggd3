@@ -6,7 +6,7 @@ charts.geom.abLine = function(specs) {
   // stat calculates a statistic for each group
   // y just draws a line at that y intercept
   var attributes = {
-    lineWidth: null,
+    lineWidth: 2,
     lineOpacity: 0.8,
     stat: null,
     vals: [null],
@@ -16,7 +16,10 @@ charts.geom.abLine = function(specs) {
     yints: null,
     xints: null,
     slopes: null,
-    singleColor: "grey"
+    singleColor: "grey",
+    // b/c we're using this to draw grid, needs dummy
+    // dataset.
+    data: null
   };
   // allow passing in of settings as an argument
   if(typeof specs === "object"){
@@ -72,19 +75,15 @@ charts.geom.abLine = function(specs) {
     min: aggregator(d3.min)
   }
 
-  // use area generators for lines
-  // allowing variables to set the width if desired
-  // y0 and y1 flank the center position by the 
-  // width of the line/2
-  // width for ordinal x axis doesn't make sense
+  // decides how to link data to elements
   geom.selector = function() {
-    var selector = geom.grid() ? "geom-grid":"geom-"
+    var selector = geom.grid() ? "geom-grid":"geom"
     if(geom.orient() == 'vertical') {
       selector += '-vert';
     } else if (geom.orient() === 'horizontal'){
       selector += '-horiz';
     } else if (geom.orient() === "ab"){
-      selector += "ab";
+      selector += "-ab";
     }
     selector += " order-" + geom.order()
     return selector;
@@ -294,6 +293,7 @@ charts.geom.abLine = function(specs) {
       geom.color(d3.functor(undefined));
     }
     var plotDim = geom.chart().plotDim(geom.chart().attributes);
+    // filter lineData for what's in the facet
     if(usingFacet){
       if(!_.isNull(geom.facet())){
         geom.lineData = _.filter(geom.lineData, function(d) {
@@ -304,8 +304,8 @@ charts.geom.abLine = function(specs) {
     // do this because we want to append a line per
     // entry in data. the generators expect arrays
     var paths = sel.select('.chart')
-    paths = paths.selectAll("path." + selector.replace(" ", "."))
-              .data(geom.lineData);
+                  .selectAll("path." + selector.replace(" ", "."))
+                  .data(geom.lineData);
     paths
       .transition().duration(geom.transitionTime())
       .attr('d', geom.line)

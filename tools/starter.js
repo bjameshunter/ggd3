@@ -2,7 +2,7 @@ charts.util.BaseChart = function (newAttributes) {
   var attributes = {
     width: 600,
     height: 400,
-    margin: {top:40, bottom:40, left:40, right:40},
+    margin: {top:40, bottom:40, left:50, right:50},
     id: 'chart_id',
     legend: true,
     facet: null,
@@ -27,8 +27,8 @@ charts.util.BaseChart = function (newAttributes) {
     sizeVar: null,
     sizeRange: [3, 10],
     sizeFree: false,
-    lineWidth: 2,
-    color: d3.scale.category10(),
+    lineWidth: 3,
+    color: null,
     colorVar: null,
     colorFree: false,
     groupVar: null, // arbitrary groups, not necessarily color
@@ -74,6 +74,7 @@ charts.util.BaseChart.prototype.plotDim = function(attributes) {
 charts.util.BaseChart.prototype.data = function(data){
       if(!arguments.length){ return this.attributes.data; }
       this.attributes.data = data;
+      this.newData(true);
       this.reCalculate();
       this.newData(false);
       return this;
