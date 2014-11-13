@@ -2,23 +2,21 @@
 <head>
 <link rel='stylesheet' href='../css/style.css'>
 <link rel='stylesheet' href='../node_modules/bootstrap/dist/css/bootstrap.css'>
-<script type='text/javascript' src='../ggd3.standalone.js'></script></head>
+<script type='text/javascript' src='../node_modules/jquery/dist/jquery.js'></script></head>
+<script type='text/javascript' src='../node_modules/d3/d3.min.js'></script></head>
+<script type='text/javascript' src='../node_modules/lodash/lodash.js'></script></head>
+<script type='text/javascript' src='../dist/ggd3.v.0.1.0.js'></script></head>
 </head>
 <body>
 <div id='chart01' class='chart-frame'></div>
 <script>
 var ch;
-var div = d3.select('#chart01')
-d3.csv('../data/baseball.csv', function(error, cars) {
+d3.csv('../data/mtcars.csv', function(error, cars) {
 
 ch = new ggd3.plot(/* top-level aes */)
 //           .layers(/* string or layer object*/)
-          .layers(['bar'])
+          .facet({"x": "am"})
           .data(cars)
-          .width(200)
-          .height(200)
-          .aes({"x": "year", "y": "ab"})
-          .xAdjust(true);
 //           .scaleX(/* d3 axis or scale specs 
 //                   {axis: {}, scale: {}}*/)
 //           .scaleY(/* d3 axis or scale specs 
@@ -32,16 +30,15 @@ ch = new ggd3.plot(/* top-level aes */)
 //           .data(/* optional data, otherwise 
 //                 inherits from parent chart */)
 
-var facet = new ggd3.facet()
-              .x("decade")
-              .y("team")
-              .type("grid")
-              .scales('free_x');
-              // .scales( string, one of 
-              //         "free_x", "free_y", "free" )
-              // .space(/* string - maybe - to calculate
+// var facet = ggd3.facet()
+//               .x(/* string */)
+//               .y(/* string */)
+//               .grid(/* boolean */)
+//               .scales(/* string, one of 
+//                       "free_x", "free_y", "free" */)
+//               .space(/* string - maybe - to calculate
 //               size of plot based on range of data in facet */)
-div.call(ch.facet(facet).draw());
+d3.select('#chart01').call(ch.draw());
 })
 </script>
 </body>

@@ -2,18 +2,18 @@
 jQuery = require('./node_modules/jquery/dist/jquery.js');
 _ = require('lodash');
 var d3 = require('d3');
-crossfilter = require('crossfilter');
-var charts = require('./dist/charts.v.0.1.0.js');
+var crossfilter = require('crossfilter');
 require('draggable');
 require('bootstrap');
 $ = jQuery;
-},{"./dist/charts.v.0.1.0.js":2,"./node_modules/jquery/dist/jquery.js":11,"bootstrap":3,"crossfilter":5,"d3":6,"draggable":8,"lodash":12}],2:[function(require,module,exports){
+var ggd3 = require('./dist/ggd3.v.0.1.0.js');
+
+},{"./dist/ggd3.v.0.1.0.js":2,"./node_modules/jquery/dist/jquery.js":11,"bootstrap":3,"crossfilter":5,"d3":6,"draggable":8,"lodash":12}],2:[function(require,module,exports){
 !function() {
-  var charts = {version: "0.1.0",
-                util: {}, 
-                geom: {},
+  var ggd3 = {version: "0.1.0",
                 tools: {},
-                layouts: {},
+                geoms: {},
+                stats: {},
                 };
   function createAccessor(attr){
     function accessor(value){
@@ -23,479 +23,30 @@ $ = jQuery;
     }
     return accessor;
   }
-
-
-charts.tools.Axis = function(position, obj, data, specs) {
-  var chart = obj.chart ? obj.chart(): obj,
-      attributes = {
-        orient: position == 'x' ? chart.axesPosition()[0]:
-          chart.axesPosition()[1],
-        type: 'linear'
-      },
-      plotDim = chart.plotDim(chart.attributes)
-      dim = position == "x" ? [0, plotDim.width]:
-                             [plotDim.height, 0];
-  if(typeof specs === "object"){
-    for(var attr in specs){
-      attributes[attr] = specs[attr];
-    }
-  };
-
-  this.attributes = attributes;
-  for(var attr in attributes){
-    if((!this[attr] && attributes.hasOwnProperty(attr))){
-      this[attr] = createAccessor(attr);
-    }
-  };
-  if(this.type() == "linear"){
-    this.scale = d3.scale[this.type()]()
-                  .range(dim)
-                  .domain(charts.tools.domain(data,
-                          true, true, true))
-                  .nice();
-  } else if (this.type() == "ordinal"){
-    this.scale = d3.scale[this.type()]()
-                  .rangeRoundBands(dim)
-                  .domain(_.sortBy(_.unique(data)));
-  }
-  this.axis = d3.svg.axis()
-              .orient(attributes.orient)
-              .scale(this.scale);
-  return this;
-};
-
-
-// don't really know why this inherits from Starter
-// may combine them
-// need to mount a bunch of private variable info
-// to see what needs to be updated within
-// chart.draw
-charts.chart = function(specs){
-    var attributes = {
-      xAdjust: true,
-      yAdjust: true,
-      brush: true,
-      brushRange: null,
-      grid: true,
-      legend: true,
-      geom: [],
-      sizeFree: false,
-      xFormat: d3.format("2,.1f"),
-      yFormat: d3.format("2,.1f"),
-    };
-
-    if(typeof specs === "object"){
-      for(var attr in specs){
-        attributes[attr] = specs[attr];
-      }
-    }
-    // pass defaults to Starter
-    var chart = new charts.util.BaseChart(attributes);
-
-    chart.setGeoms = function () {
-      // geoms inherit attributes from chart if those 
-      // attributes are not declared on the geom
-      // when updating a chart, reset variables on the 
-      // FIRST geom - those will be passed to the chart
-      // object during this step.
-      var geoms = chart.geom(),
-          // array of features geoms inherit
-          inherit = ["sizeVar", "sizeRange",
-          "xVar", "yVar", "colorVar", "facet"]; 
-      for(var i = 0; i < geoms.length; i++){
-        if(typeof geoms[i] !== "object"){
-          // default geom
-          var geom = new charts.geom[chart.geom()[i]]()
-                            .chart(chart);
-          inherit.forEach(function(d) {
-            if(geom.hasOwnProperty(d) & _.isNull(geom[d]())){
-              geom[d](chart[d]());
-            }
-          })
-        } else {
-          // when using same geom object across different
-          // charts and datasets, everything needs to be reset.
-          // this doesn't do that.
-          // always update chart and facet.
-          var geom = chart.geom()[i]
-                        .chart(chart)
-                        .facet(chart.facet())
-          // with abLine, perhaps other geoms, 
-          // important attributes should be reset.
-          if(geom.newData()){
-            inherit.forEach(function(d) {
-              if(geom.hasOwnProperty(d)){
-                geom[d](chart[d]());
-              }
-            })
-          } else {
-            inherit.forEach(function(d) {
-              if(geom.hasOwnProperty(d) & _.isNull(geom[d]())){
-                geom[d](chart[d]());
-              }
-            })
-          }
-        }
-        geom.order(i);
-        geoms[i] = geom;
-        if (i == 0){
-          chart.xVar(geoms[0].xVar());
-          chart.yVar(geoms[0].yVar());
-          chart.color(geoms[0].color());
-          chart.x(geoms[0].x());
-          chart.y(geoms[0].y());
-        }
-      }
-      // always set chart x and y to first geoms x and y
-      // the geom will decide which to use based on 
-      // xFree and yFree
-      geoms[0].first(true);
-      chart.geom(geoms);
-    };
-    chart.reCalculate = function(){
-      // iterates through dataset and 
-      // sets dtype object on chart.
-      // this is performed every time .data() is called
-      // with an argument. Data must be the last thing
-      // added to the chart because this step requires
-      // knowing about the geoms
-      chart.setGeoms();
-      var data = charts.tools.setDataTypes(chart);
-      if(!_.isNull(chart.facet())){
-        chart.facets(_.unique(_.map(data, 
-                      function(d) {
-                        return d[chart.facet()];
-                      })
-                    )
-        );
-        chart.attributes.data = d3.nest()
-                                .key(function(d) {
-                                  return d[chart.facet()];
-                                })
-                                .entries(data)
-      } else {
-        chart.attributes.data = [{"key":"single", "values":data}];
-      }
-    }
-    chart.prepAxes = function(sel) {
-      // a lot of passing through the data
-      // find a way to do it as little as possible
-      // add switch to not calculate this
-      // when zooming an axis.
-      if(chart.scales()){
-        // are any of the scales declared at chart level?
-        // if so, just scan the dataset once and 
-        // coerce and record all datatypes
-        var ex = charts.tools.prepAxes(chart),
-            dtypes = chart.dtypes(),
-            specs;
-      }
-      specs = charts.tools.defineAxis(chart.xVar(), chart);
-      if(specs.type == 'ordinal'){
-        sel.selectAll('.xadjust').remove();
-      }
-      chart.x(new charts.tools.Axis('x', chart, 
-              ex.xExtent, specs))
-      specs = charts.tools.defineAxis(chart.yVar(), chart);
-      if(specs.type == 'ordinal'){
-        sel.selectAll('.yadjust').remove();
-      }
-      chart.y(new charts.tools.Axis('y', chart, 
-              ex.yExtent, specs))
-      chart.size().domain(ex.sExtent.length > 0 ? 
-                          d3.extent(ex.sExtent):
-                          d3.extent([1]))
-                  .range(d3.extent(_.flatten(
-                         [chart.sizeRange()])))
-      // add setting color here      
-    }
-    // zoom should be called on the first geom's axis
-    // if it is continuous and requested by user
-    var makeZoom = function() {
-      var zoomer = d3.behavior.zoom()[axis](scale)
-      geom.svgs.each(function() {
-
-
-      })
-
-    }
-    // do I add a chart.prepareChart method to 
-    // set stuff up after adding all the settings?
-    // chart.prepareChart() {
-    //     chart.setGeoms();
-    //     chart.prepAxes(sel);
-    //     chart.makeZoome();
-    // etc.
-
-    // }
-    chart.draw = function(sel, facet) {
-      // sel is the topmost level element
-      // div on which chart.draw is called.
-      sel.each(function() {
-
-        var data = chart.data();
-
-        charts.util.Frame(sel, chart);
-        if(!_.isUndefined(facet)) {
-          chart.svgs = chart.svgs.filter(function(d) {
-            return d == facet;
-          })
-        }
-        // first set chart-level axes if we want them
-        // if we don't, the first geom will set them
-        chart.setGeoms();
-        chart.prepAxes(sel);
-
-        if(chart.grid()){
-          if(!_.isUndefined(chart.x().scale.ticks)) {
-
-            var xGrid = new charts.geom.vline()
-                          .chart(chart)
-                          .xVar(chart.xVar())
-                          .yVar(chart.yVar())
-                          .grid(true)
-          }
-          if(!_.isUndefined(chart.y().scale.ticks)) {
-            var yGrid = new charts.geom.hline()
-                          .chart(chart)
-                          .xVar(chart.xVar())
-                          .yVar(chart.yVar())
-                          .grid(true)
-          }
-        }
-
-        var geoms = chart.geom();
-        chart.svgs
-          .each(function(d, i) {
-            var s = d3.select(this);
-            // by now, chart.x and chart. y
-            // should know whether they are free or not
-            if(!_.isUndefined(chart.x().scale.ticks)){
-              xGrid.vals(chart.x().scale.ticks())
-                .data(data.filter(function(e) {
-                return e.key == d;
-              }))
-              s.call(xGrid.draw)
-            } else {
-              s.selectAll(".geom-grid-vert")
-                .transition().duration(chart.transitionTime())
-                .style('opacity', 0)
-                .remove()
-            }
-            if(!_.isUndefined(chart.y().scale.ticks)){
-              yGrid.vals(chart.y().scale.ticks())
-                .data(data.filter(function(e) {
-                return e.key == d;
-              }))
-              s.call(yGrid.draw)
-            } else {
-              s.selectAll(".geom-grid-horiz")
-                .transition().duration(chart.transitionTime())
-                .style('opacity', 0)
-                .remove()
-            }
-            geoms.forEach(function(geom){
-              // reset data
-              geom = geom.data(data.filter(function(e) {
-                return e.key == d;
-              }));
-              s.call(geom.draw);
-            });
-            // only call axes for first geom
-            s.select('.x-axis')
-              .transition().duration(chart.transitionTime())
-              .call(geoms[0].x().axis);
-            s.select('.y-axis')
-              .transition().duration(chart.transitionTime())
-              .call(geoms[0].y().axis);
-          });
-
-      });
-
-    };
-    return chart;
-  };
-
-charts.util.Frame = function Frame(selection, chart) {
-  // returns a array of svg selections or a single svg
-  // each with a clipPath with id set to "<facet>-clip"
-
-  var id = chart.id(),
-      div = selection.selectAll('div.outer')
-              .data([1]),
-      facet = chart.facets(),
-      plotDim = chart.plotDim(chart.attributes),
-      margin = chart.margin();
-  div.attr('id', 'frame-' + id)
-     .attr('class', 'outer');
-  div.enter().append('div')
-     .attr('class', 'outer')
-     .attr('id', 'frame-' + id)
-     .each(function(d) {
-      d3.select(this).insert('div', "*")
-       .attr('id', 'legend-' + id)
-       .call(legend);
-     });
-  div.exit().remove();
-  // not to be kept here
-  function legend(div){
-    div.style('width', 50)
-      .style('height', 50)
-      .append('svg')
-      .append('rect')
-      .attr('width', 50)
-      .attr('height', 50)
-      .attr('fill', 'orange');
-  $(div.node()).draggable({containment: "parent"});
-  }
-  function setup(svg, d){
-    var defs = svg.selectAll('defs')
-                .data([1]),
-        gch = svg.selectAll('g.chart')
-                .data([1]),
-        gx = svg.selectAll('g.x-axis')
-                .data([1]),
-        gy = svg.selectAll('g.y-axis')
-                .data([1]),
-        axesPosition = chart.axesPosition(),
-        gxTranslate = axesPosition[0] == "bottom" ? 
-          [margin.left, margin.top + plotDim.height]:
-          [margin.left, margin.top],
-        gyTranslate = axesPosition[1] == "left" ?
-          [margin.left, margin.top]:
-          [margin.left + plotDim.width, margin.top];
-
-    gy.attr('transform', "translate(" + 
-            gyTranslate + ")");
-    gy.enter().append('g')
-      .attr('class', 'y-axis')
-      .attr('transform', "translate(" + 
-            gyTranslate + ")");
-    gx.attr('transform', "translate(" + 
-            gxTranslate + ")");
-    gx.enter().append('g')
-      .attr('class', 'x-axis')
-      .attr('transform', "translate(" + 
-            gxTranslate + ")");
-    if(chart.xAdjust()){
-      if(axesPosition[0]=="top"){
-        gxTranslate[1] = gxTranslate[1] - margin.top;
-      }
-      charts.tools.makeZoomRect(svg, chart, 'xadjust',
-                               plotDim.width, margin.bottom,
-                               gxTranslate)
-    }
-    if(chart.yAdjust()){
-      if(axesPosition[1] == "left"){
-        gyTranslate[0] -= margin.left;
-      }
-      charts.tools.makeZoomRect(svg, chart, 'yadjust',
-                               margin.left, plotDim.height,
-                               gyTranslate)
-    }
-    defs.select('rect')
-      .attr('width', plotDim.width)
-      .attr('height', plotDim.height);
-    defs.enter()
-      .append('defs')
-      .append('clipPath')
-      .attr('id', function() {
-        return d + "-" + "clip";
-      })
-      .append('rect')
-      .attr('width', plotDim.width + 2)
-      .attr('height', plotDim.height + 1);
-    gch
-      .attr('class', 'chart')
-      .attr('transform', 'translate(' + 
-            plotDim.translate + ")")
-      .attr('clip-path', function() {
-        return 'url(#' + d + "-clip)";
-      });
-    gch.enter().append('g')
-      .attr('class', 'chart')
-      .attr('transform', 'translate(' + 
-            plotDim.translate + ")")
-      .attr('clip-path', function() {
-        return 'url(#' + d + "-clip)";
-      });
-    if(chart.brush()){
-      var br = svg.select('.chart')
-                  .selectAll('rect.brushframe').data([1]);
-      br.attr('width', plotDim.width)
-        .attr('height', plotDim.height);
-      br.enter().append('rect')
-          .attr('class', 'brushframe')
-          .attr('width', plotDim.width)
-          .attr('height', plotDim.height);
-    }
-  }
-  var svg = div.selectAll('svg.plot')
-        .data(facet ? facet:['single'], _.identity);
-  svg
-    .each(function(d) {
-      d3.select(this)
-        .attr({width:chart.width(), height:chart.height()})
-        .call(setup, d);
-    });
-  svg.enter()
-    .append('svg')
-    .attr({width:0, height:0, 'fill-opacity':0})
-    .each(function(d) {
-      d3.select(this)
-        .attr('class', 'plot')
-        .attr({width:chart.width(), height:chart.height(), 'fill-opacity':1})
-        .attr('id', function(d) {
-          return d + '-' + id;
-        })
-        .call(setup, d);
-    });
-  // transitioning through different datasets presents
-  // a headache I don't want right now.
-  svg.exit()
-    // .transition().duration(500)
-    // .style('opacity', 0)
-    .remove();
-  chart.svgs = svg;
-
-};
-
-
-charts.tools.setDataTypes = function(obj) {
-  // returns dataset coerced according to chart.dtypes()
-  // or some logic.
-  // also adds jitter if necessary
-  // add an object on chart that allows tooltip summaries
-  // of arbitrary numeric values.
+function Clean(data, obj) {
+  // coerce each records data to reasonable
+  // type and get domains for all scales in aes.
   var vars = {},
-      dtypeDict = {"number": parseFloat, "integer": parseInt,
-          "date": Date, "string": String},
-      chart = obj.chart ? obj.chart(): obj,
-      data = obj.data(),
-      dtypes = chart.dtypes(),
+      dtypeDict = {"number": parseFloat, 
+                  "integer": parseInt,
+                  "date": Date, 
+                  "string": String},
+      dtypes = {},
       keys = _.keys(dtypes),
-      dkeys = _.keys(data[0]),
-      yVars = _.map(chart.geom(), function(g) {
-        return g.yVar();
-      }),
-      xVars = _.map(chart.geom(), function(g) {
-        return g.xVar();
-      });
-
-  // is the data already in a nested structure ?
-  // if so, skip all
+      // assume all data points have same keys
+      dkeys = _.keys(data[0]);
 
   dkeys.forEach(function(v){
-    if(!_.contains(keys, v)) vars[v] = [];
+    if(!_.contains(keys, v)) { vars[v] = []; }
   });
   data.forEach(function(d) {
     _.mapValues(vars, function(v,k) {
-      return vars[k].push(d[k])
-    })
+      return vars[k].push(d[k]);
+    });
   });
   _.mapValues(vars, function(v,k) {
     vars[k] = dtype(v);
-  })
+  });
   dtypes = _.merge(dtypes, vars);
 
   data.forEach(function(d) {
@@ -505,29 +56,24 @@ charts.tools.setDataTypes = function(obj) {
       } else {
         d[k] = dtypeDict[dtypes[k][0]](d[k]);
       }
-      if(_.contains(xVars, k)){
-        d['jitter-x'] = _.random(-1,1,true);
-      }
-      if(_.contains(yVars, k)){
-        d['jitter-y'] = _.random(-1,1,true);
-      }
-    })
+    });
   });
   function dtype(arr) {
     var numProp = [],
-        dateProp = [];
+        dateProp = [],
+        n = (arr.length > 1000 ? 1000: arr.length);
     // for now, looking at random 1000 obs.
-    _.map(_.sample(arr, arr.length > 1000 ? 1000:arr.length), 
+    _.map(_.sample(arr, n), 
           function(d) {
-      numProp.push(!_.isNaN(parseFloat(d)));
-    })
+            numProp.push(!_.isNaN(parseFloat(d)));
+          });
     numProp = numProp.reduce(function(p,v) { 
-      return p + v; }) / (arr.length > 1000 ? 1000: arr.length);
-    var lenUnique = _.unique(arr).length
+      return p + v; }) / n;
+    var lenUnique = _.unique(arr).length;
     // handle floats v. ints and Dates.
     // if a number variable has fewer than 20 unique values
-    // 
-    if(numProp > 0.95 & lenUnique > 20){
+    // I guess this will do...
+    if(numProp > 0.8 && lenUnique > 20){
       return ["number", "many"];
     } else if (numProp > 0.95) {
       return ['number', 'few'];
@@ -537,58 +83,77 @@ charts.tools.setDataTypes = function(obj) {
       return ["string", "few"];
     }
   }
-  return data;
-};
-charts.util.BaseChart = function (newAttributes) {
+  return {data: data, dtypes: dtypes};
+}
+
+ggd3.tools.clean = Clean;
+function DataList() {
+  // needs to work for plots and layers.
+  // I think this should be cheap enought to not 
+  // worry about executing a few times per draw.
+  // it's a layer and doesn't have it's own data
+  if((this instanceof ggd3.layer) && !this.ownData()) {
+    this.data(this.plot().data());
+  }
+  // it's a layer and has it's own data
+  if((this instanceof ggd3.layer) && this.ownData()){
+    this.attributes.data = this.plot().nest(this.data());
+  }
+  var facet = (this instanceof ggd3.layer) ? this.plot().facet(): this.facet(),
+      x = facet.x(),
+      y = facet.y(),
+      by = facet.by(),
+      selector;
+  if((x && !y) || (y && !x)){
+    selector = x ? x + "-": y + "-";
+    return _.map(this.data(), function(d) {
+      return {selector: selector + d.key,
+        data: d};
+    });
+
+  } else if(x && y) {
+    // loop through both levels
+    data = [];
+    _.each(this.data(), function(l1) {
+      var selectX = x + "-" + l1.key;
+      _.each(l1.values, function(l2) {
+        var s = y + "-" + l2.key + "_" + selectX;
+        data.push({selector:s, data: l2.values});
+      });
+    });
+    return data;
+  } else if(x && y && by){
+    // nothing yet
+  }
+  if(!x && !y){
+    console.log("neither x nor y");
+    return [{selector: 'single', data: this.data()}];
+  }
+}
+
+function Facet(spec) {
   var attributes = {
-    width: 600,
-    height: 400,
-    margin: {top:40, bottom:40, left:50, right:50},
-    id: 'chart_id',
-    legend: true,
-    facet: null,
-    facets: null,
-    legendPosition: 'bottom',
-    legendId: function() {
-      return chart.id() + "-legend";
-    },
     x: null,
-    xVar: null,
-    xZero: false,
-    xFree: false,
-    xAdjust: false,
-    xTitle: null,
     y: null,
-    yVar: null,
-    yZero: false,
-    yFree: false,
-    yAdjust: false,
-    yTitle: null,
-    size: d3.scale.linear(),
-    sizeVar: null,
-    sizeRange: [3, 10],
-    sizeFree: false,
-    lineWidth: 3,
-    color: null,
-    colorVar: null,
-    colorFree: false,
-    groupVar: null, // arbitrary groups, not necessarily color
-    toolTitle: null,
-    toolContent: null,
-    brush: true,
-    dtypes: {},
-    newData: true,
-    transitionTime: 500,
-    transitioning: false,
-    axesOrient: ['bottom', 'left'],
-    axesPosition: ["bottom", 'left']
+    by: null, // add another 
+    type: "wrap", // grid or wrap?
+    scales: "fixed", // "free_x", "free_y"
+    space: "fixed", // eventually "free_x" and "free_y"
+    plot: null, 
+    nrows: null,
+    ncols: null,
+    margins: null, 
+    // inherit from plot, but allow override
+    // if scales are fixed, much smaller margins
+    // because scales won't be drawn for inner plots.
   };
-  // overwrite or add new elements to default settings.
-  if(typeof newAttributes === "object"){
-    for(var attr in newAttributes){
-      attributes[attr] = newAttributes[attr];
+  // store number of facet svgs made to 
+  // limit number to nFacets later
+  this.nSVGs = 0;
+  if(typeof spec === "object"){
+    for(var s in spec) {
+      attributes[s] = spec[s];
     }
-    delete attr;
   }
   this.attributes = attributes;
   for(var attr in this.attributes){
@@ -596,765 +161,824 @@ charts.util.BaseChart = function (newAttributes) {
       this[attr] = createAccessor(attr);
     }
   }
-  return this;
-};
-
-// calculate shape of actual plot area within svg.
-charts.util.BaseChart.prototype.plotDim = function(attributes) {
-    return {
-    width: (attributes.width - attributes.margin.left - 
-            attributes.margin.right),
-    height: (attributes.height - attributes.margin.top - 
-             attributes.margin.bottom),
-    translate: [attributes.margin.left, 
-                  attributes.margin.top]
-    };
-  };
-// data getter/setter to 
-// recalculate when data is set.
-charts.util.BaseChart.prototype.data = function(data){
-      if(!arguments.length){ return this.attributes.data; }
-      this.attributes.data = data;
-      this.newData(true);
-      this.reCalculate();
-      this.newData(false);
-      return this;
-  };
-
-// function returning whether we're constructing
-// any top level scales
-charts.util.BaseChart.prototype.scales = function() {
-      return _.any([!this.xFree(), !this.yFree(),
-                   !this.sizeFree(), !this.colorFree()])
-    }
-
-charts.tools.round = function(x) {
-  return Math.round(x*100)/100;
-};
-charts.tools.zeroDomain = function(range, zero) {
-  if(zero){
-    range[0] = 0;
-  }
-  return range;
-};
-
-charts.tools.makeZoomRect = function(sel, chart, classId, width, height, trans) {
-  var adj = sel.selectAll('rect.' + classId)
-                .data([1]);
-  adj.attr('width', width)
-      .attr('height', height)
-      .attr('transform', "translate(" + 
-        trans + ")");
-  adj.enter().append('rect')
-      .attr('class', classId)
-      .attr('width', width)
-      .attr('height', height)
-      .attr('transform', "translate(" + 
-        trans + ")");
 }
-// function to allow extending domain 10% in either 
-// direction and setting min (or max) to zero
-charts.tools.domain = function(data, expand, 
-                               left, right, zero,
-                               variable) {
-  if(_.isUndefined(variable)){
-    var extent = d3.extent(data);
-  } else {
-    var extent = d3.extent(_.map(data, function(d) {
-      return d[variable];
+
+
+Facet.prototype.updateFacet = function() {
+  var that = this,
+      data = this.plot().data();
+  that.xFacets = ["single"];
+  that.yFacets = ["single"];
+  // rules of faceting:
+  // specify either x and y or an x or y with nrows or ncols
+  if(!_.isNull(that.x())) {
+    // x is always first nest
+    that.xFacets = _.unique(_.map(data, function(d) {
+      return d.key;
     }));
   }
-  if(!_.isUndefined(expand)){
-    var range = Math.abs(extent[1] - extent[0])
-    if(!_.isUndefined(left)){
-      extent[0] = extent[0] - 0.1 * range;
-    }
-    if(!_.isUndefined(right)){
-      extent[1] = extent[1] + 0.1 * range;
-    }
-  }
-  return extent
-}
-// function to collect data relevent to axes
-// 
-charts.tools.prepAxes = function(obj){
-
-  var out = {xExtent: [],
-        yExtent: [],
-        cExtent: [],
-        sExtent: []},
-        data = obj.chart ? obj.data()[0].values: 
-          _.flatten(_.map(obj.data(), function(d){
-            return d.values;})),
-        chart = obj.chart ? obj.chart(): obj,
-        dtypes = chart.dtypes();
-
-  data.forEach(function(d) {
-    out.xExtent.push(d[obj.xVar()])
-    out.yExtent.push(d[obj.yVar()])
-    if(!_.isNull(obj.sizeVar())){
-      out.sExtent.push(d[obj.sizeVar()])
-    }
-    if(!_.isNull(obj.colorVar())){
-      out.cExtent.push(d[obj.colorVar()])
-    };
-  });
-
-  return out;
-}
-charts.tools.defineAxis = function(varName, obj){
-    var chart = obj.chart ? obj.chart(): obj,
-        dtype = chart.dtypes()[varName],
-        t;
-    //weird shit is happening here.
-    if(dtype[0] === "number"  & dtype[1] === "many"){
-      t = 'linear';
-    } else {
-      t = "ordinal";
-    }
-    return {type: t}
-  }
-
-
-// geom abline is a base for hline, vline, and smooth
-// to draw arbitrary intercept/slope
-// needs to handle drawing 
-charts.geom.abLine = function(specs) {
-  // add attributes to basic chart or reset defaults
-  // stat calculates a statistic for each group
-  // y just draws a line at that y intercept
-  var attributes = {
-    lineWidth: 2,
-    lineOpacity: 0.8,
-    stat: null,
-    vals: [null],
-    // vals: [null],
-    grid: false, // use this geom to make gridlines
-    orient: "ab",
-    yints: null,
-    xints: null,
-    slopes: null,
-    singleColor: "grey",
-    // b/c we're using this to draw grid, needs dummy
-    // dataset.
-    data: null
-  };
-  // allow passing in of settings as an argument
-  if(typeof specs === "object"){
-    for(var attr in specs){
-      attributes[attr] = specs[attr];
-    }
-  }
-  
-  var geom = new charts.geom.BaseGeom(attributes);
-
-  for(var attr in geom.attributes){
-    if((!geom[attr] && geom.attributes.hasOwnProperty(attr))){
-      geom[attr] = createAccessor(attr);
-    }
-  }
-  // function that returns an object containing relevent
-  // data points for the chart. Accepts aggregator function
-  // which takes a single array of numbers
-  function aggregator(fun) {
-    function agg(arr) {
-      var out = {};
-      if(arr.length > 0){
-        // these data will be nested, so just get
-        // info from the first one
-        _.mapValues(arr[0], function(v, k){
-          out[k] = v;
-        })
-        var v = geom.orient() == 'horizontal' ? geom.yVar():geom.xVar();
-        out[v] = fun(_.map(arr, function(d) {
-          return d[v];
-        }))
-        return [out]
-      }
-    }
-    return agg
-  }
-  // function to recurse output of agg function and return
-  // bottom leaf
-  // leaf will always contain an object with yVar or xVar
-  function recurseNest(d){
-    var v = geom.orient() == 'horizontal' ? geom.yVar():geom.xVar();
-    if(_.contains(_.keys(d), v)){
-      return d;
-    } else {
-      return _.flatten(_.map(d.values, function(val) {
-          return recurseNest(val)
+  if(!_.isNull(that.y()) ){
+    // if facet.y is specified, it might be the first or
+    // second nest
+    if(_.isNull(that.x()) ){
+      that.yFacets = _.unique(_.map(data, function(d) {
+        return d.key;
       }));
-    }
-  }
-  var stats = {mean: aggregator(d3.mean),
-    median: aggregator(d3.median),
-    max: aggregator(d3.max),
-    min: aggregator(d3.min)
-  }
-
-  // decides how to link data to elements
-  geom.selector = function() {
-    var selector = geom.grid() ? "geom-grid":"geom"
-    if(geom.orient() == 'vertical') {
-      selector += '-vert';
-    } else if (geom.orient() === 'horizontal'){
-      selector += '-horiz';
-    } else if (geom.orient() === "ab"){
-      selector += "-ab";
-    }
-    selector += " order-" + geom.order()
-    return selector;
-  }
-
-  geom.checkErrors = function(sel) {
-    switch(geom.orient()){
-      case "horizontal":
-        if(!_.isUndefined(geom.chart().y().scale.rangeBand)){
-          console.error("you are trying to draw a horizontal line on an ordinal y axis.")
-          return true
-        }
-        break;
-      case "vertical":
-        if(!_.isUndefined(geom.chart().x().scale.rangeBand)){
-          console.error("you are trying to draw a vertical line on an ordinal x axis.")
-          return true
-        }
-        break;
-      case "ab":
-        if(!_.isUndefined(geom.chart().x().scale.rangeBand) | 
-           !_.isUndefined(geom.chart().y().scale.rangeBand)){
-          console.error("both x and y must be continuous")
-          return true;
-        }
-        break;
-      default:
-        return false;
-    }
-  }
-  geom.line = d3.svg.line()
-                .x(function(d) { 
-                  return d['xpos'];})
-                .y(function(d) { 
-                    return d['ypos'];});
-  var usingFacet = false;
-  function generateLineData(arr, orient) {
-    var plotDim = geom.chart().plotDim(geom.chart().attributes);
-    var s1 = orient == "x" ? geom.x().scale: geom.y().scale,
-        s2 = orient == "x" ? geom.y().scale: geom.x().scale,
-        v1 = orient == "x" ? geom.xVar(): geom.yVar(),
-        v2 = orient == "x" ? geom.yVar(): geom.xVar(),
-        p1 = orient == "x" ? 'xpos': "ypos",
-        p2 = orient == "x" ? "ypos": "xpos",
-        data = [],
-        hasRangeBand = !_.isUndefined(s2.rangeBand);
-    if(_.all(_.map(arr, _.isNumber))){
-      // array is a list of intercepts with no
-      // color or group variables of interest
-      // set color to something neutral
-      if(geom.chart().color() == geom.color()){
-        geom.color(d3.functor("gray"))
-      }
-      _.map(arr, function(d) {
-        if(hasRangeBand & !geom.grid()){
-          _.map(s2.domain(), function(oppAxisVal) {
-            var o1 = {};
-            o1[v1] = d;
-            o1[v2] = oppAxisVal;
-            o1[p1] = s1(d);
-            o1[p2] = s2(oppAxisVal) + s2.rangeBand()/4;
-            o2 = _.cloneDeep(o1);
-            o2[p2] = s2(oppAxisVal) + s2.rangeBand()*3/4;
-            data.push([o1,o2]);
-          });
-        } else {
-          o1 = {};
-          o1[v1] = d
-          o1[v2] = s2.domain()[0];
-          o1[p1] = s1(d);
-          o1[p2] = s2.range()[0];
-          o2 = _.clone(o1);
-          o2[v2] = s2.domain()[1];
-          o2[p2] = s2.range()[1];
-          if(geom.grid() & !_.isUndefined(s2.rangeExtent)) {
-            o1[p2] = orient!="x" ? s2.rangeExtent()[0]:s2.rangeExtent()[1];
-            o2[p2] = orient=="x" ? s2.rangeExtent()[0]:s2.rangeExtent()[1];
-          }
-          data.push([o1, o2]);
-
-        }
-      })
-      usingFacet=false;
-    } else if(_.all(_.map(arr, _.isObject))){
-      // they are objects
-      _.map(arr, function(d) {
-        if(hasRangeBand & !geom.grid()){
-          var o1 = _.clone(d);
-          o1[p1] = s1(d[v1]);
-          o1[p2] = s2(d[v2]) + s2.rangeBand()/4;
-          o2 = _.clone(o1);
-          o2[p2] = s2(d[v2]) + s2.rangeBand()*3/4;
-          data.push([o1,o2]);
-        } else {
-          var o1 = _.clone(d);
-          o1[p1] = s1(d[v1]);
-          o1[p2] = s2(s2.domain()[0]);
-          o2 = _.clone(o1);
-          o2[v2] = s2.domain()[1];
-          o2[p2] = s2(s2.domain()[1]);
-          data.push([o1, o2]);
-        }
-      })
-      usingFacet = true
     } else {
-      // vals is null
-      // use data passed to geom to nest on relevent
-      // groupings and draw line based on geom.stat()
-      var nest = d3.nest()
-                  .rollup(stats[geom.stat()])
-      if(!_.isNull(geom.colorVar())){
-        nest.key(function(d) { return d[geom.colorVar()]});
-      }
-      if(!_.isNull(geom.groupVar())){
-        nest.key(function(d) { return d[geom.groupVar()]});
-      }
-      if(hasRangeBand){
-        nest.key(function(d) { return d[v2]});
-      }
-      var tmp = _.flatten(_.map(nest.entries(geom.data()[0].values), 
-                       recurseNest));
-      _.map(tmp, function(o1) {
-        if(hasRangeBand){
-            o1[p2] = s2(o1[v2]) + s2.rangeBand()/4;
-            o1[p1] = s1(o1[v1]);
-            var o2 = _.clone(o1);
-            o2[p2] = s2(o2[v2]) + s2.rangeBand()*3/4;
-        } else {
-          o1[p1] = s1(o1[v1]);
-          o1[p2] = s2(s2.domain()[0]);
-          var o2 = _.clone(o1);
-          o2[p2] = s2(s2.domain()[1]);
-        }
-        data.push([o1, o2]);
-      })
-      usingFacet = true;
+      that.yFacets = _.unique(
+                      _.flatten(
+                        _.map(
+                          data, function(d) {
+                            return _.map(d.values, 
+                              function(v) {
+                                return v.key;
+                              });
+                        })
+                      )
+                    );
     }
-    geom.lineData = data;
   }
-  geom.prepData = function() {
-    // nest to group the colors and groups and aggregate
-    // needs refactoring, too hungover.
-    // needs to handle array of intercepts,
-    // array of objects w/ agg function
-    // and array of objects no agg function
-    geom.lineData = [];
-    switch(geom.orient()){
-      case "horizontal":
-        generateLineData(geom.vals(), "y")
-          // data to be nested by all relevent variables
-          // and aggregated according to geom.stat()
-        break;
-      case "vertical":
-        generateLineData(geom.vals(), "x")
-        break;
-      case "ab":
-        // yints or xints and slopes
-        if(!_.isNull(geom.xints()) & !_.isNull(geom.yints())){
-          throw "specifying both yints and xints is not allowed"
-        }
-        // we don't want to use main color scale
-        if(geom.chart().color() == geom.color()){
-          geom.color(d3.functor(geom.singleColor()))
-        }
-        var intercepts = _.isNull(geom.xints()) ? geom.yints(): geom.xints(),
-            intName = _.isNull(geom.xints()) ? "ypos": "xpos",
-            otherName = !_.isNull(geom.xints()) ? "ypos": "xpos",
-            scale = _.isNull(geom.xints()) ? geom.x().scale: geom.y().scale,
-            scale2 = !_.isNull(geom.xints()) ? geom.x().scale: geom.y().scale,
-            domain = scale.domain();
-        if(intercepts.length !== geom.slopes().length){
-          throw "intercepts must be the same length as slopes"
-        }
-
-        var points = _.zip(intercepts,
-                           geom.slopes());
-        var data = _.map(points, function(p) {
-          return _.map(domain, function(d) {
-            return _.zipObject([intName, otherName], 
-                    [scale2(d*p[1] + p[0]), scale(d)])
-            })
-        });
-        geom.lineData = data;
-
-        break;
-      }
+  that.nFacets = that.xFacets.length * that.yFacets.length;
+  // if only x or y is set, user should input # rows or columns
+  if( ( that.x() && that.y() ) && 
+     ( that.ncols() || that.nrows() ) ){
+    throw ('specifying x and y facets with ncols or nrows' +
+                  " is not supported");
+  }
+  if( that.ncols() && that.nrows() ){
+    throw ("specify only one of ncols or nrows");
+  }
+  if( (that.x() && !that.y()) || (that.y() && !that.x()) ){
+    if(!that.ncols() && !that.nrows()){
+      throw("specify one of ncols or nrows if setting only" +
+            " one of facet.x() or facet.y()");
     }
-
-
-  geom.draw = function(sel) {
-    // throw an error if y-axis is not continuous
-    var selector = geom.selector()
-    // remove the paths if the geom isn't appropriate
-    if(geom.checkErrors()) {
-      sel.select('.chart').selectAll('path.' + selector.replace(" ", "."))
-        .transition().duration(geom.transitionTime())
-        .style('opacity', 0)
-        .remove()
-      return
+    if(that.nrows() && !that.ncols()) {
+      that.ncols(Math.ceil(that.nFacets/that.nrows()));
     }
-    geom.prepAxes(sel);
-    geom.prepData();
-    // gridlines are defined in css
-    if(geom.grid()){
-      geom.lineOpacity(undefined);
-      geom.lineWidth(undefined)
-      geom.color(d3.functor(undefined));
+    if(that.ncols() && !that.nrows()) {
+      that.nrows(Math.ceil(that.nFacets/that.ncols()));
     }
-    var plotDim = geom.chart().plotDim(geom.chart().attributes);
-    // filter lineData for what's in the facet
-    if(usingFacet){
-      if(!_.isNull(geom.facet())){
-        geom.lineData = _.filter(geom.lineData, function(d) {
-          return (d[0][geom.facet()] + '-' + geom.chart().id()) == sel.attr('id')
-        })
-      }
-    }
-    // do this because we want to append a line per
-    // entry in data. the generators expect arrays
-    var paths = sel.select('.chart')
-                  .selectAll("path." + selector.replace(" ", "."))
-                  .data(geom.lineData);
-    paths
-      .transition().duration(geom.transitionTime())
-      .attr('d', geom.line)
-      .attr('stroke', function(d) {
-      return geom.color()(d[0][geom.colorVar()])
-        });
-    paths.enter().append('path')
-      .style('opacity', 0)
-      .attr('class', selector)
-      .attr('d', geom.line)
-      .attr('stroke', function(d) {
-      return geom.color()(d[0][geom.colorVar()])
-        })
-      .transition().duration(geom.transitionTime())
-      .style({'opacity': geom.lineOpacity(),
-          'stroke-width': geom.lineWidth()})
-    paths.exit()
-      .transition().duration(geom.transitionTime())
-      .style(geom.transitionStyle())
-      .remove();
+  }
+  if(!that.ncols() && !that.nrows() ) {
+    that.nrows(that.yFacets.length);
+    that.ncols(that.xFacets.length);
+  }
 
-  };
-  return geom;
+  function update(sel) {
+    var rows = sel.selectAll('div.row')
+                .data(_.range(that.nrows()));
+    rows
+      .attr('id', function(d) { return "row-" + d; })
+      .each(function(d, i) {
+        that.makeDIV(d3.select(this), d);
+      });
+
+    rows.enter()
+      .append('div')
+      .attr('class', 'row')
+      .attr('id', function(d) { return "row-" + d; })
+      .each(function(d, i) {
+        that.makeDIV(d3.select(this), d);
+      });
+    rows.exit().remove();
+  }
+  return update;
 };
-  
 
-charts.geom.BaseGeom = function (specs){
-  // geom should inherit from the chart it lives in.
+Facet.prototype.makeDIV = function(selection, rowNum) {
+  var remainder = this.nFacets % this.ncols(),
+      that = this;
+  row = selection.selectAll('div')
+           .data(_.range((this.nFacets - this.nSVGs) > remainder ? 
+                 this.ncols(): remainder));
+  row
+    .each(function() {
+      that.makeSVG(d3.select(this), rowNum);
+    });
+  row.enter().append('div')
+    .attr('class', 'plot-div')
+    .each(function() {
+      that.makeSVG(d3.select(this), rowNum);
+    });
+  row.exit().remove();
+};
+
+Facet.prototype.makeSVG = function(selection, rowNum) {
+  var that = this,
+      dim = this.plot().plotDim(),
+      x = selection.data(),
+      svg = selection
+              .attr('id', function(d) {
+                return that.id(d, rowNum);
+               })
+              .selectAll('svg')
+              .data([0]);
+  // will need to do something clever here
+  // to allow for space free, free_x and free_y
+  svg
+    .attr('class', 'plot-svg')
+    .attr('width', dim.x)
+    .attr('height', dim.y)
+    .each(function(d) {
+      that.makeCell(d3.select(this));
+      that.makeClip(d3.select(this), x, rowNum);
+    });
+  svg.enter().append('svg')
+    .attr('class', 'plot-svg')
+    .attr('width', dim.x)
+    .attr('height', dim.y)
+    .each(function(d) {
+      that.makeCell(d3.select(this));
+      that.makeClip(d3.select(this), x, rowNum);
+    });
+  svg.exit().remove();
+  that.nSVGs += 1;
+};
+
+Facet.prototype.makeClip = function(selection, x, y) {
+    // if either xAdjust or yAdjust are present
+  if(this.plot().xAdjust() || this.plot().yAdjust()){
+    var clip = selection.selectAll('defs')
+                .data([0]),
+        that = this,
+        id = that.id(x, y) + "-clip",
+        plotDim = this.plot().plotDim();
+    clip.select('.clip')
+        .attr('id', id)
+        .select('rect')
+        .attr('width', plotDim.x)
+        .attr('height', plotDim.y);
+    clip.enter().insert('defs', "*")
+        .append('svg:clipPath')
+        .attr('class', 'clip')
+        .attr('id', id)
+        .append('rect')
+        .attr('x', 0)
+        .attr('y',0)
+        .attr('width', plotDim.x)
+        .attr('height', plotDim.y);
+    selection.select('g.plot')
+      .attr('clip-path', "url(#" + id + ")");
+  }
+};
+// if x and y [and "by"] are specified, return id like:
+// x-y[-by], otherwise return xFacet or yFacet
+Facet.prototype.id = function(x, y) {
+  if(this.x() && this.y()) {
+    return this.y() + "-" + this.yFacets[y]  + '_' + 
+    this.x() + "-" + this.xFacets[x];
+  } else if(this.x()){
+    return this.x() + "-" + this.xFacets[this.nSVGs];
+  } else if(this.y()){
+    return this.y() + "-" + this.yFacets[this.nSVGs];
+  } else {
+    return 'single';
+  }
+};
+Facet.prototype.makeCell = function(selection) {
+  var margins = this.plot().margins();
+
+  var plot = selection.selectAll('g.plot')
+                .data([0]);
+  plot.enter().append('g')
+    .attr('class', 'plot')
+    .attr('transform', "translate(" + margins.left + 
+            "," + margins.top + ")");
+  var xaxis = selection.selectAll('g.x.axis')
+                .data([0]);
+  xaxis.enter().append('g')
+    .attr('class', 'x axis');
+  var yaxis = selection.selectAll('g.y.axis')
+                .data([0]);
+  yaxis.enter().append('g')
+    .attr('class', 'y axis');
+
+};
+ggd3.facet = Facet;
+
+// aes is an object literal with 
+// x, y, yintercept, xintercept, shape, size, 
+// color, etc.
+function Plot(aes) {
   var attributes = {
     data: null,
-    width: null,
-    height: null,
-    chart: null,
-    xFormat: null,
-    yFormat: null,
-    xVar: null,
-    yVar:null,
-    x: null,
-    y: null,
-    size: d3.scale.linear(),
-    sizeVar: null,
-    sizeRange: null,
-    colorVar: null,
-    color: d3.scale.category10(),
-    lineWidth: 5,
-    groupVar: null,
-    facet: null,
-    toolTitle: function(d) {
-      if(chart.facet()){
-        return "<h4>" + d[chart.facet()] + "</h4>";
-      }else if(chart.colorVar()){
-        return "<h4>" + d[chart.nestVar()] + "</h4>";
-      }
-    },
-    toolContent: function(d) {
-      return chart.nestVar() + ": " + d[chart.nestVar()] +
-      "<br>" + chart.xVar() + ": " + charts.tools.round(d[chart.xVar()]) + 
-      "<br>" + chart.yVar() + ": " + charts.tools.round(d[chart.yVar()]);
-    },
-    legendSize: 12,
-    transitionTime: 500,
-    transitionStyle: {opacity: 0},
-    newData: true,
-    geom: null, // just add more geoms!?
-    first: false,
-    order: 0,
-    newData:true
+    layers: [],
+    facet: new ggd3.facet(),
+    xScale: {}, 
+    yScale: {},
+    colorScale: {},
+    sizeScale: {},
+    opts: {},
+    theme: "ggd3",
+    margins: {left:20, right:20, top:20, bottom:20},
+    width: 400,
+    height: 400,
+    aes: null,
+    legends: null, // strings corresponding to scales
+    // that need legends or legend objects
+    xAdjust: false,
+    yAdjust: false,
   };
-  // overwrite or add new elements to default settings.
-  if(typeof specs === "object"){
-    for(var attr in specs){
-      attributes[attr] = specs[attr];
-    }
-    delete attr;
-  }
+  // aesthetics I might like to support:
+// ["alpha", "angle", "color", "fill", "group", "height", "label", "linetype", "lower", "order", "radius", "shape", "size", "slope", "width", "x", "xmax", "xmin", "xintercept", "y", "ymax", "ymin", "yintercept"] 
+  this.attributes = attributes;
+  // if the data method has been handed a new dataset, 
+  // dataNew will be true, after the plot is drawn the
+  // first time, dataNew is set to false
+  this.dataNew = true;
+  // when cycling through data, need to know if 
+  // data are nested or not.
+  this.nested = false;
+  // explicitly declare which attributes get a basic
+  // getter/setter
+  var getSet = ["opts", "theme", "margins",
+    "width", "height", "xAdjust", "yAdjust"];
+
   for(var attr in attributes){
-    if((!this[attr] && attributes.hasOwnProperty(attr))){
+    if((!this[attr] && 
+       _.contains(getSet, attr))){
       this[attr] = createAccessor(attr);
     }
   }
-  // prepAxes is an overloaded name, present in tools
-  // and chart as well. It gets the chart and geom-level
-  // data extents/domains and applies them to axes.
-  this.prepAxes = function(sel) {
-    // need to solidify conditions under which
-    // top-level axes get overridden by geom level data
-    // for the time being, they are below
+}
 
-    var chart = this.chart(),
-        size = chart.sizeFree(),
-        x = chart.xFree(),
-        y = chart.yFree(),
-        color = chart.colorFree(),
-        specs;
-    if(_.any([x, y, color, size])){
-      var ex = charts.tools.prepAxes(this)
-    }
-    if(size){
-      // size is always a continuous variable
-      this.size().domain(ex.sExtent.length > 0 ? 
-                          d3.extent(ex.sExtent):
-                          d3.extent([1]))
-                .range(d3.extent(_.flatten(
-                         [this.sizeRange()])));
-    } else {
-      this.size(chart.size())
-    }
-    if(x){
-      specs = charts.tools.defineAxis(this.xVar(), this)
-      // zooming on ordinal axis doesn't make sense, yet
-      // so remove xadjust or yadjust if it exists
-      if(specs.type=='ordinal'){
-        sel.select('.xadjust').remove();
-      }
-      this.x(new charts.tools.Axis('x', this, 
-             ex.xExtent, specs));
-
-    } else {
-      this.x(chart.x())
-    }
-    if(y){
-      specs = charts.tools.defineAxis(this.yVar(), this)
-      if(specs.type=='ordinal'){
-        sel.select('.yadjust').remove();
-      }
-      this.y(new charts.tools.Axis('y', this, 
-             ex.yExtent, specs));
-    } else {
-      this.y(chart.y())
-    }
-    if(color){
-      // use existing colorscale on default geom obj
-    } else {
-      this.color(chart.color())
-    }
+function scaleConfig(type) {
+  var scale;
+  switch(type){
+    case "x":
+      scale = 'xScale';
+      break;
+    case "y":
+      scale = 'yScale';
+      break;
+    case "color":
+      scale = 'colorScale';
+      break;
+    case "size":
+      scale = 'sizeScale';
+      break;
   }
-  // make custom data accessor to do 
-  // recalculations when necessary
-  this.reCalculate = function() {
-
-  }
-  this.attributes = attributes;
-  this.data = function(data){
-      if(!arguments.length){ return this.attributes.data; }
-      this.attributes.data = data;
-      this.newData(true);
-      // is geom going to have it's own recalculate function?
-      this.reCalculate();
-      this.newData(false);
+  function scaleGetter(obj){
+    // reset scale to empty object
+    if(_.isEmpty(obj) && !_.isUndefined(obj)) {
+      this.attributes[scale] = obj;
       return this;
+    }
+    if(!arguments.length) {
+      return this.attributes[scale];
+    }
+    if(obj instanceof ggd3.scale){
+      this.attributesp[scale] = obj;
+      return this;
+    }
+    // this isn't used yet, but will allow passing 
+    // an object of 
+    var s = new ggd3.scale().type(type).plot(this);
+    for(var setting in obj) {
+      s[setting](obj[setting]);
+    }
+    this.attributes[scale] = s;
+    return this;
+  }
+  return scaleGetter;
+}
+
+Plot.prototype.xScale = scaleConfig('x');
+
+Plot.prototype.yScale = scaleConfig('y');
+
+Plot.prototype.colorScale = scaleConfig('color');
+
+Plot.prototype.sizeScale = scaleConfig('size');
+
+Plot.prototype.layers = function(layers) {
+  if(!arguments.length) { return this.attributes.layers; }
+  if(_.isArray(layers)) {
+    // allow reseting of layers by passing empty array
+    if(layers.length === 0){
+      this.attributes = layers;
+      return this;
+    }
+    var layer;
+    _.each(layers, function(l) {
+      if(_.isString(l)){
+        // passed string to get geom with default settings
+        layer = new ggd3.layer()
+                      .aes(this.aes())
+                      .plot(this)
+                      .geom(l);
+
+        this.attributes.layers.push(layer);
+      } else if ( l instanceof ggd3.layer ){
+        // user specified layer
+        this.attributes.push(l.ownData(true).plot(this));
+      }
+    }, this);
+  }
+  return this;
+};
+
+// custom data getter setter to pass data to layer if null
+Plot.prototype.data = function(data) {
+  if(!arguments.length) { return this.attributes.data; }
+  // clean data according to data types
+  // and set top level ranges of scales.
+  // dataset is passed through once here.
+  data = ggd3.tools.clean(data, this);
+  this.setScales();
+  // after data is declared, nest it according to facets.
+  this.attributes.data = this.nest(data.data);
+  this.dtypes = data.dtypes;
+  this.nested = true;
+  this.dataNew = true;
+  return this;
+};
+
+
+Plot.prototype.facet = function(spec) {
+  if(!arguments.length) { return this.attributes.facet; }
+  var data;
+  if(spec instanceof ggd3.facet){
+    this.attributes.facet = spec.plot(this);
+    if(this.nested){
+      // unnest from old facets
+      data = ggd3.tools.unNest(this.data());
+      // nest according to new facets
+      this.attributes.data = this.nest(data);
+      this.setScales();
+    } else {
+      this.attributes.data = this.nest(this.data());
+      this.setScales();
+    }
+  } else {
+    this.attributes.facet = new ggd3.facet(spec)
+                                    .plot(this);
+    if(this.nested){
+      data = ggd3.tools.unNest(this.data());
+      this.attributes.data = this.nest(data);
+      this.setScales();
+    } else {
+      this.attributes.data = this.nest(this.data());
+      this.setScales();
+    }
+  }
+  this.nested = true;
+  return this;
+};
+
+Plot.prototype.aes = function(aes) {
+  if(!arguments.length) { return this.attributes.aes; }
+  this.setScales();
+  _.each(this.layers(), function(l) {
+    if(_.isNull(l.aes())){
+      l.aes(aes);
+    }
+  }, this);
+  this.attributes.aes = aes;
+  return this;
+};
+
+Plot.prototype.plotDim = function() {
+  var margins = this.margins();
+  return {x: this.width() - margins.left - margins.right,
+   y: this.height() - margins.top - margins.bottom};
+};
+
+Plot.prototype.draw = function() {
+  var that = this;
+  function draw(sel) {
+    sel.call(that.facet().updateFacet());
+    _.each(that.layers(), function(l) {
+      sel.call(l.draw());
+    });
+  }
+  this.dataNew = false;
+  return draw;
+};
+
+Plot.prototype.nest = function(data) {
+  if(_.isNull(data)) { return data; }
+  var nest = d3.nest(),
+      that = this,
+      facet = this.facet();
+  if(!_.isNull(facet.x())){
+    nest.key(function(d) { return d[facet.x()]; });
+  }
+  if(!_.isNull(facet.y())){
+    nest.key(function(d) { return d[facet.y()]; });
+  }
+  if(!_.isNull(facet.by())){
+    nest.key(function(d) { return d[facet.by()]; });
+  }
+  data = nest.entries(data);
+  return data; 
+};
+
+// returns array of faceted objects {selector: s, data: data} 
+Plot.prototype.dataList = DataList;
+
+ggd3.plot = Plot;
+function Scale(opts) {
+  // allow setting of orient, position, scaleType, 
+  // scale and axis settings, etc.
+  var attributes = {
+    type: null,
+    domain: null,
+    range: null,
+    position: null, // left right top bottom none
+    orient: null, // left right top bottom
+    plot: null,
+    scaleType: "linear", // linear, log, ordinal, time, category, 
+    // maybe radial, etc.
+    scale: null,
+    axis: null
+  };
+  this.opts = opts;
+  this.attributes = attributes;
+  var getSet = ["type", "plot", "orient", "position"];
+  for(var attr in this.attributes){
+    if(!this[attr] && _.contains(getSet, attr) ){
+      this[attr] = createAccessor(attr);
+    }
+  }
+}
+
+Scale.prototype.scaleType = function(scaleType) {
+  if(!arguments.length) { return this.attributes.scaleType; }
+  var that = this;
+  switch(scaleType) {
+    case 'linear':
+      that.attributes.scale = d3.scale.linear();
+      break;
+    case 'log':
+      that.attributes.scale = d3.scale.log();
+      break;
+    case 'ordinal':
+      that.attributes.scale = d3.scale.ordinal();
+      break;
+    case 'time':
+      that.attributes.scale = d3.time.scale();
+      break;
+    case "category10":
+      that.attributes.scale = d3.scale.category10();
+      break;
+    case "category20":
+      that.attributes.scale = d3.scale.category20();
+      break;
+    case "category20b":
+      that.attributes.scale = d3.scale.category20b();
+      break;
+    case "category20c":
+      that.attributes.scale = d3.scale.category20c();
+      break;
+  }
+  return this;
+};
+
+Scale.prototype.axis = function(settings) {
+  if(!arguments.length) { return this.attributes.axis; }
+  if(!_.contains(['x', 'y'], this.type())){
+    return this;
+  } else {
+    if(!_.isNull(this.axis())){
+      this.attributes.axis = d3.svg.axis();
+    }
+  }
+  for(var s in settings){
+    if(this.attributes.axis.hasOwnProperty(s)){
+      this.attributes.axis[s](settings[s]);
+    }
+  }
+  return this;
+};
+
+Scale.prototype.scale = function(settings){
+  if(!arguments.length) { return this.attributes.scale; }
+  for(var s in settings){
+    if(this.attributes.scale.hasOwnProperty(s)){
+      this.attributes.scale[s](settings[s]);
+    }
+  }
+  return this;
+};
+
+Scale.prototype.range = function(range) {
+  if(!arguments.length) { return this.attributes.range; }
+  this.attributes.scale.range(range);
+  return this;
+};
+
+Scale.prototype.domain = function(domain) {
+  if(!arguments.length) { return this.attributes.domain; }
+  this.attributes.scale.domain(domain);
+
+  return this;
+};
+
+ggd3.scale = Scale;
+// only required by plot, no need to pass plot in.
+// geom will already have it's scale available to it,
+// regardless of whether it's layer has own data.
+// probably no need to pass data in either.
+// Plot knows it's facet, data and aes, therefore with 
+// dataList, can get a list of facet ids and relevent data
+// with which to make scales per facet if needed.
+// if an aes mapping or facet mapping does exist in data
+// throw error.
+function SetScales() {
+
+  // do nothing if the object doesn't have aes, data and facet
+  // if any of them get reset, the scales must be reset
+  if(!this.data() || !this.aes() || !this.facet()){
+    console.log('not setting scales');
+    return false;
+  }
+  // obj is a layer or main plot
+  console.log('setting scales');
+  var aes = this.aes(),
+      that = this,
+      facet = this.facet(),
+      scales = ['x', 'y', 'color', 'size'],
+      aesMap = {
+        x: 'xScale',
+        y: 'yScale',
+        color: 'colorScale',
+        size: 'sizeScale',
+      },
+      data = this.dataList(),
+      dtype,
+      settings;
+  function makeScale(d, aesthetic) {
+    // rescale all aesthetics
+    // need to allow the scale settings from plot object to 
+    // take precedence over this, if scale config is 
+    // passed to xScale, yScale, colorScale or sizeScale
+    for(var a in aes){
+      if(_.contains(scales, a)){
+        dtype = that.dtypes[aes[a]];
+        settings = ggd3.tools.defaultScaleSettings(dtype, a);
+        var scale = new ggd3.scale(settings.opts)
+                            .type(a)
+                            .scaleType(settings.type);
+        that[aesMap[a]]()[d.selector] = scale;
+      }
+    }
+  }
+  for(var a in aes) {
+    // reset all scales to empty object
+    that[aesMap[a]]({});
+  }
+  _.map(data, function(d,i) {return makeScale(d);});
+}
+function xyScale(dtype) {
+  if(dtype[0] === "number") {
+    if(dtype[1] === "many"){
+      return 'linear';
+    } else {
+      return 'ordinal';
+    }
+  }
+  if(dtype[0] === "date"){
+    return 'time';
+  }
+  if(dtype[0] === "string"){
+    return 'ordinal';
+  }
+}
+ggd3.tools.defaultScaleSettings = function(dtype, aesthetic) {
+  switch(aesthetic) {
+    case "x":
+      var xOpts = {position: "bottom", 
+                  orient: "bottom"};
+      return {type: xyScale(dtype), opts: xOpts};
+    case "y":
+      var yOpts = {position: "left", 
+                  orient: "left"};
+      return {type: xyScale(dtype), opts: yOpts};
+    case "color":
+      return {type:"category10", opts: {position:'none'}};
+    case "size":
+      return {type: 'linear', opts: {position:'none'}};
+  }
+};
+ggd3.tools.domain = function(data) {
+  return d3.extent(data);
+};
+Plot.prototype.setScales = SetScales;
+
+
+// 
+function Bar(spec) {
+  var attributes = {
+    name: "bar",
+  };
+
+  this.attributes = _.merge(attributes, this.attributes);
+
+  for(var attr in this.attributes){
+    if((!this[attr] && this.attributes.hasOwnProperty(attr))){
+      this[attr] = createAccessor(attr);
+    }
   }
   return this;
 }
 
+Bar.prototype = new Geom();
+
+Bar.prototype.draw = function() {
+  var layer = this.layer(),
+      plot = layer.plot(),
+      aes = layer.aes(),
+      that = this;
+  function draw(sel, data) {
+    // sel is svg, data is array of objects
 
 
-charts.geom.hline = function() {
-  var h = new charts.geom.abLine()
-                  .orient('horizontal')
-                  .stat('mean');
-  return h;
-}
-
-// geoms take optional data, the default is found 
-// on the selection that calls them.
-// geoms get put in a chart definition. If they are objects,
-// the get called, if strings, they create a default
-// object of that name.
-
-charts.geom.point = function(specs) {
-  // add attributes to basic chart or reset defaults
-  var attributes = {
-    sizeRange: null,
-    pointOpacity: 0.5,
-    // string or function indicating how to get point id
-    dataPointId: null,
-    // should brushing highlight ids or highlight scale domain?
-    highlightId: null,
-    canvas: null, // for over 1000, rewrite draw w/ canvas
-    canvasThreshold: 1000
-  };
-  // allow passing in of settings as an argument
-  if(typeof specs === "object"){
-    for(var attr in specs){
-      attributes[attr] = specs[attr];
-    }
   }
-  
-  var geom = new charts.geom.BaseGeom(attributes);
-
-  for(var attr in geom.attributes){
-    if((!geom[attr] && geom.attributes.hasOwnProperty(attr))){
-      geom[attr] = createAccessor(attr);
-    }
-  }
-  // allows a single number to be entered as size
-  geom.size()
-    .range(d3.extent(_.flatten(geom.sizeRange())))
-  function getSize(d) {
-    if(_.isNull(geom.sizeVar())){
-      return 1;
-    }
-    return d[geom.sizeVar()];
-  }
-  // return function to position linear or ordinal
-  function position(scale, xy) {
-    if(scale.rangeRoundBands){
-      var rb = scale.rangeBand()/2
-      return function(d, name) {
-        return scale(d[name]) + rb + rb/2 * d['jitter-' + xy];
-      }
-    } else {
-      return function(d,name) {
-        return scale(d[name])
-      };
-    }
-  };
-
-
-  function drawPoint() {
-
-    return {cx: function(d) {return geom.positionX(d,geom.xVar())},
-      cy: function(d) {return geom.positionY(d,geom.yVar())},
-      r: function(d) {return d3.functor(geom.size())(getSize(d))},
-      fill: function(d) {return d3.functor(geom.color())(d[geom.colorVar()])}
-    }
-  }
-
-  geom.draw = function(sel) {
-    geom.prepAxes(sel)
-    geom.positionX = position(geom.x().scale, 'x');
-    geom.positionY = position(geom.y().scale, 'y');
-    // better to nest data beforehand, pass it to geom
-    // to be able to set axes free or fixed.
-    var data = geom.data()[0].values
-    if(data.length > geom.canvasThreshold()){
-      sel.call(geom.drawCanvas);
-    } else {
-      var circles = sel.select(".chart")
-                  .selectAll('circle.geom-point')
-                  .data(data);
-      circles.transition().duration(geom.transitionTime())
-        .attr(drawPoint());
-      circles.enter().append('circle')
-        .attr('class', 'geom-point')
-        .attr(drawPoint())
-        .style('opacity', geom.pointOpacity());
-      circles.exit()
-        .transition().duration(geom.transitionTime())
-        .style("opacity", 0)
-        .attr("r", 0)
-        .remove();
-    }
-  };
-  geom.drawCanvas = function(sel) {
-    var chart = geom.chart(),
-        data = geom.data()[0].values,
-        plotDim = chart.plotDim(chart.attributes),
-        i = 0,
-        d, cx, cy, r, fill;
-    if(sel.select('.f-object').empty()){
-      console.log("empty")
-
-      // geom.canvas.clearRect(0, 0, plotDim.width, plotDim.height)
-      geom.canvas = sel.insert("foreignObject", "*")
-                    .attr('class', "f-object")
-                    .attr('width', plotDim.width)
-                    .attr('height', plotDim.height)
-                    .append("xhtml:body")
-                    .append('div')
-                    .style('position', 'relative')
-                    .style('left', plotDim.translate[0])
-                    .style('top', plotDim.translate[1])
-                    .append("canvas")
-                    .attr('width', plotDim.width)
-                    .attr('height', plotDim.height)
-                    .node().getContext('2d')
-    } else {
-      geom.canvas = sel.select('canvas').node().getContext('2d')
-    }
-          
-    geom.canvas.clearRect(0, 0, plotDim.width, plotDim.height)
-    geom.canvas.globalAlpha = geom.pointOpacity();
-    data.forEach(function(d) {
-      cx = geom.positionX(d,geom.xVar()),
-      cy = geom.positionY(d,geom.yVar()),
-      r = d3.functor(geom.size())(getSize(d)),
-      fill = d3.functor(geom.color())(d[geom.colorVar()])
-      geom.canvas.moveTo(cx, cy);
-      geom.canvas.beginPath();
-      geom.canvas.arc(cx, cy, r, 0, 2 * Math.PI);
-      geom.canvas.fillStyle = fill;
-      geom.canvas.closePath()
-      geom.canvas.fill();
-    })
-  }
-  return geom;
+  return draw;
 };
-  
-charts.geom.smooth = function() {
-  var v = new charts.geom.abLine()
-                  .orient('vertical')
-  // overwrite prepData
-  // to deliver linear or loess curves
-  // with optional SE area.
-  return v;
+
+Bar.prototype.defaultStat = function() {
+  return new ggd3.stats.count();
+};
+
+ggd3.geoms.bar = Bar;
+
+// Base geom from which all geoms inherit
+function Geom(aes) {
+  var attributes = {
+    layer:     null,
+  };
+  this.attributes = attributes;
+  for(var attr in this.attributes){
+    if((!this[attr] && this.attributes.hasOwnProperty(attr))){
+      this[attr] = createAccessor(attr);
+    }
+  }
+}
+ggd3.geom = Geom;
+
+
+function Layer(aes) {
+  var attributes = {
+    plot:     null,
+    data:     null,
+    geom:     null,
+    stat:     null, // identity, sum, mean, percentile, etc.
+    position: null, // jitter, dodge, stack, etc.
+    aes:      null,
+    ownData: false,
+  };
+  this.attributes = attributes;
+  var getSet = ["plot", "data", "position", "aes"];
+  for(var attr in this.attributes){
+    if(!this[attr] && _.contains(getSet, attr) ){
+      this[attr] = createAccessor(attr);
+    }
+  }
 }
 
+Layer.prototype.ownData = function(tf) {
+  if(!arguments.length) { return this.attributes.ownData; }
+  // eventually, when called, this may
+  // nest the data appropriately
+  // ie.
+  // this.attributes.data = this.plot().nest(this.data());
+  this.attributes.ownData = tf;
+  return tf;
+};
 
-charts.geom.vline = function() {
-  var v = new charts.geom.abLine()
-                  .orient('vertical')
-                  .stat('mean')
-  return v;
+Layer.prototype.stat = function(stat) {
+  if(!arguments.length) { return this.attributes.stat; }
+  this.attributes.stat = stat;
+  // usually, default stat is accepted from geom
+  // but you can choose a stat and get a default geom
+  if(_.isNull(this.attributes.geom)) {
+    this.attributes.geom = stat.defaultGeom();
+  }
+  return this;
+};
+
+Layer.prototype.draw = function() {
+  var that = this,
+      facet = this.plot().facet();
+  function draw(sel) {
+
+    var dataList = that.ownData() ? that.dataList():that.plot().dataList();
+    // console.log(dataList);
+    _.each(dataList, function(data){
+      var s = sel.select("#" + data.selector);
+      s.call(that.geom().draw(), data.data);
+    });
+  }
+  return draw;
+};
+Layer.prototype.dataList = DataList;
+
+Layer.prototype.geom = function(geom) {
+  if(!arguments.length) { return this.attributes.geom; }
+  geom = new ggd3.geoms[geom]()
+                .layer(this);
+  this.attributes.geom = geom;
+  return this;
+};
+
+ggd3.layer = Layer;
+
+
+
+
+
+function Stat() {
+  var attributes = {
+  };
+  this.attributes = attributes;
+  for(var attr in this.attributes){
+    if((!this[attr] && this.attributes.hasOwnProperty(attr))){
+      this[attr] = createAccessor(attr);
+    }
+  }
+  return this;
+}
+// bin
+function Bin() {
+
+}
+Bin.prototype = new Stat();
+Bin.prototype.compute = function(data, nbins) {
+
+};
+Bin.prototype.name = function() {
+  return "bin";
+};
+ggd3.stats.bin = Bin;
+
+
+// count
+function Count() {
+
+}
+Count.prototype = new Stat();
+Count.prototype.compute = function(data) {
+  return data.length;
+};
+Count.prototype.name = function() {
+  return "count";
+};
+Count.prototype.defaultGeom = function() {
+  return new ggd3.geom.bar();
+};
+ggd3.stats.count = Count;
+
+// sum
+
+// mean
+
+// median
+
+// max
+
+// min 
+
+// identity
+function unNest (data) {
+  // recurse and flatten nested dataset
+  // this means no dataset can have a 'values' column
+  if(_.isNull(data)){ return data; }
+  var branch = _.all(_.map(data, function(d){
+    return d.hasOwnProperty('values');
+  }));
+  if(branch === false) { 
+    return data; 
+  }
+  var vals = _.flatten(
+              _.map(data, function(d) { return d.values; })
+             );
+  return ggd3.tools.unNest(vals);
 }
 
+ggd3.tools.unNest = unNest;
   if(typeof module === "object" && module.exports){
     // package loaded as node module
-    // charts.chart.scatter = require('./scatter.js').scatter;
-    this.charts = charts;
-    module.exports = charts;
+    this.ggd3 = ggd3;
+    module.exports = ggd3;
+    // I should probably learn what all this stuff does
+    // added the following two lines so this would work in
+    // vows
+    this._ = require('lodash');
+    this.d3 = require('d3');
   } else {
     // file is loaded in browser.
-    this.charts = charts;
+    console.log('loaded in browser')
+    this.ggd3 = ggd3;
   }
 }();
 
-},{}],3:[function(require,module,exports){
+},{"d3":6,"lodash":12}],3:[function(require,module,exports){
 (function (global){
 
-; $ = global.$ = require("/home/ben/projects/python27venv/charts/v2/node_modules/jquery/dist/jquery.js");
+; $ = global.$ = require("/home/ben/projects/python27venv/charts/v3/node_modules/jquery/dist/jquery.js");
 ;__browserify_shim_require__=require;(function browserifyShim(module, define, require) {
 /*!
  * Bootstrap v3.2.0 (http://getbootstrap.com)
@@ -3474,7 +3098,7 @@ if (typeof jQuery === 'undefined') { throw new Error('Bootstrap\'s JavaScript re
 }).call(global, module, undefined, undefined);
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"/home/ben/projects/python27venv/charts/v2/node_modules/jquery/dist/jquery.js":11}],4:[function(require,module,exports){
+},{"/home/ben/projects/python27venv/charts/v3/node_modules/jquery/dist/jquery.js":11}],4:[function(require,module,exports){
 (function(exports){
 crossfilter.version = "1.3.11";
 function crossfilter_identity(d) {

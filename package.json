@@ -1,5 +1,5 @@
 {
-  "name": "charts",
+  "name": "ggd3",
   "version": "0.1.0",
   "scripts": {
     "test": "grunt"
@@ -12,8 +12,8 @@
   },
   "browserify": {
     "scripts": {
-      "build": "browserify start.js -o charts.standalone.js",
-      "watch": "watchify start.js -o charts.standalone.js --debug --verbose"
+      "build": "browserify start.js -o ggd3.standalone.js",
+      "watch": "watchify start.js -o ggd3.standalone.js --debug --verbose"
     },
     "transform": [
       "browserify-shim"
@@ -41,6 +41,7 @@
     "grunt-contrib-uglify": "^0.6.0",
     "grunt-contrib-watch": "^0.6.1",
     "grunt-extract-sourcemap": "^0.1.12",
+    "grunt-vows": "^0.4.1",
     "vows": "^0.7.0"
   }
 }

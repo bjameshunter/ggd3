@@ -11,19 +11,18 @@ module.exports = function(grunt){
       dist: {
         src: [
           "begin.js",
-          "tools/*.js",
-          "geom/*.js",
-          "layout/*.js",
+          "src/*/*.js",
+          // "src/*/*.js",
           "end.js"
         ],
         dest: "dist/<%= pkg.name %>.v.<%= pkg.version%>.js"
       },
       test: {
-
+        "plot": "test/plot.js"
       }
     },
     jshint: {
-      files: ["chart/*.js", "layout/*.js",
+      files: ["src/**/*.js",
       "!node_modules/**/*"],
       options: {
         jshintrc: ".jshintrc"
@@ -34,7 +33,11 @@ module.exports = function(grunt){
         banner: '/*! <%= pkg.name %> <%= grunt.template.today("yyyy-mm-dd") %> */\n'
       },
         build: {
-        src: ['chart/*.js'],
+        src: [
+          "begin.js",
+          "src/*/*.js",
+          "end.js"
+        ],
         dest: 'build/<%= pkg.name %>.min.js'
       }
     },
@@ -52,19 +55,25 @@ module.exports = function(grunt){
           debug: true
         }
       }
+
     },
     watch: {
       scripts: {
         files: [
-          '*/*.js', 
-          "!charts.standalone.js",
+          '*.js', "src/*/*.js", "src/*.js",
           "!dist/*",
           ],
-        tasks: ['concat', 'browserify'],
+        tasks: ['concat', 'browserify', 'jshint'],
         options: {
           spawn: true,
           reload: false
         },  
+      }
+    },
+    vows: {
+      all: {
+        options: {reporter: 'spec'},
+        src: ["test/*.js", "!test/test-setup.js"],
       }
     }
   })
@@ -74,9 +83,10 @@ module.exports = function(grunt){
   grunt.loadNpmTasks('grunt-browserify');
   grunt.loadNpmTasks('grunt-extract-sourcemap');
   grunt.loadNpmTasks('grunt-contrib-watch');
+  grunt.loadNpmTasks('grunt-vows');
 
   // default tasks
-  grunt.registerTask('default', ["jshint", 'uglify', 'watch' ]);
+  grunt.registerTask('default', ["jshint", 'concat', 'watch']);
 
   // don't think I need this;
   grunt.registerTask('hint', ["jshint"]);

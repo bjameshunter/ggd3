@@ -1,9 +1,8 @@
 !function() {
-  var charts = {version: "0.1.0",
-                util: {}, 
-                geom: {},
+  var ggd3 = {version: "0.1.0",
                 tools: {},
-                layouts: {},
+                geoms: {},
+                stats: {},
                 };
   function createAccessor(attr){
     function accessor(value){

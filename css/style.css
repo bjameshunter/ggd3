@@ -6,17 +6,7 @@
 svg {
   font: 10px sans-serif;
 }
-.chart {
-  shape-Rendering: crispEdges;
-  stroke: #222222;
-}
-
-.brush .extent {
-  stroke: #fff;
-  fill-opacity: .125;
-  shape-rendering: crispEdges;
-}
-
+/* tooltips */
 div.tooltip-container {
   position: absolute;
   border-style: solid;
@@ -32,10 +22,6 @@ tooltip-container p {
 rect.brushframe {
   fill: none;
 }
-rect.node {
-  shape-Rendering: crispEdges;
-  stroke: #222222;
-}
 .yadjust {
   fill: none;
   pointer-events: all;
@@ -50,32 +36,10 @@ line.grid {
   stroke-dasharray: 3,3;
   stroke-opacity: 0.2;
 }
-circle.shade {
-  fill: gray !important;
-  opacity: 0.1 !important;
-}
-.hist {
-  stroke: black;
-}
-.geom-point {
-  stroke: none;
-}
-rect.geom {
-  shape-Rendering: crispEdges;
-  stroke: #222222;
-  stroke-opacity: 0.8;
-}
 .main-title {
   position: relative;
 }
-.controls {
-  width: 120px;
-  float:right;
-  display: inline-block;
-}
-.btn-group-sm label{
-  width: 50%;
-}
+/* plot/frames, etc. */
 .chart-frame {
   position:relative;
   border-width: 1px;
@@ -85,8 +49,44 @@ rect.geom {
   display:inline-block;
   float:left;
 }
+.plot-div {
+  float: left;
+/*  border-width: 1px;
+  border-style: solid;
+*/}
+.plot {
+  border-width: 1px;
+  border-style: solid;
+  border-color: orange;
+}
+.chart {
+  shape-Rendering: crispEdges;
+  stroke: #222222;
+}
 
+.brush .extent {
+  stroke: #fff;
+  fill-opacity: .125;
+  shape-rendering: crispEdges;
+}
+
+/* geoms */
 path.geom-grid-horiz, path.geom-grid-vert {
   stroke-dasharray: 3,1;
   stroke-opacity: 0.4;
+}
+.geom-point {
+  stroke: none;
+}
+rect.geom {
+  shape-Rendering: crispEdges;
+  stroke: #222222;
+  stroke-opacity: 0.8;
+}
+circle.shade {
+  fill: gray !important;
+  opacity: 0.1 !important;
+}
+.hist {
+  stroke: black;
 }
