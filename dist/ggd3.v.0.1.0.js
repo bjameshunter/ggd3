@@ -18,14 +18,16 @@ function Clean(data, obj) {
   var vars = {},
       dtypeDict = {"number": parseFloat, 
                   "integer": parseInt,
-                  "date": Date, 
                   "string": String},
-      dtypes = {},
+      dtypes = _.merge({}, obj.dtypes()),
       keys = _.keys(dtypes),
-      // assume all data points have same keys
+      // assume all records have same keys
       dkeys = _.keys(data[0]);
 
   dkeys.forEach(function(v){
+    // if a data type has been declared, don't 
+    // bother testing what it is.
+    // this is necessary for dates and such.
     if(!_.contains(keys, v)) { vars[v] = []; }
   });
   data.forEach(function(d) {
@@ -36,16 +38,20 @@ function Clean(data, obj) {
   _.mapValues(vars, function(v,k) {
     vars[k] = dtype(v);
   });
-  dtypes = _.merge(dtypes, vars);
+  dtypes = _.merge(vars, dtypes);
 
-  data.forEach(function(d) {
-    _.mapValues(dtypes, function(v,k) {
-      if(dtypeDict[dtypes[k][0]] === "date"){
-        d[k] = new Date(d[k]);
+  data = _.map(data, function(d,i) {
+    return _.map(dtypes, function(v,k) {
+      if(v[0] === "date" || 
+         v[0] === "time"){
+        var format = v[2];
+        if(i % 1000 ===0) { console.log(d[k]);}
+        d[k] = ggd3.tools.dateFormatter(d[k], format);
       } else {
         d[k] = dtypeDict[dtypes[k][0]](d[k]);
       }
-    });
+      return d;
+    })[0];
   });
   function dtype(arr) {
     var numProp = [],
@@ -72,6 +78,7 @@ function Clean(data, obj) {
       return ["string", "few"];
     }
   }
+  console.log(data);
   return {data: data, dtypes: dtypes};
 }
 
@@ -94,10 +101,11 @@ function DataList() {
       by = facet.by(),
       selector;
   if((x && !y) || (y && !x)){
+    console.log('x xor y');
     selector = x ? x + "-": y + "-";
     return _.map(this.data(), function(d) {
-      return {selector: selector + d.key,
-        data: d};
+      return {selector: rep(selector + d.key),
+        data: d.values};
     });
 
   } else if(x && y) {
@@ -106,7 +114,7 @@ function DataList() {
     _.each(this.data(), function(l1) {
       var selectX = x + "-" + l1.key;
       _.each(l1.values, function(l2) {
-        var s = y + "-" + l2.key + "_" + selectX;
+        var s = rep(y + "-" + l2.key + "_" + selectX);
         data.push({selector:s, data: l2.values});
       });
     });
@@ -120,6 +128,13 @@ function DataList() {
   }
 }
 
+ggd3.tools.dateFormatter = function(v, format) {
+  if(format === "%Y") {
+    return new Date(v, 0, 0, 0);
+  } else {
+    return new Date(v);
+  }
+};
 function Facet(spec) {
   var attributes = {
     x: null,
@@ -155,7 +170,8 @@ function Facet(spec) {
 
 Facet.prototype.updateFacet = function() {
   var that = this,
-      data = this.plot().data();
+      data = this.plot().data(),
+      nrows, ncols;
   that.xFacets = ["single"];
   that.yFacets = ["single"];
   // rules of faceting:
@@ -188,6 +204,7 @@ Facet.prototype.updateFacet = function() {
     }
   }
   that.nFacets = that.xFacets.length * that.yFacets.length;
+
   // if only x or y is set, user should input # rows or columns
   if( ( that.x() && that.y() ) && 
      ( that.ncols() || that.nrows() ) ){
@@ -203,24 +220,26 @@ Facet.prototype.updateFacet = function() {
             " one of facet.x() or facet.y()");
     }
     if(that.nrows() && !that.ncols()) {
-      that.ncols(Math.ceil(that.nFacets/that.nrows()));
+      that._ncols = Math.ceil(that.nFacets/that.nrows()); 
+      that._nrows = that.nrows();
     }
     if(that.ncols() && !that.nrows()) {
-      that.nrows(Math.ceil(that.nFacets/that.ncols()));
+      that._nrows = Math.ceil(that.nFacets/that.ncols());
+      that._ncols = that.ncols();
     }
   }
   if(!that.ncols() && !that.nrows() ) {
-    that.nrows(that.yFacets.length);
-    that.ncols(that.xFacets.length);
+    that._nrows = that.yFacets.length;
+    that._ncols = that.xFacets.length;
   }
 
   function update(sel) {
     var rows = sel.selectAll('div.row')
-                .data(_.range(that.nrows()));
+                .data(_.range(that._nrows));
     rows
       .attr('id', function(d) { return "row-" + d; })
       .each(function(d, i) {
-        that.makeDIV(d3.select(this), d);
+        that.makeDIV(d3.select(this), d, that._ncols);
       });
 
     rows.enter()
@@ -228,19 +247,19 @@ Facet.prototype.updateFacet = function() {
       .attr('class', 'row')
       .attr('id', function(d) { return "row-" + d; })
       .each(function(d, i) {
-        that.makeDIV(d3.select(this), d);
+        that.makeDIV(d3.select(this), d, that._ncols);
       });
     rows.exit().remove();
   }
   return update;
 };
 
-Facet.prototype.makeDIV = function(selection, rowNum) {
-  var remainder = this.nFacets % this.ncols(),
+Facet.prototype.makeDIV = function(selection, rowNum, ncols) {
+  var remainder = this.nFacets % ncols,
       that = this;
   row = selection.selectAll('div')
            .data(_.range((this.nFacets - this.nSVGs) > remainder ? 
-                 this.ncols(): remainder));
+                 ncols: remainder));
   row
     .each(function() {
       that.makeSVG(d3.select(this), rowNum);
@@ -256,6 +275,7 @@ Facet.prototype.makeDIV = function(selection, rowNum) {
 Facet.prototype.makeSVG = function(selection, rowNum) {
   var that = this,
       dim = this.plot().plotDim(),
+      plot = this.plot(),
       x = selection.data(),
       svg = selection
               .attr('id', function(d) {
@@ -267,16 +287,16 @@ Facet.prototype.makeSVG = function(selection, rowNum) {
   // to allow for space free, free_x and free_y
   svg
     .attr('class', 'plot-svg')
-    .attr('width', dim.x)
-    .attr('height', dim.y)
+    .attr('width', plot.width())
+    .attr('height', plot.height())
     .each(function(d) {
       that.makeCell(d3.select(this));
       that.makeClip(d3.select(this), x, rowNum);
     });
   svg.enter().append('svg')
     .attr('class', 'plot-svg')
-    .attr('width', dim.x)
-    .attr('height', dim.y)
+    .attr('width', plot.width())
+    .attr('height', plot.height())
     .each(function(d) {
       that.makeCell(d3.select(this));
       that.makeClip(d3.select(this), x, rowNum);
@@ -313,35 +333,48 @@ Facet.prototype.makeClip = function(selection, x, y) {
 };
 // if x and y [and "by"] are specified, return id like:
 // x-y[-by], otherwise return xFacet or yFacet
+function rep(s) {
+  return s.replace(' ', '-');
+}
 Facet.prototype.id = function(x, y) {
+
   if(this.x() && this.y()) {
-    return this.y() + "-" + this.yFacets[y]  + '_' + 
-    this.x() + "-" + this.xFacets[x];
+    return rep(this.y() + "-" + this.yFacets[y]  + '_' + 
+    this.x() + "-" + this.xFacets[x]);
   } else if(this.x()){
-    return this.x() + "-" + this.xFacets[this.nSVGs];
+    return rep(this.x() + "-" + this.xFacets[this.nSVGs]);
   } else if(this.y()){
-    return this.y() + "-" + this.yFacets[this.nSVGs];
+    return rep(this.y() + "-" + this.yFacets[this.nSVGs]);
   } else {
     return 'single';
   }
 };
 Facet.prototype.makeCell = function(selection) {
-  var margins = this.plot().margins();
+  var margins = this.plot().margins(),
+      plotDim = this.plot().plotDim();
 
   var plot = selection.selectAll('g.plot')
                 .data([0]);
   plot.enter().append('g')
     .attr('class', 'plot')
     .attr('transform', "translate(" + margins.left + 
-            "," + margins.top + ")");
+            "," + margins.top + ")")
+    .append('rect')
+    .attr('class', 'background')
+    .attr({x: 0, y:0, width: plotDim.x, height:plotDim.y});
+  plot.exit().remove();
+
   var xaxis = selection.selectAll('g.x.axis')
                 .data([0]);
   xaxis.enter().append('g')
     .attr('class', 'x axis');
+  xaxis.exit().remove();
   var yaxis = selection.selectAll('g.y.axis')
                 .data([0]);
   yaxis.enter().append('g')
     .attr('class', 'y axis');
+  yaxis.exit().remove();
+
 
 };
 ggd3.facet = Facet;
@@ -368,6 +401,7 @@ function Plot(aes) {
     // that need legends or legend objects
     xAdjust: false,
     yAdjust: false,
+    dtypes: {},
   };
   // aesthetics I might like to support:
 // ["alpha", "angle", "color", "fill", "group", "height", "label", "linetype", "lower", "order", "radius", "shape", "size", "slope", "width", "x", "xmax", "xmin", "xintercept", "y", "ymax", "ymin", "yintercept"] 
@@ -381,7 +415,7 @@ function Plot(aes) {
   this.nested = false;
   // explicitly declare which attributes get a basic
   // getter/setter
-  var getSet = ["opts", "theme", "margins",
+  var getSet = ["opts", "theme", "margins", 
     "width", "height", "xAdjust", "yAdjust"];
 
   for(var attr in attributes){
@@ -409,26 +443,18 @@ function scaleConfig(type) {
       break;
   }
   function scaleGetter(obj){
-    // reset scale to empty object
-    if(_.isEmpty(obj) && !_.isUndefined(obj)) {
-      this.attributes[scale] = obj;
-      return this;
-    }
     if(!arguments.length) {
       return this.attributes[scale];
     }
     if(obj instanceof ggd3.scale){
-      this.attributesp[scale] = obj;
+      this.attributes[scale] = obj;
       return this;
     }
-    // this isn't used yet, but will allow passing 
-    // an object of 
-    var s = new ggd3.scale().type(type).plot(this);
-    for(var setting in obj) {
-      s[setting](obj[setting]);
+    // reset scale to empty object or pass settings
+    if(!_.isUndefined(obj)) {
+      this.attributes[scale] = obj;
+      return this;
     }
-    this.attributes[scale] = s;
-    return this;
   }
   return scaleGetter;
 }
@@ -468,17 +494,24 @@ Plot.prototype.layers = function(layers) {
   return this;
 };
 
+Plot.prototype.dtypes = function(dtypes) {
+  if(!arguments.length) { return this.attributes.dtypes; }
+  this.attributes.dtypes = _.merge(this.attributes.dtypes, dtypes);
+  return this;
+};
+
 // custom data getter setter to pass data to layer if null
 Plot.prototype.data = function(data) {
   if(!arguments.length) { return this.attributes.data; }
   // clean data according to data types
   // and set top level ranges of scales.
   // dataset is passed through once here.
+  // must have passed a datatypes object in before.
   data = ggd3.tools.clean(data, this);
-  this.setScales();
   // after data is declared, nest it according to facets.
   this.attributes.data = this.nest(data.data);
-  this.dtypes = data.dtypes;
+  this.dtypes(data.dtypes);
+  this.setScales();
   this.nested = true;
   this.dataNew = true;
   return this;
@@ -492,11 +525,13 @@ Plot.prototype.facet = function(spec) {
     this.attributes.facet = spec.plot(this);
     if(this.nested){
       // unnest from old facets
+      console.log('nested');
       data = ggd3.tools.unNest(this.data());
       // nest according to new facets
       this.attributes.data = this.nest(data);
       this.setScales();
     } else {
+      console.log('not nested');
       this.attributes.data = this.nest(this.data());
       this.setScales();
     }
@@ -518,13 +553,13 @@ Plot.prototype.facet = function(spec) {
 
 Plot.prototype.aes = function(aes) {
   if(!arguments.length) { return this.attributes.aes; }
-  this.setScales();
   _.each(this.layers(), function(l) {
     if(_.isNull(l.aes())){
       l.aes(aes);
     }
   }, this);
   this.attributes.aes = aes;
+  this.setScales();
   return this;
 };
 
@@ -538,13 +573,27 @@ Plot.prototype.draw = function() {
   var that = this;
   function draw(sel) {
     sel.call(that.facet().updateFacet());
-    _.each(that.layers(), function(l) {
-      sel.call(l.draw());
+    // kinda labored way to get rid of unnecessary facets
+    var divs = [],
+        facets = _.pluck(that.dataList(), "selector");
+    sel.selectAll('.plot-div')
+      .each(function(d) {
+        divs.push(d3.select(this).attr('id'));
+      });
+    divs = divs.filter(function(d) { return !_.contains(facets, d);});
+    divs.forEach(function(d) {
+      sel.select("#" + d).select('svg').selectAll('*').remove();
+    });
+
+    // drawing layers
+    _.each(that.layers(), function(l, i) {
+      sel.call(l.draw(), i);
     });
   }
   this.dataNew = false;
   return draw;
 };
+
 
 Plot.prototype.nest = function(data) {
   if(_.isNull(data)) { return data; }
@@ -568,24 +617,34 @@ Plot.prototype.nest = function(data) {
 Plot.prototype.dataList = DataList;
 
 ggd3.plot = Plot;
+// opts looks like {scale: {}, 
+              // axis: {}, 
+              // type: <"linear", "ordinal", "time", etc... >,
+              // orient: "",
+              // position: ""};
+// for scales not x or y, axis will reflect 
+// settings for the legend (maybe)
+// all scales will get passed through "setScales"
+// but opts will override defaults
 function Scale(opts) {
+
   // allow setting of orient, position, scaleType, 
   // scale and axis settings, etc.
   var attributes = {
-    type: null,
+    aesthetic: null,
     domain: null,
     range: null,
     position: null, // left right top bottom none
     orient: null, // left right top bottom
     plot: null,
-    scaleType: "linear", // linear, log, ordinal, time, category, 
+    scaleType: null, // linear, log, ordinal, time, category, 
     // maybe radial, etc.
     scale: null,
-    axis: null
   };
   this.opts = opts;
   this.attributes = attributes;
-  var getSet = ["type", "plot", "orient", "position"];
+  this.scaleType(opts.type ? opts.type:null);
+  var getSet = ["aesthetic", "plot", "orient", "position"];
   for(var attr in this.attributes){
     if(!this[attr] && _.contains(getSet, attr) ){
       this[attr] = createAccessor(attr);
@@ -596,6 +655,7 @@ function Scale(opts) {
 Scale.prototype.scaleType = function(scaleType) {
   if(!arguments.length) { return this.attributes.scaleType; }
   var that = this;
+  this.attributes.scaleType = scaleType;
   switch(scaleType) {
     case 'linear':
       that.attributes.scale = d3.scale.linear();
@@ -607,6 +667,9 @@ Scale.prototype.scaleType = function(scaleType) {
       that.attributes.scale = d3.scale.ordinal();
       break;
     case 'time':
+      that.attributes.scale = d3.time.scale();
+      break;
+    case 'date':
       that.attributes.scale = d3.time.scale();
       break;
     case "category10":
@@ -625,23 +688,6 @@ Scale.prototype.scaleType = function(scaleType) {
   return this;
 };
 
-Scale.prototype.axis = function(settings) {
-  if(!arguments.length) { return this.attributes.axis; }
-  if(!_.contains(['x', 'y'], this.type())){
-    return this;
-  } else {
-    if(!_.isNull(this.axis())){
-      this.attributes.axis = d3.svg.axis();
-    }
-  }
-  for(var s in settings){
-    if(this.attributes.axis.hasOwnProperty(s)){
-      this.attributes.axis[s](settings[s]);
-    }
-  }
-  return this;
-};
-
 Scale.prototype.scale = function(settings){
   if(!arguments.length) { return this.attributes.scale; }
   for(var s in settings){
@@ -654,7 +700,11 @@ Scale.prototype.scale = function(settings){
 
 Scale.prototype.range = function(range) {
   if(!arguments.length) { return this.attributes.range; }
-  this.attributes.scale.range(range);
+  if(this.scaleType() === "ordinal"){
+    this.attributes.scale.rangeRoundBands(range, 0);
+  } else {
+    this.attributes.scale.range(range);
+  }
   return this;
 };
 
@@ -663,6 +713,28 @@ Scale.prototype.domain = function(domain) {
   this.attributes.scale.domain(domain);
 
   return this;
+};
+Scale.prototype.positionAxis = function() {
+  var margins = this.plot().margins(),
+      dim = this.plot().plotDim(),
+      aes = this.aesthetic(),
+      opts = this.opts.axis;
+  if(aes === "x"){
+    if(opts.position === "bottom"){
+      return [margins.left, margins.top + dim.y];
+    }
+    if(opts.position === "top"){
+      return [margins.left, margins.top];
+    }
+  }
+  if(aes === "y") {
+    if(opts.position === "left"){
+      return [margins.left, margins.top];
+    }
+    if(opts.position === "right"){
+      return [margins.left + dim.x, margins.top];
+    }
+  }
 };
 
 ggd3.scale = Scale;
@@ -697,7 +769,13 @@ function SetScales() {
       },
       data = this.dataList(),
       dtype,
-      settings;
+      settings,
+      // gather user defined settings in opts object
+      opts = _.mapValues(aesMap, function(v, k) {
+        return that[v]();
+      });
+  console.log(opts);
+
   function makeScale(d, aesthetic) {
     // rescale all aesthetics
     // need to allow the scale settings from plot object to 
@@ -705,50 +783,114 @@ function SetScales() {
     // passed to xScale, yScale, colorScale or sizeScale
     for(var a in aes){
       if(_.contains(scales, a)){
-        dtype = that.dtypes[aes[a]];
-        settings = ggd3.tools.defaultScaleSettings(dtype, a);
-        var scale = new ggd3.scale(settings.opts)
-                            .type(a)
-                            .scaleType(settings.type);
-        that[aesMap[a]]()[d.selector] = scale;
+        // user is not specifying a scale.
+        if(!(that[aesMap[a]]() instanceof ggd3.scale)){
+          // get plot level options set for scale.
+
+          dtype = that.dtypes()[aes[a]];
+          settings = _.merge(ggd3.tools.defaultScaleSettings(dtype, a),
+                             opts[a]);
+          var scale = new ggd3.scale(settings)
+                              .plot(that)
+                              .aesthetic(a);
+          if(_.contains(['x', 'y'], a)){
+            if(a === "x"){
+              scale.range([0, that.plotDim().x]);
+            }
+            if(a === "y") {
+              scale.range([that.plotDim().y, 0]);
+            }
+            scale.axis = d3.svg.axis().scale(scale.scale());
+          }
+          for(var ax in settings.axis){
+            if(scale.axis.hasOwnProperty(ax)){
+              scale.axis[ax](settings.axis[ax]);
+            }
+          }
+          for(var sc in settings.scale){
+            if(scale.scale.hasOwnProperty(sc)){
+              scale.scale()[ax](settings.scale[sc]);
+            }
+          }
+          if(_.contains(['linear', 'log', 'time'], settings.type)){
+            if(facet.scales() === "free" || 
+               facet.scales() === "free_" + a) {
+              scale.domain(d3.extent(_.pluck(d.data, aes[a])));
+            } else {
+              scale.domain(d3.extent(
+                              _.pluck(
+                                ggd3.tools.unNest(that.data()), aes[a])));     
+            }
+          } else {
+            // scale is ordinal
+            if(facet.scales() === "free" || 
+               facet.scales() === "free_" + a) {
+              scale.domain(_.unique(_.pluck(d.data, aes[a])));
+            } else {
+              scale.domain(_.unique(
+                              _.pluck(
+                                ggd3.tools.unNest(that.data()), aes[a])));              
+            }
+          }
+          that[aesMap[a]]()[d.selector] = scale;
+        } else {
+          // copy scale settings, merge with default info that wasn't
+          // declared and create for each facet if needed.
+        } 
       }
     }
   }
-  for(var a in aes) {
-    // reset all scales to empty object
-    that[aesMap[a]]({});
-  }
+  // for(var a in aes) {
+  //   // reset all scales to empty object
+  //   that[aesMap[a]]({});
+  // }
   _.map(data, function(d,i) {return makeScale(d);});
 }
-function xyScale(dtype) {
-  if(dtype[0] === "number") {
-    if(dtype[1] === "many"){
-      return 'linear';
-    } else {
-      return 'ordinal';
+
+ggd3.tools.defaultScaleSettings = function(dtype, aesthetic) {
+  function xyScale() {
+    if(dtype[0] === "number") {
+      if(dtype[1] === "many"){
+        return {type: 'linear',
+                  axis: {},
+                  scale: {}};
+      } else {
+        return {type: 'ordinal',
+                  axis: {},
+                  scale: {rangeRoundBands: ""}};
+      }
+    }
+    if(dtype[0] === "date"){
+        return {type: 'time',
+                  axis: {},
+                  scale: {}};
+    }
+    if(dtype[0] === "string"){
+        return {type: 'ordinal',
+                  axis: {},
+                  scale: {}};
     }
   }
-  if(dtype[0] === "date"){
-    return 'time';
-  }
-  if(dtype[0] === "string"){
-    return 'ordinal';
-  }
-}
-ggd3.tools.defaultScaleSettings = function(dtype, aesthetic) {
+  var s;
   switch(aesthetic) {
     case "x":
-      var xOpts = {position: "bottom", 
-                  orient: "bottom"};
-      return {type: xyScale(dtype), opts: xOpts};
+      s = xyScale(dtype);
+      s.axis.position = "bottom";
+      s.axis.orient = "bottom";
+      return s;
     case "y":
-      var yOpts = {position: "left", 
-                  orient: "left"};
-      return {type: xyScale(dtype), opts: yOpts};
+      s = xyScale(dtype);
+      s.axis.position = "left";
+      s.axis.orient = "left";
+      return s;
     case "color":
-      return {type:"category10", opts: {position:'none'}};
+      return {type:"category10", 
+            axis: {position:'none'},
+            scale: {}};
     case "size":
-      return {type: 'linear', opts: {position:'none'}};
+      return {type: 'linear', 
+             axis: {position:'none'},
+             scale: {}};
   }
 };
 ggd3.tools.domain = function(data) {
@@ -778,9 +920,22 @@ Bar.prototype = new Geom();
 Bar.prototype.draw = function() {
   var layer = this.layer(),
       plot = layer.plot(),
+      margins = plot.margins(),
       aes = layer.aes(),
       that = this;
   function draw(sel, data) {
+    var id = sel.attr('id'),
+        x = plot.xScale()[id],
+        y = plot.yScale()[id];
+    // drawing and positioning axes probably shouldn't be on
+    // the geom
+    sel.select('.x.axis')
+      .attr("transform", "translate(" + x.positionAxis() + ")")
+      .call(x.axis);
+    sel.select('.y.axis')
+      .attr("transform", "translate(" + y.positionAxis() + ")")
+      .call(y.axis);
+    
     // sel is svg, data is array of objects
 
 
@@ -855,7 +1010,6 @@ Layer.prototype.draw = function() {
   function draw(sel) {
 
     var dataList = that.ownData() ? that.dataList():that.plot().dataList();
-    // console.log(dataList);
     _.each(dataList, function(data){
       var s = sel.select("#" + data.selector);
       s.call(that.geom().draw(), data.data);

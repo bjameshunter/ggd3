@@ -20,6 +20,7 @@ function Plot(aes) {
     // that need legends or legend objects
     xAdjust: false,
     yAdjust: false,
+    dtypes: {},
   };
   // aesthetics I might like to support:
 // ["alpha", "angle", "color", "fill", "group", "height", "label", "linetype", "lower", "order", "radius", "shape", "size", "slope", "width", "x", "xmax", "xmin", "xintercept", "y", "ymax", "ymin", "yintercept"] 
@@ -33,7 +34,7 @@ function Plot(aes) {
   this.nested = false;
   // explicitly declare which attributes get a basic
   // getter/setter
-  var getSet = ["opts", "theme", "margins",
+  var getSet = ["opts", "theme", "margins", 
     "width", "height", "xAdjust", "yAdjust"];
 
   for(var attr in attributes){
@@ -61,26 +62,18 @@ function scaleConfig(type) {
       break;
   }
   function scaleGetter(obj){
-    // reset scale to empty object
-    if(_.isEmpty(obj) && !_.isUndefined(obj)) {
-      this.attributes[scale] = obj;
-      return this;
-    }
     if(!arguments.length) {
       return this.attributes[scale];
     }
     if(obj instanceof ggd3.scale){
-      this.attributesp[scale] = obj;
+      this.attributes[scale] = obj;
       return this;
     }
-    // this isn't used yet, but will allow passing 
-    // an object of 
-    var s = new ggd3.scale().type(type).plot(this);
-    for(var setting in obj) {
-      s[setting](obj[setting]);
+    // reset scale to empty object or pass settings
+    if(!_.isUndefined(obj)) {
+      this.attributes[scale] = obj;
+      return this;
     }
-    this.attributes[scale] = s;
-    return this;
   }
   return scaleGetter;
 }
@@ -120,17 +113,24 @@ Plot.prototype.layers = function(layers) {
   return this;
 };
 
+Plot.prototype.dtypes = function(dtypes) {
+  if(!arguments.length) { return this.attributes.dtypes; }
+  this.attributes.dtypes = _.merge(this.attributes.dtypes, dtypes);
+  return this;
+};
+
 // custom data getter setter to pass data to layer if null
 Plot.prototype.data = function(data) {
   if(!arguments.length) { return this.attributes.data; }
   // clean data according to data types
   // and set top level ranges of scales.
   // dataset is passed through once here.
+  // must have passed a datatypes object in before.
   data = ggd3.tools.clean(data, this);
-  this.setScales();
   // after data is declared, nest it according to facets.
   this.attributes.data = this.nest(data.data);
-  this.dtypes = data.dtypes;
+  this.dtypes(data.dtypes);
+  this.setScales();
   this.nested = true;
   this.dataNew = true;
   return this;
@@ -144,11 +144,13 @@ Plot.prototype.facet = function(spec) {
     this.attributes.facet = spec.plot(this);
     if(this.nested){
       // unnest from old facets
+      console.log('nested');
       data = ggd3.tools.unNest(this.data());
       // nest according to new facets
       this.attributes.data = this.nest(data);
       this.setScales();
     } else {
+      console.log('not nested');
       this.attributes.data = this.nest(this.data());
       this.setScales();
     }
@@ -170,13 +172,13 @@ Plot.prototype.facet = function(spec) {
 
 Plot.prototype.aes = function(aes) {
   if(!arguments.length) { return this.attributes.aes; }
-  this.setScales();
   _.each(this.layers(), function(l) {
     if(_.isNull(l.aes())){
       l.aes(aes);
     }
   }, this);
   this.attributes.aes = aes;
+  this.setScales();
   return this;
 };
 
@@ -190,13 +192,27 @@ Plot.prototype.draw = function() {
   var that = this;
   function draw(sel) {
     sel.call(that.facet().updateFacet());
-    _.each(that.layers(), function(l) {
-      sel.call(l.draw());
+    // kinda labored way to get rid of unnecessary facets
+    var divs = [],
+        facets = _.pluck(that.dataList(), "selector");
+    sel.selectAll('.plot-div')
+      .each(function(d) {
+        divs.push(d3.select(this).attr('id'));
+      });
+    divs = divs.filter(function(d) { return !_.contains(facets, d);});
+    divs.forEach(function(d) {
+      sel.select("#" + d).select('svg').selectAll('*').remove();
+    });
+
+    // drawing layers
+    _.each(that.layers(), function(l, i) {
+      sel.call(l.draw(), i);
     });
   }
   this.dataNew = false;
   return draw;
 };
+
 
 Plot.prototype.nest = function(data) {
   if(_.isNull(data)) { return data; }

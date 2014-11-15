@@ -5,44 +5,94 @@
 <script type='text/javascript' src='../ggd3.standalone.js'></script></head>
 </head>
 <body>
+<div>
+  <select id="dataset" class='btn btn-primary'>
+  <option value="mtcars.csv" id='cars' >cars</option>
+  <option value="iris.csv" id='iris' >iris</option>
+  <option value="diamonds.csv" id='diamonds' >diamonds</option>
+  <option value="baseball.csv" id='baseball' selected>baseball</option>
+  <option value="nelplo.csv" id='nelplo' >nelplo</option>
+  <option value="wells.csv" id='wells' >wells</option>
+  <option value="ustimeseries.csv" id='ustimeseries' >ustimeseries</option>
+</select>
+<!-- <select id="xVar" class='btn btn-primary'>
+</select>    
+<select id="yVar" class='btn btn-primary'>
+</select>    
+ -->
+<select id="facet-scales" class='btn btn-primary'>
+  <option value="fixed" id="fixed" selected>fixed</option>
+  <option value="free" id="free" >free</option>
+  <option value="free_x" id="free_x" >free x</option>
+  <option value="free_y" id="free_y" >free y</option>
+</select>    
+<!-- <select id="xAxisPos" class='btn btn-primary'>
+  <option value="bottom" selected>x axis bottom</option>
+  <option value="top">x axis top</option>
+</select>    
+<select id="yAxisPos" class='btn btn-primary'>
+  <option value="left" selected>y axis left</option>
+  <option value="right">y axis right</option>
+</select>    
+ -->
+</div>
 <div id='chart01' class='chart-frame'></div>
 <script>
 var ch;
 var div = d3.select('#chart01')
-d3.csv('../data/baseball.csv', function(error, cars) {
-
-ch = new ggd3.plot(/* top-level aes */)
-//           .layers(/* string or layer object*/)
+$("#dataset").on('change', function() {
+  redraw()
+})
+$("#facet-scales").on('change', function() {
+  redraw()
+})
+var facets = {'mtcars.csv': {"x": "gear", y: "am"},
+            "iris.csv" : {'y': "Species", ncols: 3},
+            "diamonds.csv": {"x": "color", "y": "cut"},
+            "baseball.csv": {"x": "decade", "y": "team"},
+            "nelplo.csv": {x: 'group', ncols: 3},
+            "ustimeseries.csv": {x: 'group', nrows:3},
+            "wells.csv": {x: 'switch', nrows:2}
+          };
+var aes = {'mtcars.csv': {"x": "mpg" , "y": "hp"},
+            "iris.csv" : {'x': "Sepal.Length", "y": "Sepal.Width"},
+            "diamonds.csv": {"x": "carat", "y": "clarity"},
+            "baseball.csv": {"x": "year", "y": "h"},
+            "nelplo.csv": {'x': 'date', 'y': 'value'},
+            "ustimeseries.csv": {'x': 'date', 'y': 'value'},
+            "wells.csv": {'x': 'arsenic', 'y': 'dist'}
+          };
+var dtypes = {'mtcars.csv': {"gear": ["string"]},
+            "iris.csv" : {},
+            "diamonds.csv": {},
+            "baseball.csv": {"year": ['date', 'many', "%Y"]},
+            "nelplo.csv": {"date": ['date', 'many']},
+            "ustimeseries.csv": {"date": ['date', 'many']},
+            "wells.csv": {},
+          };
+ch = new ggd3.plot()
           .layers(['bar'])
-          .data(cars)
           .width(200)
           .height(200)
-          .aes({"x": "year", "y": "ab"})
+          .yScale({axis: {ticks: 8, position:'right'}})
+          .margins({top: 5, bottom:20, left:11, right:2})
+          .xScale({axis: {ticks: 4}})
           .xAdjust(true);
-//           .scaleX(/* d3 axis or scale specs 
-//                   {axis: {}, scale: {}}*/)
-//           .scaleY(/* d3 axis or scale specs 
-//                   {axis: {}, scale: {}}*/)
-//           .opts(/* assorted settings */)
-//           .theme(/* optional theme to direct to custom css */)
+// this should work;
+function redraw() {
+  var dataset = $("#dataset")[0].value;
+  d3.csv("../data/" + dataset, function(error, data) {
+  ch.data(data)
+    .aes(aes[dataset])
+    .dtypes(dtypes[dataset])
 
-// var layer1 = ggd3.layer(/* top-level aes */)
-//           .geom(/* string */)
-//           .stat(/* string */)
-//           .data(/* optional data, otherwise 
-//                 inherits from parent chart */)
-
-var facet = new ggd3.facet()
-              .x("decade")
-              .y("team")
-              .type("grid")
-              .scales('free_x');
-              // .scales( string, one of 
-              //         "free_x", "free_y", "free" )
-              // .space(/* string - maybe - to calculate
-//               size of plot based on range of data in facet */)
-div.call(ch.facet(facet).draw());
-})
+    var facet = new ggd3.facet(facets[dataset])
+                  .type("grid")
+                  .scales($("#facet-scales")[0].value);
+    div.call(ch.facet(facet).draw());
+  })
+}
+redraw();
 </script>
 </body>
 </html>

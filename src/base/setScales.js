@@ -29,7 +29,13 @@ function SetScales() {
       },
       data = this.dataList(),
       dtype,
-      settings;
+      settings,
+      // gather user defined settings in opts object
+      opts = _.mapValues(aesMap, function(v, k) {
+        return that[v]();
+      });
+  console.log(opts);
+
   function makeScale(d, aesthetic) {
     // rescale all aesthetics
     // need to allow the scale settings from plot object to 
@@ -37,50 +43,114 @@ function SetScales() {
     // passed to xScale, yScale, colorScale or sizeScale
     for(var a in aes){
       if(_.contains(scales, a)){
-        dtype = that.dtypes[aes[a]];
-        settings = ggd3.tools.defaultScaleSettings(dtype, a);
-        var scale = new ggd3.scale(settings.opts)
-                            .type(a)
-                            .scaleType(settings.type);
-        that[aesMap[a]]()[d.selector] = scale;
+        // user is not specifying a scale.
+        if(!(that[aesMap[a]]() instanceof ggd3.scale)){
+          // get plot level options set for scale.
+
+          dtype = that.dtypes()[aes[a]];
+          settings = _.merge(ggd3.tools.defaultScaleSettings(dtype, a),
+                             opts[a]);
+          var scale = new ggd3.scale(settings)
+                              .plot(that)
+                              .aesthetic(a);
+          if(_.contains(['x', 'y'], a)){
+            if(a === "x"){
+              scale.range([0, that.plotDim().x]);
+            }
+            if(a === "y") {
+              scale.range([that.plotDim().y, 0]);
+            }
+            scale.axis = d3.svg.axis().scale(scale.scale());
+          }
+          for(var ax in settings.axis){
+            if(scale.axis.hasOwnProperty(ax)){
+              scale.axis[ax](settings.axis[ax]);
+            }
+          }
+          for(var sc in settings.scale){
+            if(scale.scale.hasOwnProperty(sc)){
+              scale.scale()[ax](settings.scale[sc]);
+            }
+          }
+          if(_.contains(['linear', 'log', 'time'], settings.type)){
+            if(facet.scales() === "free" || 
+               facet.scales() === "free_" + a) {
+              scale.domain(d3.extent(_.pluck(d.data, aes[a])));
+            } else {
+              scale.domain(d3.extent(
+                              _.pluck(
+                                ggd3.tools.unNest(that.data()), aes[a])));     
+            }
+          } else {
+            // scale is ordinal
+            if(facet.scales() === "free" || 
+               facet.scales() === "free_" + a) {
+              scale.domain(_.unique(_.pluck(d.data, aes[a])));
+            } else {
+              scale.domain(_.unique(
+                              _.pluck(
+                                ggd3.tools.unNest(that.data()), aes[a])));              
+            }
+          }
+          that[aesMap[a]]()[d.selector] = scale;
+        } else {
+          // copy scale settings, merge with default info that wasn't
+          // declared and create for each facet if needed.
+        } 
       }
     }
   }
-  for(var a in aes) {
-    // reset all scales to empty object
-    that[aesMap[a]]({});
-  }
+  // for(var a in aes) {
+  //   // reset all scales to empty object
+  //   that[aesMap[a]]({});
+  // }
   _.map(data, function(d,i) {return makeScale(d);});
 }
-function xyScale(dtype) {
-  if(dtype[0] === "number") {
-    if(dtype[1] === "many"){
-      return 'linear';
-    } else {
-      return 'ordinal';
+
+ggd3.tools.defaultScaleSettings = function(dtype, aesthetic) {
+  function xyScale() {
+    if(dtype[0] === "number") {
+      if(dtype[1] === "many"){
+        return {type: 'linear',
+                  axis: {},
+                  scale: {}};
+      } else {
+        return {type: 'ordinal',
+                  axis: {},
+                  scale: {rangeRoundBands: ""}};
+      }
+    }
+    if(dtype[0] === "date"){
+        return {type: 'time',
+                  axis: {},
+                  scale: {}};
+    }
+    if(dtype[0] === "string"){
+        return {type: 'ordinal',
+                  axis: {},
+                  scale: {}};
     }
   }
-  if(dtype[0] === "date"){
-    return 'time';
-  }
-  if(dtype[0] === "string"){
-    return 'ordinal';
-  }
-}
-ggd3.tools.defaultScaleSettings = function(dtype, aesthetic) {
+  var s;
   switch(aesthetic) {
     case "x":
-      var xOpts = {position: "bottom", 
-                  orient: "bottom"};
-      return {type: xyScale(dtype), opts: xOpts};
+      s = xyScale(dtype);
+      s.axis.position = "bottom";
+      s.axis.orient = "bottom";
+      return s;
     case "y":
-      var yOpts = {position: "left", 
-                  orient: "left"};
-      return {type: xyScale(dtype), opts: yOpts};
+      s = xyScale(dtype);
+      s.axis.position = "left";
+      s.axis.orient = "left";
+      return s;
     case "color":
-      return {type:"category10", opts: {position:'none'}};
+      return {type:"category10", 
+            axis: {position:'none'},
+            scale: {}};
     case "size":
-      return {type: 'linear', opts: {position:'none'}};
+      return {type: 'linear', 
+             axis: {position:'none'},
+             scale: {}};
   }
 };
 ggd3.tools.domain = function(data) {

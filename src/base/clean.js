@@ -4,14 +4,16 @@ function Clean(data, obj) {
   var vars = {},
       dtypeDict = {"number": parseFloat, 
                   "integer": parseInt,
-                  "date": Date, 
                   "string": String},
-      dtypes = {},
+      dtypes = _.merge({}, obj.dtypes()),
       keys = _.keys(dtypes),
-      // assume all data points have same keys
+      // assume all records have same keys
       dkeys = _.keys(data[0]);
 
   dkeys.forEach(function(v){
+    // if a data type has been declared, don't 
+    // bother testing what it is.
+    // this is necessary for dates and such.
     if(!_.contains(keys, v)) { vars[v] = []; }
   });
   data.forEach(function(d) {
@@ -22,16 +24,20 @@ function Clean(data, obj) {
   _.mapValues(vars, function(v,k) {
     vars[k] = dtype(v);
   });
-  dtypes = _.merge(dtypes, vars);
+  dtypes = _.merge(vars, dtypes);
 
-  data.forEach(function(d) {
-    _.mapValues(dtypes, function(v,k) {
-      if(dtypeDict[dtypes[k][0]] === "date"){
-        d[k] = new Date(d[k]);
+  data = _.map(data, function(d,i) {
+    return _.map(dtypes, function(v,k) {
+      if(v[0] === "date" || 
+         v[0] === "time"){
+        var format = v[2];
+        if(i % 1000 ===0) { console.log(d[k]);}
+        d[k] = ggd3.tools.dateFormatter(d[k], format);
       } else {
         d[k] = dtypeDict[dtypes[k][0]](d[k]);
       }
-    });
+      return d;
+    })[0];
   });
   function dtype(arr) {
     var numProp = [],
@@ -58,6 +64,7 @@ function Clean(data, obj) {
       return ["string", "few"];
     }
   }
+  console.log(data);
   return {data: data, dtypes: dtypes};
 }
 

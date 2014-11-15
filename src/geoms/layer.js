@@ -44,7 +44,6 @@ Layer.prototype.draw = function() {
   function draw(sel) {
 
     var dataList = that.ownData() ? that.dataList():that.plot().dataList();
-    // console.log(dataList);
     _.each(dataList, function(data){
       var s = sel.select("#" + data.selector);
       s.call(that.geom().draw(), data.data);

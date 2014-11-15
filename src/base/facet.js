@@ -33,7 +33,8 @@ function Facet(spec) {
 
 Facet.prototype.updateFacet = function() {
   var that = this,
-      data = this.plot().data();
+      data = this.plot().data(),
+      nrows, ncols;
   that.xFacets = ["single"];
   that.yFacets = ["single"];
   // rules of faceting:
@@ -66,6 +67,7 @@ Facet.prototype.updateFacet = function() {
     }
   }
   that.nFacets = that.xFacets.length * that.yFacets.length;
+
   // if only x or y is set, user should input # rows or columns
   if( ( that.x() && that.y() ) && 
      ( that.ncols() || that.nrows() ) ){
@@ -81,24 +83,26 @@ Facet.prototype.updateFacet = function() {
             " one of facet.x() or facet.y()");
     }
     if(that.nrows() && !that.ncols()) {
-      that.ncols(Math.ceil(that.nFacets/that.nrows()));
+      that._ncols = Math.ceil(that.nFacets/that.nrows()); 
+      that._nrows = that.nrows();
     }
     if(that.ncols() && !that.nrows()) {
-      that.nrows(Math.ceil(that.nFacets/that.ncols()));
+      that._nrows = Math.ceil(that.nFacets/that.ncols());
+      that._ncols = that.ncols();
     }
   }
   if(!that.ncols() && !that.nrows() ) {
-    that.nrows(that.yFacets.length);
-    that.ncols(that.xFacets.length);
+    that._nrows = that.yFacets.length;
+    that._ncols = that.xFacets.length;
   }
 
   function update(sel) {
     var rows = sel.selectAll('div.row')
-                .data(_.range(that.nrows()));
+                .data(_.range(that._nrows));
     rows
       .attr('id', function(d) { return "row-" + d; })
       .each(function(d, i) {
-        that.makeDIV(d3.select(this), d);
+        that.makeDIV(d3.select(this), d, that._ncols);
       });
 
     rows.enter()
@@ -106,19 +110,19 @@ Facet.prototype.updateFacet = function() {
       .attr('class', 'row')
       .attr('id', function(d) { return "row-" + d; })
       .each(function(d, i) {
-        that.makeDIV(d3.select(this), d);
+        that.makeDIV(d3.select(this), d, that._ncols);
       });
     rows.exit().remove();
   }
   return update;
 };
 
-Facet.prototype.makeDIV = function(selection, rowNum) {
-  var remainder = this.nFacets % this.ncols(),
+Facet.prototype.makeDIV = function(selection, rowNum, ncols) {
+  var remainder = this.nFacets % ncols,
       that = this;
   row = selection.selectAll('div')
            .data(_.range((this.nFacets - this.nSVGs) > remainder ? 
-                 this.ncols(): remainder));
+                 ncols: remainder));
   row
     .each(function() {
       that.makeSVG(d3.select(this), rowNum);
@@ -134,6 +138,7 @@ Facet.prototype.makeDIV = function(selection, rowNum) {
 Facet.prototype.makeSVG = function(selection, rowNum) {
   var that = this,
       dim = this.plot().plotDim(),
+      plot = this.plot(),
       x = selection.data(),
       svg = selection
               .attr('id', function(d) {
@@ -145,16 +150,16 @@ Facet.prototype.makeSVG = function(selection, rowNum) {
   // to allow for space free, free_x and free_y
   svg
     .attr('class', 'plot-svg')
-    .attr('width', dim.x)
-    .attr('height', dim.y)
+    .attr('width', plot.width())
+    .attr('height', plot.height())
     .each(function(d) {
       that.makeCell(d3.select(this));
       that.makeClip(d3.select(this), x, rowNum);
     });
   svg.enter().append('svg')
     .attr('class', 'plot-svg')
-    .attr('width', dim.x)
-    .attr('height', dim.y)
+    .attr('width', plot.width())
+    .attr('height', plot.height())
     .each(function(d) {
       that.makeCell(d3.select(this));
       that.makeClip(d3.select(this), x, rowNum);
@@ -191,35 +196,48 @@ Facet.prototype.makeClip = function(selection, x, y) {
 };
 // if x and y [and "by"] are specified, return id like:
 // x-y[-by], otherwise return xFacet or yFacet
+function rep(s) {
+  return s.replace(' ', '-');
+}
 Facet.prototype.id = function(x, y) {
+
   if(this.x() && this.y()) {
-    return this.y() + "-" + this.yFacets[y]  + '_' + 
-    this.x() + "-" + this.xFacets[x];
+    return rep(this.y() + "-" + this.yFacets[y]  + '_' + 
+    this.x() + "-" + this.xFacets[x]);
   } else if(this.x()){
-    return this.x() + "-" + this.xFacets[this.nSVGs];
+    return rep(this.x() + "-" + this.xFacets[this.nSVGs]);
   } else if(this.y()){
-    return this.y() + "-" + this.yFacets[this.nSVGs];
+    return rep(this.y() + "-" + this.yFacets[this.nSVGs]);
   } else {
     return 'single';
   }
 };
 Facet.prototype.makeCell = function(selection) {
-  var margins = this.plot().margins();
+  var margins = this.plot().margins(),
+      plotDim = this.plot().plotDim();
 
   var plot = selection.selectAll('g.plot')
                 .data([0]);
   plot.enter().append('g')
     .attr('class', 'plot')
     .attr('transform', "translate(" + margins.left + 
-            "," + margins.top + ")");
+            "," + margins.top + ")")
+    .append('rect')
+    .attr('class', 'background')
+    .attr({x: 0, y:0, width: plotDim.x, height:plotDim.y});
+  plot.exit().remove();
+
   var xaxis = selection.selectAll('g.x.axis')
                 .data([0]);
   xaxis.enter().append('g')
     .attr('class', 'x axis');
+  xaxis.exit().remove();
   var yaxis = selection.selectAll('g.y.axis')
                 .data([0]);
   yaxis.enter().append('g')
     .attr('class', 'y axis');
+  yaxis.exit().remove();
+
 
 };
 ggd3.facet = Facet;

@@ -16,10 +16,11 @@ function DataList() {
       by = facet.by(),
       selector;
   if((x && !y) || (y && !x)){
+    console.log('x xor y');
     selector = x ? x + "-": y + "-";
     return _.map(this.data(), function(d) {
-      return {selector: selector + d.key,
-        data: d};
+      return {selector: rep(selector + d.key),
+        data: d.values};
     });
 
   } else if(x && y) {
@@ -28,7 +29,7 @@ function DataList() {
     _.each(this.data(), function(l1) {
       var selectX = x + "-" + l1.key;
       _.each(l1.values, function(l2) {
-        var s = y + "-" + l2.key + "_" + selectX;
+        var s = rep(y + "-" + l2.key + "_" + selectX);
         data.push({selector:s, data: l2.values});
       });
     });
