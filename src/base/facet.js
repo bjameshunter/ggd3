@@ -279,64 +279,82 @@ Facet.prototype.makeCell = function(selection, x, y, ncols) {
 Facet.prototype.makeTitle = function(selection, colNum, rowNum) {
   var that = this,
       dim = this.plot().plotDim(),
-      addHeight = rowNum === 0 ? dim.y*that.titleProps()[1]:0,
-      addWidth = colNum === 0 ? dim.x*that.titleProps()[0]:0,
+      addHeight = dim.y*that.titleProps()[1],
+      addWidth = dim.x*that.titleProps()[0],
       plot = this.plot();
-  if(rowNum===0 && that.type() === "grid"){
-    var xlab = selection
-                .selectAll('svg.grid-title-x')
-                .data([that.xFacets[colNum]]);
-    xlab.attr('width', dim.x)
-        .attr('height', dim.y*0.1)
-        .select('text')
-        .text(_.identity);
-    xlab.enter().append('svg')
-        .attr('class', 'grid-title-x')
-        .attr('width', dim.x)
-        .attr('height', addHeight)
-        .append('text')
-        .attr({'fill': 'black',
-              'opacity': 1,
-              'font-size': 12,
-            'x': dim.x/2 + addWidth,
-            'y': addHeight*0.8,
+  var xlab = selection
+              .selectAll('svg.grid-title-x')
+              .data([that.x() + " - " + that.xFacets[colNum]]);
+  var ylab = selection
+              .selectAll('svg.grid-title-y')
+              .data([that.y() + " - " + that.yFacets[rowNum]]);
+  xlab.enter().append('svg')
+      .attr({'class': 'grid-title-x',
+            width: dim.x + addWidth,
+            height: addHeight*0.8})
+      .append('text');
+  ylab.enter().append('svg')
+      .attr('class', 'grid-title-y')
+      .append('text');
+  if(that.type() === "grid"){
+    addHeight = rowNum === 0 ? addHeight:0;
+    addWidth = colNum === 0 ? addWidth:0;
+    if(rowNum===0 && that.type() === "grid"){
+      xlab.attr("height", addHeight*0.8)
+          .select('text').attr({fill: 'black',
+            opacity: 1,
+            "font-size": 12,
+            x: dim.x/2 + addWidth,
+            y: addHeight*0.8,
             "text-anchor": 'middle'})
-        .text(_.identity);
-  }
-  if(colNum===0 && that.type() === "grid"){
-    console.log(addWidth);
-    var ylab = selection
-                .selectAll('svg.grid-title-y')
-                .data([that.yFacets[rowNum]]);
-    ylab.attr('width', addWidth)
-        .attr('height', dim.y)
-        .select('text')
-        .attr({'fill': 'black',
-            'opacity': 1,
-            'font-size': 14,
-            'x': addWidth,
-            'y': dim.y/2 + addHeight,
-            "text-anchor": 'middle',
-            "transform": "rotate(-90 " + addWidth + ", " + (dim.y/2 + addHeight) + ")"})
-        .text(_.identity);
-    ylab.enter().append('svg')
-        .attr('class', 'grid-title-y')
-        .attr('width', addWidth)
-        .attr('height', dim.y)
-        .append('g')
-        .append('text')
-        .attr({'fill': 'black',
+          .text(_.identity);
+    } else {
+      selection.select('.grid-title-x')
+        .attr("height", 0)
+        .select('text').text('');
+    }
+    if(colNum===0 && that.type() === "grid"){
+      ylab.attr('width', addWidth)
+          .select('text')
+          .attr({'fill': 'black',
               'opacity': 1,
               'font-size': 14,
-            'x': addWidth,
-            'y': dim.y/2 + addHeight,
-            "text-anchor": 'middle',
-            "transform": "rotate(-90 " + addWidth + ", " + (dim.y/2 + addHeight) + ")"})
-        .text(_.identity);
-  }
-  if(that.type() !== "grid"){
-
+              'x': addWidth,
+              'y': dim.y/2 + addHeight,
+              "text-anchor": 'middle',
+              "transform": "rotate(-90 " + addWidth + ", " + (dim.y/2 + addHeight) + ")"})
+          .text(_.identity);
+    } else {
+      selection.select('.grid-title-y')
+        .attr({width:0}).select('text').text('');
+    }
+  } else {
+    // add labels to wrap-style faceting.
+      xlab.attr("height", addHeight*0.8)
+          .select('text').attr({fill: 'black',
+            opacity: 1,
+            "font-size": 12,
+            x: dim.x/2 + addWidth,
+            y: addHeight*0.8,
+            "text-anchor": 'middle'})
+          .text(that.wrapLabel(rowNum, colNum));
+      selection.select('.grid-title-y')
+        .attr({width:0}).select('text').text('');
   }
   return selection.select('.plot-svg');
 };
+
+Facet.prototype.wrapLabel = function(row, col) {
+  var that = this;
+  if(this.x() && !this.y()){
+    return this.x() + " - " + this.xFacets[this.nSVGs];
+  }
+  if(this.y() && !this.x()){
+    return this.y() + " - " + this.yFacets[this.nSVGs];
+  }
+  if(this.x() && this.y()){
+    return this.yFacets[row] + "~" + this.xFacets[col];
+  }
+};
+
 ggd3.facet = Facet;

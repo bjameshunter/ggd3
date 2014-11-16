@@ -424,66 +424,84 @@ Facet.prototype.makeCell = function(selection, x, y, ncols) {
 Facet.prototype.makeTitle = function(selection, colNum, rowNum) {
   var that = this,
       dim = this.plot().plotDim(),
-      addHeight = rowNum === 0 ? dim.y*that.titleProps()[1]:0,
-      addWidth = colNum === 0 ? dim.x*that.titleProps()[0]:0,
+      addHeight = dim.y*that.titleProps()[1],
+      addWidth = dim.x*that.titleProps()[0],
       plot = this.plot();
-  if(rowNum===0 && that.type() === "grid"){
-    var xlab = selection
-                .selectAll('svg.grid-title-x')
-                .data([that.xFacets[colNum]]);
-    xlab.attr('width', dim.x)
-        .attr('height', dim.y*0.1)
-        .select('text')
-        .text(_.identity);
-    xlab.enter().append('svg')
-        .attr('class', 'grid-title-x')
-        .attr('width', dim.x)
-        .attr('height', addHeight)
-        .append('text')
-        .attr({'fill': 'black',
-              'opacity': 1,
-              'font-size': 12,
-            'x': dim.x/2 + addWidth,
-            'y': addHeight*0.8,
+  var xlab = selection
+              .selectAll('svg.grid-title-x')
+              .data([that.x() + " - " + that.xFacets[colNum]]);
+  var ylab = selection
+              .selectAll('svg.grid-title-y')
+              .data([that.y() + " - " + that.yFacets[rowNum]]);
+  xlab.enter().append('svg')
+      .attr({'class': 'grid-title-x',
+            width: dim.x + addWidth,
+            height: addHeight*0.8})
+      .append('text');
+  ylab.enter().append('svg')
+      .attr('class', 'grid-title-y')
+      .append('text');
+  if(that.type() === "grid"){
+    addHeight = rowNum === 0 ? addHeight:0;
+    addWidth = colNum === 0 ? addWidth:0;
+    if(rowNum===0 && that.type() === "grid"){
+      xlab.attr("height", addHeight*0.8)
+          .select('text').attr({fill: 'black',
+            opacity: 1,
+            "font-size": 12,
+            x: dim.x/2 + addWidth,
+            y: addHeight*0.8,
             "text-anchor": 'middle'})
-        .text(_.identity);
-  }
-  if(colNum===0 && that.type() === "grid"){
-    console.log(addWidth);
-    var ylab = selection
-                .selectAll('svg.grid-title-y')
-                .data([that.yFacets[rowNum]]);
-    ylab.attr('width', addWidth)
-        .attr('height', dim.y)
-        .select('text')
-        .attr({'fill': 'black',
-            'opacity': 1,
-            'font-size': 14,
-            'x': addWidth,
-            'y': dim.y/2 + addHeight,
-            "text-anchor": 'middle',
-            "transform": "rotate(-90 " + addWidth + ", " + (dim.y/2 + addHeight) + ")"})
-        .text(_.identity);
-    ylab.enter().append('svg')
-        .attr('class', 'grid-title-y')
-        .attr('width', addWidth)
-        .attr('height', dim.y)
-        .append('g')
-        .append('text')
-        .attr({'fill': 'black',
+          .text(_.identity);
+    } else {
+      selection.select('.grid-title-x')
+        .attr("height", 0)
+        .select('text').text('');
+    }
+    if(colNum===0 && that.type() === "grid"){
+      ylab.attr('width', addWidth)
+          .select('text')
+          .attr({'fill': 'black',
               'opacity': 1,
               'font-size': 14,
-            'x': addWidth,
-            'y': dim.y/2 + addHeight,
-            "text-anchor": 'middle',
-            "transform": "rotate(-90 " + addWidth + ", " + (dim.y/2 + addHeight) + ")"})
-        .text(_.identity);
-  }
-  if(that.type() !== "grid"){
-
+              'x': addWidth,
+              'y': dim.y/2 + addHeight,
+              "text-anchor": 'middle',
+              "transform": "rotate(-90 " + addWidth + ", " + (dim.y/2 + addHeight) + ")"})
+          .text(_.identity);
+    } else {
+      selection.select('.grid-title-y')
+        .attr({width:0}).select('text').text('');
+    }
+  } else {
+    // add labels to wrap-style faceting.
+      xlab.attr("height", addHeight*0.8)
+          .select('text').attr({fill: 'black',
+            opacity: 1,
+            "font-size": 12,
+            x: dim.x/2 + addWidth,
+            y: addHeight*0.8,
+            "text-anchor": 'middle'})
+          .text(that.wrapLabel(rowNum, colNum));
+      selection.select('.grid-title-y')
+        .attr({width:0}).select('text').text('');
   }
   return selection.select('.plot-svg');
 };
+
+Facet.prototype.wrapLabel = function(row, col) {
+  var that = this;
+  if(this.x() && !this.y()){
+    return this.x() + " - " + this.xFacets[this.nSVGs];
+  }
+  if(this.y() && !this.x()){
+    return this.y() + " - " + this.yFacets[this.nSVGs];
+  }
+  if(this.x() && this.y()){
+    return this.yFacets[row] + "~" + this.xFacets[col];
+  }
+};
+
 ggd3.facet = Facet;
 
 // aes is an object literal with 
@@ -1015,13 +1033,32 @@ ggd3.tools.defaultScaleSettings = function(dtype, aesthetic) {
              scale: {}};
   }
 };
-ggd3.tools.domain = function(data) {
-  return d3.extent(data);
+ggd3.tools.domain = function(data, rule, zero,
+                             variable) {
+  var extent, range;
+  if(_.isUndefined(variable)){
+    extent = d3.extent(data);
+  } else {
+    extent = d3.extent(_.pluck(data, variable));
+  }
+  if(!_.isUndefined(rule) && !_.isDate(extent[0]) ){
+    range = Math.abs(extent[1] - extent[0]);
+    if(rule === "left" || rule === "both"){
+      extent[0] +=  0.1 * range;
+    }
+    if(rule === "right" || rule === "both"){
+      extent[1] += 0.1 * range;
+    }
+  }
+  return extent;
 };
+
 Plot.prototype.setDomains = function() {
   var aes = this.aes(),
       that = this,
       facet = this.facet(),
+      layer = this.layers()[0],
+      stat = layer.stat(),
       linearScales = ['log', 'linear', 'time', 'date'],
       domain,
       data,
@@ -1032,8 +1069,9 @@ Plot.prototype.setDomains = function() {
        facet.scales() !== "free"){
       data = ggd3.tools.unNest(this.data());
       if(_.contains(linearScales, scales.single.opts().type)){
-        domain = ggd3.tools.domain(_.pluck(data, aes[a]));
+        domain = ggd3.tools.domain(data, 'both', false, aes[a]);
       } else {
+        // nest according ordinal axes, group, and color
         domain = _.unique(_.pluck(data, aes[a]));
       }
       for(scale in scales) {
@@ -1084,21 +1122,26 @@ Bar.prototype.draw = function() {
   // of the stat. 
   var layer = this.layer(),
       plot = layer.plot(),
+      facet = plot.facet(),
       margins = plot.margins(),
       aes = layer.aes(),
       that = this;
-  function draw(sel, data) {
-    var id = sel.attr('id'),
+  function draw(sel, data, i) {
+    var id = (facet.type() === "grid" || 
+              facet.scales()==="fixed") ? "single":sel.attr('id'),
         x = plot.xScale()[id],
         y = plot.yScale()[id];
     // drawing and positioning axes probably shouldn't be on
     // the geom
-    sel.select('.x.axis')
-      .attr("transform", "translate(" + x.positionAxis() + ")")
-      .transition().call(x.axis);
-    sel.select('.y.axis')
-      .attr("transform", "translate(" + y.positionAxis() + ")")
-      .transition().call(y.axis);
+    // but here, we're drawing
+    if(i === 0){
+      sel.select('.x.axis')
+        .attr("transform", "translate(" + x.positionAxis() + ")")
+        .transition().call(x.axis);
+      sel.select('.y.axis')
+        .attr("transform", "translate(" + y.positionAxis() + ")")
+        .transition().call(y.axis);
+    }
     data = that.stat(data);
     var bars = sel.select('.plot')
                   .selectAll('rect')
@@ -1179,15 +1222,23 @@ Layer.prototype.stat = function(stat) {
   return this;
 };
 
-Layer.prototype.draw = function() {
+Layer.prototype.draw = function(i) {
   var that = this,
       facet = this.plot().facet();
   function draw(sel) {
 
-    var dataList = that.ownData() ? that.dataList():that.plot().dataList();
-    _.each(dataList, function(data){
-      var s = sel.select("#" + data.selector);
-      s.call(that.geom().draw(), data.data);
+    var dataList = that.ownData() ? that.dataList():that.plot().dataList(),
+        divs = [];
+    sel.selectAll('.plot-div')
+      .each(function(d) {
+        divs.push(d3.select(this).attr('id'));
+      });
+    _.each(divs, function(id){
+      var s = sel.select("#" + id),
+          d = dataList.filter(function(d) {
+            return d.selector === id;
+          });
+      s.call(that.geom().draw(), d|| [], i);
     });
   }
   return draw;
@@ -1207,6 +1258,72 @@ Layer.prototype.geom = function(geom) {
 
 ggd3.layer = Layer;
 
+// 
+function Point(spec) {
+  var attributes = {
+    name: "point",
+  };
+
+  this.attributes = _.merge(attributes, this.attributes);
+
+  for(var attr in this.attributes){
+    if((!this[attr] && this.attributes.hasOwnProperty(attr))){
+      this[attr] = createAccessor(attr);
+    }
+  }
+  return this;
+}
+Point.prototype = new Geom();
+
+Point.prototype.draw = function() {
+  // bar takes an array of data, 
+  // nests by a required ordinal axis, optional color and group
+  // variables then calculates the stat and draws
+  // horizontal or vertical bars.
+  // stacked, grouped, expanded or not.
+  // scales first need to be calculated according to output
+  // of the stat. 
+  var layer = this.layer(),
+      plot = layer.plot(),
+      facet = plot.facet(),
+      margins = plot.margins(),
+      aes = layer.aes(),
+      that = this;
+  function draw(sel, data, i) {
+    var id = (facet.type() === "grid" || 
+              facet.scales()==="fixed") ? "single":sel.attr('id'),
+        x = plot.xScale()[id],
+        y = plot.yScale()[id];
+    // drawing and positioning axes probably shouldn't be on
+    // the geom
+    // but here, we're drawing
+    if(i === 0){
+      sel.select('.x.axis')
+        .attr("transform", "translate(" + x.positionAxis() + ")")
+        .transition().call(x.axis);
+      sel.select('.y.axis')
+        .attr("transform", "translate(" + y.positionAxis() + ")")
+        .transition().call(y.axis);
+    }
+    data = that.stat(data);
+    var bars = sel.select('.plot')
+                  .selectAll('circle')
+                  .data(data);
+    // add canvas and svg functions.
+    // bars.enter().append('rect')
+    //     .attr('class', 'geom-bar');    
+    // sel is svg, data is array of objects
+
+
+  }
+  return draw;
+};
+
+Point.prototype.defaultStat = function() {
+  return new ggd3.stats.identity();
+};
+
+ggd3.geoms.point = Point;
 
 
 
@@ -1263,6 +1380,22 @@ ggd3.stats.count = Count;
 // min 
 
 // identity
+function Identity() {
+
+}
+Identity.prototype = new Stat();
+Identity.prototype.compute = function(data) {
+  return data;
+};
+Identity.prototype.name = function() {
+  return "identity";
+};
+Identity.prototype.defaultGeom = function() {
+  return new ggd3.geom.point();
+};
+ggd3.stats.identity = Identity;
+
+
 function unNest (data) {
   // recurse and flatten nested dataset
   // this means no dataset can have a 'values' column

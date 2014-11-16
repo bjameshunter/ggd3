@@ -50,3 +50,18 @@ ggd3.stats.count = Count;
 // min 
 
 // identity
+function Identity() {
+
+}
+Identity.prototype = new Stat();
+Identity.prototype.compute = function(data) {
+  return data;
+};
+Identity.prototype.name = function() {
+  return "identity";
+};
+Identity.prototype.defaultGeom = function() {
+  return new ggd3.geom.point();
+};
+ggd3.stats.identity = Identity;
+

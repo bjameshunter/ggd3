@@ -26,21 +26,26 @@ Bar.prototype.draw = function() {
   // of the stat. 
   var layer = this.layer(),
       plot = layer.plot(),
+      facet = plot.facet(),
       margins = plot.margins(),
       aes = layer.aes(),
       that = this;
-  function draw(sel, data) {
-    var id = sel.attr('id'),
+  function draw(sel, data, i) {
+    var id = (facet.type() === "grid" || 
+              facet.scales()==="fixed") ? "single":sel.attr('id'),
         x = plot.xScale()[id],
         y = plot.yScale()[id];
     // drawing and positioning axes probably shouldn't be on
     // the geom
-    sel.select('.x.axis')
-      .attr("transform", "translate(" + x.positionAxis() + ")")
-      .transition().call(x.axis);
-    sel.select('.y.axis')
-      .attr("transform", "translate(" + y.positionAxis() + ")")
-      .transition().call(y.axis);
+    // but here, we're drawing
+    if(i === 0){
+      sel.select('.x.axis')
+        .attr("transform", "translate(" + x.positionAxis() + ")")
+        .transition().call(x.axis);
+      sel.select('.y.axis')
+        .attr("transform", "translate(" + y.positionAxis() + ")")
+        .transition().call(y.axis);
+    }
     data = that.stat(data);
     var bars = sel.select('.plot')
                   .selectAll('rect')

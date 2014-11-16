@@ -134,13 +134,32 @@ ggd3.tools.defaultScaleSettings = function(dtype, aesthetic) {
              scale: {}};
   }
 };
-ggd3.tools.domain = function(data) {
-  return d3.extent(data);
+ggd3.tools.domain = function(data, rule, zero,
+                             variable) {
+  var extent, range;
+  if(_.isUndefined(variable)){
+    extent = d3.extent(data);
+  } else {
+    extent = d3.extent(_.pluck(data, variable));
+  }
+  if(!_.isUndefined(rule) && !_.isDate(extent[0]) ){
+    range = Math.abs(extent[1] - extent[0]);
+    if(rule === "left" || rule === "both"){
+      extent[0] +=  0.1 * range;
+    }
+    if(rule === "right" || rule === "both"){
+      extent[1] += 0.1 * range;
+    }
+  }
+  return extent;
 };
+
 Plot.prototype.setDomains = function() {
   var aes = this.aes(),
       that = this,
       facet = this.facet(),
+      layer = this.layers()[0],
+      stat = layer.stat(),
       linearScales = ['log', 'linear', 'time', 'date'],
       domain,
       data,
@@ -151,8 +170,9 @@ Plot.prototype.setDomains = function() {
        facet.scales() !== "free"){
       data = ggd3.tools.unNest(this.data());
       if(_.contains(linearScales, scales.single.opts().type)){
-        domain = ggd3.tools.domain(_.pluck(data, aes[a]));
+        domain = ggd3.tools.domain(data, 'both', false, aes[a]);
       } else {
+        // nest according ordinal axes, group, and color
         domain = _.unique(_.pluck(data, aes[a]));
       }
       for(scale in scales) {

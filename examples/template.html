@@ -78,10 +78,17 @@ var FacetType = {'mtcars.csv': "grid",
             "ustimeseries.csv": "wrap",
             "wells.csv": "wrap",
           };
+var geom = {'mtcars.csv': ["point"],
+            "iris.csv" : ["point"],
+            "diamonds.csv": ["bar"],
+            "baseball.csv": ["bar"],
+            "nelplo.csv": ["point"],
+            "ustimeseries.csv": ["point"],
+            "wells.csv": ["point"],
+          };
 ch = new ggd3.plot()
-          .layers(['bar'])
           .width(150)
-          .height(300)
+          .height(150)
           .yScale({axis: {ticks: 4, position:'right',
                   "orient": "left"}})
           .margins({top: 5, bottom:20, left:2, right:2})
@@ -93,6 +100,7 @@ function redraw() {
   var dataset = $("#dataset")[0].value;
   d3.csv("../data/" + dataset, function(error, data) {
   ch
+    .layers(geom[dataset])
     .dtypes(dtypes[dataset])
     .data(data)
     .aes(aes[dataset]);

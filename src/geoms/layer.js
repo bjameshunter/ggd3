@@ -38,15 +38,23 @@ Layer.prototype.stat = function(stat) {
   return this;
 };
 
-Layer.prototype.draw = function() {
+Layer.prototype.draw = function(i) {
   var that = this,
       facet = this.plot().facet();
   function draw(sel) {
 
-    var dataList = that.ownData() ? that.dataList():that.plot().dataList();
-    _.each(dataList, function(data){
-      var s = sel.select("#" + data.selector);
-      s.call(that.geom().draw(), data.data);
+    var dataList = that.ownData() ? that.dataList():that.plot().dataList(),
+        divs = [];
+    sel.selectAll('.plot-div')
+      .each(function(d) {
+        divs.push(d3.select(this).attr('id'));
+      });
+    _.each(divs, function(id){
+      var s = sel.select("#" + id),
+          d = dataList.filter(function(d) {
+            return d.selector === id;
+          });
+      s.call(that.geom().draw(), d|| [], i);
     });
   }
   return draw;
