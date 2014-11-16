@@ -70,25 +70,36 @@ var dtypes = {'mtcars.csv': {"gear": ["string"]},
             "ustimeseries.csv": {"date": ['date', 'many']},
             "wells.csv": {},
           };
+var FacetType = {'mtcars.csv': "grid",
+            "iris.csv" : "wrap",
+            "diamonds.csv": "grid",
+            "baseball.csv": "grid",
+            "nelplo.csv": "wrap",
+            "ustimeseries.csv": "wrap",
+            "wells.csv": "wrap",
+          };
 ch = new ggd3.plot()
           .layers(['bar'])
-          .width(200)
-          .height(200)
-          .yScale({axis: {ticks: 8, position:'right'}})
-          .margins({top: 5, bottom:20, left:11, right:2})
-          .xScale({axis: {ticks: 4}})
-          .xAdjust(true);
+          .width(150)
+          .height(300)
+          .yScale({axis: {ticks: 4, position:'right',
+                  "orient": "left"}})
+          .margins({top: 5, bottom:20, left:2, right:2})
+          .xScale({axis: {ticks: 4, position: "top",
+                  "orient": "bottom"}})
+          // .xAdjust(true);
 // this should work;
 function redraw() {
   var dataset = $("#dataset")[0].value;
   d3.csv("../data/" + dataset, function(error, data) {
-  ch.data(data)
-    .aes(aes[dataset])
+  ch
     .dtypes(dtypes[dataset])
-
+    .data(data)
+    .aes(aes[dataset]);
     var facet = new ggd3.facet(facets[dataset])
-                  .type("grid")
-                  .scales($("#facet-scales")[0].value);
+                  .type(FacetType[dataset])
+                  .scales($("#facet-scales")[0].value)
+                  .titleProps([0.3, 0.1]);
     div.call(ch.facet(facet).draw());
   })
 }

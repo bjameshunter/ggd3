@@ -57,6 +57,9 @@ Layer.prototype.geom = function(geom) {
   if(!arguments.length) { return this.attributes.geom; }
   geom = new ggd3.geoms[geom]()
                 .layer(this);
+  if(_.isNull(this.attributes.stat)) {
+    this.attributes.stat = geom.defaultStat();
+  }
   this.attributes.geom = geom;
   return this;
 };

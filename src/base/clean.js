@@ -31,7 +31,6 @@ function Clean(data, obj) {
       if(v[0] === "date" || 
          v[0] === "time"){
         var format = v[2];
-        if(i % 1000 ===0) { console.log(d[k]);}
         d[k] = ggd3.tools.dateFormatter(d[k], format);
       } else {
         d[k] = dtypeDict[dtypes[k][0]](d[k]);
@@ -64,7 +63,6 @@ function Clean(data, obj) {
       return ["string", "few"];
     }
   }
-  console.log(data);
   return {data: data, dtypes: dtypes};
 }
 

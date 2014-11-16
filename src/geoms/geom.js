@@ -2,6 +2,7 @@
 function Geom(aes) {
   var attributes = {
     layer:     null,
+    stat: null,
   };
   this.attributes = attributes;
   for(var attr in this.attributes){
@@ -10,4 +11,8 @@ function Geom(aes) {
     }
   }
 }
+Geom.prototype.defaultStat = function() {
+  return null;
+};
+
 ggd3.geom = Geom;

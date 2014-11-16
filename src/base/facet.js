@@ -9,7 +9,8 @@ function Facet(spec) {
     plot: null, 
     nrows: null,
     ncols: null,
-    margins: null, 
+    margins: {x: 5, y:5}, 
+    titleProps: null,
     // inherit from plot, but allow override
     // if scales are fixed, much smaller margins
     // because scales won't be drawn for inner plots.
@@ -35,6 +36,7 @@ Facet.prototype.updateFacet = function() {
   var that = this,
       data = this.plot().data(),
       nrows, ncols;
+  this.calculateMargins();
   that.xFacets = ["single"];
   that.yFacets = ["single"];
   // rules of faceting:
@@ -68,6 +70,10 @@ Facet.prototype.updateFacet = function() {
   }
   that.nFacets = that.xFacets.length * that.yFacets.length;
 
+  if( that.scales() !== "fixed" && that.type()==="grid"){
+    throw ("facet type of 'grid' requires fixed scales." + 
+            " You have facet scales set to: " + that.scales());
+  }
   // if only x or y is set, user should input # rows or columns
   if( ( that.x() && that.y() ) && 
      ( that.ncols() || that.nrows() ) ){
@@ -120,52 +126,74 @@ Facet.prototype.updateFacet = function() {
 Facet.prototype.makeDIV = function(selection, rowNum, ncols) {
   var remainder = this.nFacets % ncols,
       that = this;
-  row = selection.selectAll('div')
+  row = selection.selectAll('div.plot-div')
            .data(_.range((this.nFacets - this.nSVGs) > remainder ? 
                  ncols: remainder));
   row
-    .each(function() {
-      that.makeSVG(d3.select(this), rowNum);
+    .each(function(colNum) {
+      that.makeSVG(d3.select(this), rowNum, colNum);
     });
   row.enter().append('div')
     .attr('class', 'plot-div')
-    .each(function() {
-      that.makeSVG(d3.select(this), rowNum);
+    .each(function(colNum) {
+      that.makeSVG(d3.select(this), rowNum, colNum);
     });
   row.exit().remove();
 };
 
-Facet.prototype.makeSVG = function(selection, rowNum) {
+Facet.prototype.makeSVG = function(selection, rowNum, colNum) {
   var that = this,
       dim = this.plot().plotDim(),
       plot = this.plot(),
-      x = selection.data(),
+      x = selection.data()[0],
+      addHeight = rowNum === 0 ? dim.y*that.titleProps()[1]:0,
+      addWidth = colNum === 0 ? dim.x*that.titleProps()[0]:0,
+      width = function() {
+          return plot.width() + addWidth;
+      },
+      height = function() {
+          return plot.height() + addHeight;
+      },
       svg = selection
               .attr('id', function(d) {
                 return that.id(d, rowNum);
                })
-              .selectAll('svg')
+              .selectAll('svg.svg-wrap')
               .data([0]);
-  // will need to do something clever here
-  // to allow for space free, free_x and free_y
+
   svg
-    .attr('class', 'plot-svg')
-    .attr('width', plot.width())
-    .attr('height', plot.height())
+    .attr('width', width())
+    .attr('height', height())
     .each(function(d) {
-      that.makeCell(d3.select(this));
-      that.makeClip(d3.select(this), x, rowNum);
+      that.makeTitle(d3.select(this), colNum, rowNum);
+      var sel = d3.select(this).select('.plot-svg');
+      that.makeCell(sel, x, rowNum, that._ncols);
+      that.makeClip(sel, x, rowNum);
     });
   svg.enter().append('svg')
-    .attr('class', 'plot-svg')
-    .attr('width', plot.width())
-    .attr('height', plot.height())
+    .attr('class', 'svg-wrap')
+    .attr('width', width())
+    .attr('height', height())
     .each(function(d) {
-      that.makeCell(d3.select(this));
-      that.makeClip(d3.select(this), x, rowNum);
+      that.makeTitle(d3.select(this), colNum, rowNum);
+      var sel = d3.select(this).selectAll('.plot-svg')
+                  .data([0]);
+      sel.attr('x', addWidth)
+        .attr('y', addHeight);
+      sel.enter().append('svg')
+        .attr('x', addWidth)
+        .attr('y', addHeight)
+        .attr('class', 'plot-svg');
+      that.makeCell(sel, x, rowNum, that._ncols);
+      that.makeClip(sel, x, rowNum);
     });
   svg.exit().remove();
   that.nSVGs += 1;
+};
+// overrides default margins if facet type == "grid"
+// or scales are free
+Facet.prototype.calculateMargins = function(plot) {
+
 };
 
 Facet.prototype.makeClip = function(selection, x, y) {
@@ -175,12 +203,12 @@ Facet.prototype.makeClip = function(selection, x, y) {
                 .data([0]),
         that = this,
         id = that.id(x, y) + "-clip",
-        plotDim = this.plot().plotDim();
+        dim = this.plot().plotDim();
     clip.select('.clip')
         .attr('id', id)
         .select('rect')
-        .attr('width', plotDim.x)
-        .attr('height', plotDim.y);
+        .attr('width', dim.x)
+        .attr('height', dim.y);
     clip.enter().insert('defs', "*")
         .append('svg:clipPath')
         .attr('class', 'clip')
@@ -188,8 +216,8 @@ Facet.prototype.makeClip = function(selection, x, y) {
         .append('rect')
         .attr('x', 0)
         .attr('y',0)
-        .attr('width', plotDim.x)
-        .attr('height', plotDim.y);
+        .attr('width', dim.x)
+        .attr('height', dim.y);
     selection.select('g.plot')
       .attr('clip-path', "url(#" + id + ")");
   }
@@ -212,32 +240,103 @@ Facet.prototype.id = function(x, y) {
     return 'single';
   }
 };
-Facet.prototype.makeCell = function(selection) {
+Facet.prototype.makeCell = function(selection, x, y, ncols) {
   var margins = this.plot().margins(),
-      plotDim = this.plot().plotDim();
+      dim = this.plot().plotDim(),
+      that = this,
+      gridClassX = (this.type()==="grid" && y!==0) ? " grid": "",
+      gridClassY = (this.type()==="grid" && x!==(ncols-1)) ? " grid": "";
 
   var plot = selection.selectAll('g.plot')
                 .data([0]);
+  plot
+    .select('rect.background')
+    .attr({x: 0, y:0, width: dim.x, height:dim.y});
   plot.enter().append('g')
     .attr('class', 'plot')
     .attr('transform', "translate(" + margins.left + 
             "," + margins.top + ")")
     .append('rect')
     .attr('class', 'background')
-    .attr({x: 0, y:0, width: plotDim.x, height:plotDim.y});
+    .attr({x: 0, y:0, width: dim.x, height:dim.y});
   plot.exit().remove();
 
   var xaxis = selection.selectAll('g.x.axis')
                 .data([0]);
+  xaxis
+    .attr('class', 'x axis' + gridClassX);
   xaxis.enter().append('g')
-    .attr('class', 'x axis');
+    .attr('class', 'x axis' + gridClassX);
   xaxis.exit().remove();
   var yaxis = selection.selectAll('g.y.axis')
                 .data([0]);
+  yaxis
+    .attr('class', 'y axis' + gridClassY);
   yaxis.enter().append('g')
-    .attr('class', 'y axis');
+    .attr('class', 'y axis' + gridClassY);
   yaxis.exit().remove();
+};
+Facet.prototype.makeTitle = function(selection, colNum, rowNum) {
+  var that = this,
+      dim = this.plot().plotDim(),
+      addHeight = rowNum === 0 ? dim.y*that.titleProps()[1]:0,
+      addWidth = colNum === 0 ? dim.x*that.titleProps()[0]:0,
+      plot = this.plot();
+  if(rowNum===0 && that.type() === "grid"){
+    var xlab = selection
+                .selectAll('svg.grid-title-x')
+                .data([that.xFacets[colNum]]);
+    xlab.attr('width', dim.x)
+        .attr('height', dim.y*0.1)
+        .select('text')
+        .text(_.identity);
+    xlab.enter().append('svg')
+        .attr('class', 'grid-title-x')
+        .attr('width', dim.x)
+        .attr('height', addHeight)
+        .append('text')
+        .attr({'fill': 'black',
+              'opacity': 1,
+              'font-size': 12,
+            'x': dim.x/2 + addWidth,
+            'y': addHeight*0.8,
+            "text-anchor": 'middle'})
+        .text(_.identity);
+  }
+  if(colNum===0 && that.type() === "grid"){
+    console.log(addWidth);
+    var ylab = selection
+                .selectAll('svg.grid-title-y')
+                .data([that.yFacets[rowNum]]);
+    ylab.attr('width', addWidth)
+        .attr('height', dim.y)
+        .select('text')
+        .attr({'fill': 'black',
+            'opacity': 1,
+            'font-size': 14,
+            'x': addWidth,
+            'y': dim.y/2 + addHeight,
+            "text-anchor": 'middle',
+            "transform": "rotate(-90 " + addWidth + ", " + (dim.y/2 + addHeight) + ")"})
+        .text(_.identity);
+    ylab.enter().append('svg')
+        .attr('class', 'grid-title-y')
+        .attr('width', addWidth)
+        .attr('height', dim.y)
+        .append('g')
+        .append('text')
+        .attr({'fill': 'black',
+              'opacity': 1,
+              'font-size': 14,
+            'x': addWidth,
+            'y': dim.y/2 + addHeight,
+            "text-anchor": 'middle',
+            "transform": "rotate(-90 " + addWidth + ", " + (dim.y/2 + addHeight) + ")"})
+        .text(_.identity);
+  }
+  if(that.type() !== "grid"){
 
-
+  }
+  return selection.select('.plot-svg');
 };
 ggd3.facet = Facet;

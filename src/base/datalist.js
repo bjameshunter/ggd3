@@ -16,7 +16,6 @@ function DataList() {
       by = facet.by(),
       selector;
   if((x && !y) || (y && !x)){
-    console.log('x xor y');
     selector = x ? x + "-": y + "-";
     return _.map(this.data(), function(d) {
       return {selector: rep(selector + d.key),

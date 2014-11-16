@@ -14,6 +14,8 @@ Roadmap:
 - Brush on one or both axis
   - Scatterplot highlights according to datapoint value or id
 - Context brush for either axis
+- opts is an object literal with assorted options
+  - overriding margins of facets
 - More generic methods for aggregating data that has been nested
 - Initial geoms:
   - geom bar with stack, group and expand options

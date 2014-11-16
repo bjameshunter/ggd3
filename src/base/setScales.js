@@ -7,6 +7,14 @@
 // with which to make scales per facet if needed.
 // if an aes mapping or facet mapping does exist in data
 // throw error.
+var aesMap = {
+        x: 'xScale',
+        y: 'yScale',
+        color: 'colorScale',
+        size: 'sizeScale',
+      },
+    scales = ['x', 'y', 'color', 'size'];
+
 function SetScales() {
 
   // do nothing if the object doesn't have aes, data and facet
@@ -20,27 +28,17 @@ function SetScales() {
   var aes = this.aes(),
       that = this,
       facet = this.facet(),
-      scales = ['x', 'y', 'color', 'size'],
-      aesMap = {
-        x: 'xScale',
-        y: 'yScale',
-        color: 'colorScale',
-        size: 'sizeScale',
-      },
       data = this.dataList(),
       dtype,
       settings,
       // gather user defined settings in opts object
       opts = _.mapValues(aesMap, function(v, k) {
-        return that[v]();
+        // there is a scale "single" that holds the 
+        // user defined opts and the fixed scale domain
+        return that[v]().single._userOpts;
       });
-  console.log(opts);
 
-  function makeScale(d, aesthetic) {
-    // rescale all aesthetics
-    // need to allow the scale settings from plot object to 
-    // take precedence over this, if scale config is 
-    // passed to xScale, yScale, colorScale or sizeScale
+  function makeScale(d, i) {
     for(var a in aes){
       if(_.contains(scales, a)){
         // user is not specifying a scale.
@@ -61,38 +59,21 @@ function SetScales() {
               scale.range([that.plotDim().y, 0]);
             }
             scale.axis = d3.svg.axis().scale(scale.scale());
-          }
-          for(var ax in settings.axis){
-            if(scale.axis.hasOwnProperty(ax)){
-              scale.axis[ax](settings.axis[ax]);
+            for(var ax in settings.axis){
+              if(scale.axis.hasOwnProperty(ax)){
+                scale.axis[ax](settings.axis[ax]);
+              }
             }
           }
-          for(var sc in settings.scale){
-            if(scale.scale.hasOwnProperty(sc)){
-              scale.scale()[ax](settings.scale[sc]);
-            }
-          }
-          if(_.contains(['linear', 'log', 'time'], settings.type)){
-            if(facet.scales() === "free" || 
-               facet.scales() === "free_" + a) {
-              scale.domain(d3.extent(_.pluck(d.data, aes[a])));
-            } else {
-              scale.domain(d3.extent(
-                              _.pluck(
-                                ggd3.tools.unNest(that.data()), aes[a])));     
-            }
-          } else {
-            // scale is ordinal
-            if(facet.scales() === "free" || 
-               facet.scales() === "free_" + a) {
-              scale.domain(_.unique(_.pluck(d.data, aes[a])));
-            } else {
-              scale.domain(_.unique(
-                              _.pluck(
-                                ggd3.tools.unNest(that.data()), aes[a])));              
+          for(var s in settings.scale){
+            if(scale.scale().hasOwnProperty(s)){
+              scale.scale()[s](settings.scale[s]);
             }
           }
           that[aesMap[a]]()[d.selector] = scale;
+          if(i === 0) {
+            that[aesMap[a]]().single = scale;
+          }
         } else {
           // copy scale settings, merge with default info that wasn't
           // declared and create for each facet if needed.
@@ -100,11 +81,11 @@ function SetScales() {
       }
     }
   }
-  // for(var a in aes) {
-  //   // reset all scales to empty object
-  //   that[aesMap[a]]({});
-  // }
-  _.map(data, function(d,i) {return makeScale(d);});
+  _.map(data, function(d,i) {return makeScale(d, i);});
+  for(var a in aes) {
+    // give user-specified scale settings to single facet
+    that[aesMap[a]]().single._userOpts = _.cloneDeep(opts[a]);
+  }
 }
 
 ggd3.tools.defaultScaleSettings = function(dtype, aesthetic) {
@@ -155,5 +136,40 @@ ggd3.tools.defaultScaleSettings = function(dtype, aesthetic) {
 };
 ggd3.tools.domain = function(data) {
   return d3.extent(data);
+};
+Plot.prototype.setDomains = function() {
+  var aes = this.aes(),
+      that = this,
+      facet = this.facet(),
+      linearScales = ['log', 'linear', 'time', 'date'],
+      domain,
+      data,
+      scale;
+  for(var a in aes) {
+    var scales = this[aesMap[a]]();
+    if(facet.scales() !== "free_" + a &&
+       facet.scales() !== "free"){
+      data = ggd3.tools.unNest(this.data());
+      if(_.contains(linearScales, scales.single.opts().type)){
+        domain = ggd3.tools.domain(_.pluck(data, aes[a]));
+      } else {
+        domain = _.unique(_.pluck(data, aes[a]));
+      }
+      for(scale in scales) {
+        scales[scale].domain(domain);
+      }
+    } else {
+      data = this.dataList();
+      for(var d in data) {
+        scale = scales[data[d].selector];
+        if(_.contains(linearScales, scales.single.opts().type)){
+          scale.domain(ggd3.tools.domain(_.pluck(data[d].data, aes[a])));
+        } else {
+          scale.domain(_.unique(_.pluck(data[d].data, aes[a])));
+        }
+
+      }
+    }
+  }
 };
 Plot.prototype.setScales = SetScales;

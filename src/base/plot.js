@@ -6,10 +6,10 @@ function Plot(aes) {
     data: null,
     layers: [],
     facet: new ggd3.facet(),
-    xScale: {}, 
-    yScale: {},
-    colorScale: {},
-    sizeScale: {},
+    xScale: {single: new ggd3.scale()}, 
+    yScale: {single: new ggd3.scale()},
+    colorScale: {single: new ggd3.scale()},
+    sizeScale: {single: new ggd3.scale()},
     opts: {},
     theme: "ggd3",
     margins: {left:20, right:20, top:20, bottom:20},
@@ -65,13 +65,25 @@ function scaleConfig(type) {
     if(!arguments.length) {
       return this.attributes[scale];
     }
+    // reset to user specified entire scale object
     if(obj instanceof ggd3.scale){
-      this.attributes[scale] = obj;
+      this.attributes[scale] = {};
+      this.attributes[scale].single = obj;
       return this;
     }
-    // reset scale to empty object or pass settings
+    // pass null to reset scales entirely;
+    if(_.isNull(obj)){
+      this.attributes[scale] = {single: new ggd3.scale() };
+      return this;
+    }
+    // 
     if(!_.isUndefined(obj)) {
-      this.attributes[scale] = obj;
+      // merge additional options with old options
+      if(this.attributes[scale].single instanceof ggd3.scale){
+        obj = _.merge(this.attributes[scale].single._userOpts,
+                           obj);
+      }
+      this.attributes[scale].single = new ggd3.scale(obj).plot(this);
       return this;
     }
   }
@@ -130,7 +142,6 @@ Plot.prototype.data = function(data) {
   // after data is declared, nest it according to facets.
   this.attributes.data = this.nest(data.data);
   this.dtypes(data.dtypes);
-  this.setScales();
   this.nested = true;
   this.dataNew = true;
   return this;
@@ -148,11 +159,9 @@ Plot.prototype.facet = function(spec) {
       data = ggd3.tools.unNest(this.data());
       // nest according to new facets
       this.attributes.data = this.nest(data);
-      this.setScales();
     } else {
       console.log('not nested');
       this.attributes.data = this.nest(this.data());
-      this.setScales();
     }
   } else {
     this.attributes.facet = new ggd3.facet(spec)
@@ -160,10 +169,8 @@ Plot.prototype.facet = function(spec) {
     if(this.nested){
       data = ggd3.tools.unNest(this.data());
       this.attributes.data = this.nest(data);
-      this.setScales();
     } else {
       this.attributes.data = this.nest(this.data());
-      this.setScales();
     }
   }
   this.nested = true;
@@ -178,35 +185,49 @@ Plot.prototype.aes = function(aes) {
     }
   }, this);
   this.attributes.aes = aes;
-  this.setScales();
   return this;
 };
 
 Plot.prototype.plotDim = function() {
   var margins = this.margins();
+  if(this.facet().type() === "grid"){
+    return {x: this.width() - this.facet().margins().x, 
+      y: this.height() - this.facet().margins().y};
+  }
   return {x: this.width() - margins.left - margins.right,
    y: this.height() - margins.top - margins.bottom};
 };
 
 Plot.prototype.draw = function() {
   var that = this;
+  // should the first layer be special? its stat and the top-level
+  // data would be used to calculate the scale ranges.
+  // or, if any of the geoms have 'identity' as the stat
+  // use identity, otherwise use the stat summary.
+  // get basic info about scales/aes;
+  this.setScales();
+  // set fixed/free domains
+  this.setDomains();
   function draw(sel) {
     sel.call(that.facet().updateFacet());
     // kinda labored way to get rid of unnecessary facets
-    var divs = [],
-        facets = _.pluck(that.dataList(), "selector");
-    sel.selectAll('.plot-div')
-      .each(function(d) {
-        divs.push(d3.select(this).attr('id'));
-      });
-    divs = divs.filter(function(d) { return !_.contains(facets, d);});
-    divs.forEach(function(d) {
-      sel.select("#" + d).select('svg').selectAll('*').remove();
-    });
+    // empty cells are nice to have so the axes are hung
+    // consistently
+    // var divs = [],
+    //     facets = _.pluck(that.dataList(), "selector");
+    // sel.selectAll('.plot-div')
+    //   .each(function(d) {
+    //     divs.push(d3.select(this).attr('id'));
+    //   });
+    // divs = divs.filter(function(d) { return !_.contains(facets, d);});
+    // divs.forEach(function(d) {
+    //   sel.select("#" + d).select('svg.plot-svg').selectAll('*').remove();
+    // });
 
     // drawing layers
+
     _.each(that.layers(), function(l, i) {
-      sel.call(l.draw(), i);
+      sel.call(l.draw(i));
     });
   }
   this.dataNew = false;
@@ -234,5 +255,10 @@ Plot.prototype.nest = function(data) {
 
 // returns array of faceted objects {selector: s, data: data} 
 Plot.prototype.dataList = DataList;
+
+// update method for actions requiring redrawing plot
+Plot.prototype.update = function() {
+
+};
 
 ggd3.plot = Plot;

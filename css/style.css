@@ -39,7 +39,7 @@ line.grid {
 .main-title {
   position: relative;
 }
-/* plot/frames, etc. */
+/* plot/frames, axes etc. */
 .chart-frame {
   position:relative;
   margin: 20px;
@@ -53,10 +53,12 @@ line.grid {
 */}
 .plot {
 }
+
 .background {
   fill: #ddd;
   opacity: 0.5;
 }
+
 .chart {
   shape-Rendering: crispEdges;
   stroke: #222222;
@@ -67,7 +69,13 @@ line.grid {
   fill-opacity: .125;
   shape-rendering: crispEdges;
 }
-
+/*make grid axes 100% transparent*/
+.axis.grid .tick {
+  stroke-opacity: 0;
+}
+.axis.grid text {
+  fill-opacity: 0;
+}
 /* geoms */
 path.geom-grid-horiz, path.geom-grid-vert {
   stroke-dasharray: 3,1;

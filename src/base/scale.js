@@ -21,18 +21,26 @@ function Scale(opts) {
     scaleType: null, // linear, log, ordinal, time, category, 
     // maybe radial, etc.
     scale: null,
+    opts: {},
   };
-  this.opts = opts;
+  // store passed object
   this.attributes = attributes;
-  this.scaleType(opts.type ? opts.type:null);
-  var getSet = ["aesthetic", "plot", "orient", "position"];
+  var getSet = ["aesthetic", "plot", "orient", "position", "opts"];
   for(var attr in this.attributes){
     if(!this[attr] && _.contains(getSet, attr) ){
       this[attr] = createAccessor(attr);
     }
   }
-}
+  this._userOpts = {};
+  if(!_.isUndefined(opts)){
+    // opts may be updated by later functions
+    // _userOpts stays fixed on initiation.
+    this.opts(opts);
+    this._userOpts = opts;
+    this.scaleType(opts.type ? opts.type:null);
+  }
 
+}
 Scale.prototype.scaleType = function(scaleType) {
   if(!arguments.length) { return this.attributes.scaleType; }
   var that = this;
@@ -99,7 +107,7 @@ Scale.prototype.positionAxis = function() {
   var margins = this.plot().margins(),
       dim = this.plot().plotDim(),
       aes = this.aesthetic(),
-      opts = this.opts.axis;
+      opts = this.opts().axis;
   if(aes === "x"){
     if(opts.position === "bottom"){
       return [margins.left, margins.top + dim.y];
