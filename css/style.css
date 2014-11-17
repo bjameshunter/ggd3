@@ -63,7 +63,14 @@ line.grid {
   shape-Rendering: crispEdges;
   stroke: #222222;
 }
-
+.facet-label-x{
+  fill: steelblue;
+  fill-opacity: 0.3;
+}
+.facet-label-y{
+  fill: steelblue;
+  fill-opacity: 0.3;
+}
 .brush .extent {
   stroke: #fff;
   fill-opacity: .125;

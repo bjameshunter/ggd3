@@ -10,8 +10,8 @@
   <option value="mtcars.csv" id='cars' >cars</option>
   <option value="iris.csv" id='iris' >iris</option>
   <option value="diamonds.csv" id='diamonds' >diamonds</option>
-  <option value="baseball.csv" id='baseball' selected>baseball</option>
-  <option value="nelplo.csv" id='nelplo' >nelplo</option>
+  <option value="baseball.csv" id='baseball' >baseball</option>
+  <option value="nelplo.csv" id='nelplo' selected>nelplo</option>
   <option value="wells.csv" id='wells' >wells</option>
   <option value="ustimeseries.csv" id='ustimeseries' >ustimeseries</option>
 </select>
@@ -57,7 +57,7 @@ var facets = {'mtcars.csv': {"x": "gear", y: "am"},
 var aes = {'mtcars.csv': {"x": "mpg" , "y": "hp"},
             "iris.csv" : {'x': "Sepal.Length", "y": "Sepal.Width"},
             "diamonds.csv": {"x": "carat", "y": "clarity"},
-            "baseball.csv": {"x": "year", "y": "h"},
+            "baseball.csv": {"x": "ab", "y": "h"},
             "nelplo.csv": {'x': 'date', 'y': 'value'},
             "ustimeseries.csv": {'x': 'date', 'y': 'value'},
             "wells.csv": {'x': 'arsenic', 'y': 'dist'}
@@ -86,29 +86,86 @@ var geom = {'mtcars.csv': ["point"],
             "ustimeseries.csv": ["point"],
             "wells.csv": ["point"],
           };
-ch = new ggd3.plot()
-          .width(150)
-          .height(150)
-          .yScale({axis: {ticks: 4, position:'right',
-                  "orient": "left"}})
-          .margins({top: 5, bottom:20, left:2, right:2})
-          .xScale({axis: {ticks: 4, position: "top",
-                  "orient": "bottom"}})
-          // .xAdjust(true);
+var charts = {'mtcars.csv': new ggd3.plot()
+                                .width(300)
+                                .height(300)
+                                .layers(["point"])
+                                .yScale({axis: {ticks: 4, position:'right',
+                                        "orient": "left"}})
+                                .margins({top: 5, bottom:10, left:2, right:2})
+                                .xScale({axis: {ticks: 4, position: "top",
+                                        "orient": "bottom"}}),
+            "iris.csv" : new ggd3.plot()
+                                .width(150)
+                                .height(200)
+                                .layers(["point"])
+                                .yScale({axis: {ticks: 4, position:'left',
+                                        "orient": "left"}})
+                                .margins({top: 5, bottom:20, left:22, right:5})
+                                .xScale({axis: {ticks: 4, position: "bottom",
+                                        "orient": "bottom"}}),
+            "diamonds.csv": new ggd3.plot()
+                                .width(150)
+                                .height(150)
+                                .layers(["bar"])
+                                .yScale({axis: {ticks: 4, position:'right',
+                                        "orient": "left"}})
+                                .margins({top: 5, bottom:20, left:2, right:2})
+                                .xScale({axis: {ticks: 4, position: "top",
+                                        "orient": "bottom"}}),
+            "baseball.csv": new ggd3.plot()
+                                .width(300)
+                                .height(300)
+                                .layers(["bar"])
+                                .yScale({axis: {ticks: 4, position:'right',
+                                        "orient": "left"}})
+                                .margins({top: 10, bottom:20, left:2, right:2})
+                                .xScale({axis: {ticks: 4, position: "top",
+                                        "orient": "bottom"}}),
+            "nelplo.csv": new ggd3.plot()
+                                .width(150)
+                                .height(150)
+                                .layers(["point"])
+                                .yScale({axis: {ticks: 4, position:'left',
+                                        "orient": "left"}})
+                                .margins({top: 15, bottom:20, left:20, right:5})
+                                .xScale({axis: {ticks: 4, position: "bottom",
+                                        "orient": "bottom"}}),
+            "ustimeseries.csv": new ggd3.plot()
+                                .width(300)
+                                .height(150)
+                                .layers(["point"])
+                                .yScale({axis: {ticks: 4, position:'left',
+                                        "orient": "left"}})
+                                .margins({top: 5, bottom:10, left:30, right:2})
+                                .xScale({axis: {ticks: 4, position: "top",
+                                        "orient": "bottom"}}),
+            "wells.csv": new ggd3.plot()
+                                .width(150)
+                                .height(150)
+                                .layers(["point"])
+                                .yScale({axis: {ticks: 4, position:'left',
+                                        "orient": "left"}})
+                                .margins({top: 5, bottom:20, left:25, right:5})
+                                .xScale({axis: {ticks: 4, position: "bottom",
+                                        "orient": "bottom"}}),
+          };
+
 // this should work;
+var chart;
 function redraw() {
   var dataset = $("#dataset")[0].value;
   d3.csv("../data/" + dataset, function(error, data) {
-  ch
-    .layers(geom[dataset])
-    .dtypes(dtypes[dataset])
-    .data(data)
-    .aes(aes[dataset]);
+  chart = charts[dataset]
+                .layers(geom[dataset])
+                .dtypes(dtypes[dataset])
+                .data(data)
+                .aes(aes[dataset]);
     var facet = new ggd3.facet(facets[dataset])
                   .type(FacetType[dataset])
                   .scales($("#facet-scales")[0].value)
-                  .titleProps([0.3, 0.1]);
-    div.call(ch.facet(facet).draw());
+                  .titleProps([0.1, 0.1]);
+    div.call(chart.facet(facet).draw());
   })
 }
 redraw();

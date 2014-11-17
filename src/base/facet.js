@@ -146,7 +146,7 @@ Facet.prototype.makeSVG = function(selection, rowNum, colNum) {
       dim = this.plot().plotDim(),
       plot = this.plot(),
       x = selection.data()[0],
-      addHeight = rowNum === 0 ? dim.y*that.titleProps()[1]:0,
+      addHeight = (rowNum === 0 || this.type() === "wrap") ? dim.y*that.titleProps()[1]:0,
       addWidth = colNum === 0 ? dim.x*that.titleProps()[0]:0,
       width = function() {
           return plot.width() + addWidth;
@@ -167,6 +167,8 @@ Facet.prototype.makeSVG = function(selection, rowNum, colNum) {
     .each(function(d) {
       that.makeTitle(d3.select(this), colNum, rowNum);
       var sel = d3.select(this).select('.plot-svg');
+      sel.attr('x', addWidth)
+        .attr('y', addHeight);
       that.makeCell(sel, x, rowNum, that._ncols);
       that.makeClip(sel, x, rowNum);
     });
@@ -250,6 +252,8 @@ Facet.prototype.makeCell = function(selection, x, y, ncols) {
   var plot = selection.selectAll('g.plot')
                 .data([0]);
   plot
+    .attr('transform', "translate(" + margins.left + 
+            "," + margins.top + ")")
     .select('rect.background')
     .attr({x: 0, y:0, width: dim.x, height:dim.y});
   plot.enter().append('g')
@@ -276,12 +280,14 @@ Facet.prototype.makeCell = function(selection, x, y, ncols) {
     .attr('class', 'y axis' + gridClassY);
   yaxis.exit().remove();
 };
+
 Facet.prototype.makeTitle = function(selection, colNum, rowNum) {
   var that = this,
-      dim = this.plot().plotDim(),
+      plot = this.plot(),
+      dim = plot.plotDim(),
+      margins = plot.margins(),
       addHeight = dim.y*that.titleProps()[1],
-      addWidth = dim.x*that.titleProps()[0],
-      plot = this.plot();
+      addWidth = colNum === 0 ? dim.x*that.titleProps()[0]:0;
   var xlab = selection
               .selectAll('svg.grid-title-x')
               .data([that.x() + " - " + that.xFacets[colNum]]);
@@ -289,19 +295,31 @@ Facet.prototype.makeTitle = function(selection, colNum, rowNum) {
               .selectAll('svg.grid-title-y')
               .data([that.y() + " - " + that.yFacets[rowNum]]);
   xlab.enter().append('svg')
-      .attr({'class': 'grid-title-x',
-            width: dim.x + addWidth,
-            height: addHeight*0.8})
-      .append('text');
+      .attr('class', 'grid-title-x')
+      .each(function() {
+        d3.select(this).append('rect')
+          .attr('class', 'facet-label-x');
+        d3.select(this).append('text');
+      });
   ylab.enter().append('svg')
       .attr('class', 'grid-title-y')
-      .append('text');
+      .each(function() {
+        d3.select(this).append('rect')
+          .attr('class', 'facet-label-y');
+        d3.select(this).append('text');
+      });
   if(that.type() === "grid"){
     addHeight = rowNum === 0 ? addHeight:0;
-    addWidth = colNum === 0 ? addWidth:0;
-    if(rowNum===0 && that.type() === "grid"){
-      xlab.attr("height", addHeight*0.8)
-          .select('text').attr({fill: 'black',
+    if(rowNum===0){
+      xlab.attr({ width: dim.x + addWidth,
+            x: margins.left,
+            y: margins.top,
+            height: addHeight})
+          .select('rect')
+          .attr({width: dim.x, x: addWidth,
+            height: addHeight});
+      xlab.select('text')
+          .attr({fill: 'black',
             opacity: 1,
             "font-size": 12,
             x: dim.x/2 + addWidth,
@@ -313,9 +331,13 @@ Facet.prototype.makeTitle = function(selection, colNum, rowNum) {
         .attr("height", 0)
         .select('text').text('');
     }
-    if(colNum===0 && that.type() === "grid"){
-      ylab.attr('width', addWidth)
-          .select('text')
+    if(colNum===0){
+      ylab.attr({width: addWidth,
+            y:margins.top + addHeight,
+            x:margins.left})
+          .select('rect')
+          .attr({width: addWidth, height: dim.y});
+      ylab.select('text')
           .attr({'fill': 'black',
               'opacity': 1,
               'font-size': 14,
@@ -330,16 +352,23 @@ Facet.prototype.makeTitle = function(selection, colNum, rowNum) {
     }
   } else {
     // add labels to wrap-style faceting.
-      xlab.attr("height", addHeight*0.8)
-          .select('text').attr({fill: 'black',
-            opacity: 1,
-            "font-size": 12,
-            x: dim.x/2 + addWidth,
-            y: addHeight*0.8,
-            "text-anchor": 'middle'})
-          .text(that.wrapLabel(rowNum, colNum));
-      selection.select('.grid-title-y')
-        .attr({width:0}).select('text').text('');
+    xlab.attr('y', margins.top)
+        .attr('x', 0)
+        .attr('height', addHeight)
+        .select('rect').attr({height: addHeight,
+        width: dim.x, y:0,
+        x: margins.left + addWidth});
+    xlab.select('text').attr({fill: 'black',
+          opacity: 1,
+          "font-size": 12,
+          width: plot.width(),
+          height: addHeight,
+          x: plot.width()/2,
+          y: addHeight*0.8,
+          "text-anchor": 'middle'})
+        .text(that.wrapLabel(rowNum, colNum));
+    selection.select('.grid-title-y')
+      .attr({width:0}).select('text').text('');
   }
   return selection.select('.plot-svg');
 };
