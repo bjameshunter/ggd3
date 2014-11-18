@@ -1,7 +1,7 @@
 // Base geom from which all geoms inherit
 function Geom(aes) {
   var attributes = {
-    layer:     null,
+    layer: null,
     stat: null,
   };
   this.attributes = attributes;

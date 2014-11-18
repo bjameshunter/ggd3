@@ -38,9 +38,10 @@ Layer.prototype.stat = function(stat) {
   return this;
 };
 
-Layer.prototype.draw = function(i) {
+Layer.prototype.draw = function(layerNum) {
   var that = this,
       facet = this.plot().facet();
+  // 
   function draw(sel) {
 
     var dataList = that.ownData() ? that.dataList():that.plot().dataList(),
@@ -49,12 +50,13 @@ Layer.prototype.draw = function(i) {
       .each(function(d) {
         divs.push(d3.select(this).attr('id'));
       });
-    _.each(divs, function(id){
+    _.each(divs, function(id, i){
+      // cycle through all divs, drawing data if it exists.
       var s = sel.select("#" + id),
           d = dataList.filter(function(d) {
             return d.selector === id;
-          });
-      s.call(that.geom().draw(), d|| [], i);
+          })[0];
+      s.call(that.geom().draw(), d || [], i, layerNum);
     });
   }
   return draw;

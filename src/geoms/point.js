@@ -2,6 +2,7 @@
 function Point(spec) {
   var attributes = {
     name: "point",
+    shape: "circle",
   };
 
   this.attributes = _.merge(attributes, this.attributes);
@@ -25,19 +26,27 @@ Point.prototype.draw = function() {
   // of the stat. 
   var layer = this.layer(),
       plot = layer.plot(),
+      stat = layer.stat(),
       facet = plot.facet(),
       margins = plot.margins(),
       aes = layer.aes(),
-      that = this;
-  function draw(sel, data, i) {
-    var id = (facet.type() === "grid" || 
-              facet.scales()==="fixed") ? "single":sel.attr('id'),
+      fill = d3.functor(plot.fill()),
+      size = d3.functor(plot.size()),
+      shape = d3.functor(this.shape()),
+      that = this,
+      geom = d3.superformula()
+               .type(function(d) { return shape(d[aes.shape]); })
+               .size(function(d) { return size(d[aes.size]); });
+  function draw(sel, data, i, layerNum) {
+    var id = (facet.type() === "grid") ? "single":sel.attr('id'),
         x = plot.xScale()[id],
         y = plot.yScale()[id];
     // drawing and positioning axes probably shouldn't be on
     // the geom
     // but here, we're drawing
-    if(i === 0){
+    data = stat.compute(data);
+    // here set scales according to fixed/free/grid
+    if(layerNum === 0){
       sel.select('.x.axis')
         .attr("transform", "translate(" + x.positionAxis() + ")")
         .transition().call(x.axis);
@@ -45,16 +54,30 @@ Point.prototype.draw = function() {
         .attr("transform", "translate(" + y.positionAxis() + ")")
         .transition().call(y.axis);
     }
-    data = that.stat(data);
-    var bars = sel.select('.plot')
-                  .selectAll('circle')
+    var points = sel.select('.plot')
+                  .selectAll('.geom-' + layerNum)
                   .data(data);
     // add canvas and svg functions.
-    // bars.enter().append('rect')
-    //     .attr('class', 'geom-bar');    
+    points.transition()
+        .attr('d', geom)
+        .attr('transform', function(d) {
+          return "translate(" + x.scale()(d[aes.x])+ 
+                  "," + y.scale()(d[aes.y]) + ")";
+        })
+        .attr('fill', function(d) { return fill(d[aes.fill]); });
+    points.enter().append('path')
+        .attr('class', 'geom-' + layerNum + " geom-point")
+        .attr('d', geom)
+        .attr('transform', function(d) {
+          return "translate(" + x.scale()(d[aes.x])+ 
+                  "," + y.scale()(d[aes.y]) + ")";
+        })
+        .attr('fill', function(d) { return fill(d[aes.fill]); });
     // sel is svg, data is array of objects
-
-
+    points.exit()
+      .transition()
+      .style('opacity', 0)
+      .remove();
   }
   return draw;
 };

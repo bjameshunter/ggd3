@@ -71,6 +71,12 @@ line.grid {
   fill: steelblue;
   fill-opacity: 0.3;
 }
+.facet-title-x {
+  font-size: 15;
+}
+.facet-title-y {
+  font-size: 15;
+}
 .brush .extent {
   stroke: #fff;
   fill-opacity: .125;

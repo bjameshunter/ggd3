@@ -12,8 +12,10 @@ var aesMap = {
         y: 'yScale',
         color: 'colorScale',
         size: 'sizeScale',
+        fill: 'fillScale',
+        shape: 'shapeScale',
       },
-    scales = ['x', 'y', 'color', 'size'];
+    scales = ['x', 'y', 'color', 'size', 'fill'];
 
 function SetScales() {
 
@@ -38,54 +40,55 @@ function SetScales() {
         return that[v]().single._userOpts;
       });
 
-  function makeScale(d, i) {
-    for(var a in aes){
-      if(_.contains(scales, a)){
-        // user is not specifying a scale.
-        if(!(that[aesMap[a]]() instanceof ggd3.scale)){
-          // get plot level options set for scale.
-
-          dtype = that.dtypes()[aes[a]];
-          settings = _.merge(ggd3.tools.defaultScaleSettings(dtype, a),
-                             opts[a]);
-          var scale = new ggd3.scale(settings)
-                              .plot(that)
-                              .aesthetic(a);
-          if(_.contains(['x', 'y'], a)){
-            if(a === "x"){
-              scale.range([0, that.plotDim().x]);
-            }
-            if(a === "y") {
-              scale.range([that.plotDim().y, 0]);
-            }
-            scale.axis = d3.svg.axis().scale(scale.scale());
-            for(var ax in settings.axis){
-              if(scale.axis.hasOwnProperty(ax)){
-                scale.axis[ax](settings.axis[ax]);
-              }
+  function makeScale(d, i, a) {
+    if(_.contains(scales, a)){
+      // user is not specifying a scale.
+      if(!(that[aesMap[a]]() instanceof ggd3.scale)){
+        // get plot level options set for scale.
+        dtype = that.dtypes()[aes[a]];
+        settings = _.merge(ggd3.tools.defaultScaleSettings(dtype, a),
+                           opts[a]);
+        var scale = new ggd3.scale(settings)
+                            .plot(that)
+                            .aesthetic(a);
+        if(_.contains(['x', 'y'], a)){
+          if(a === "x"){
+            scale.range([0, that.plotDim().x]);
+          }
+          if(a === "y") {
+            scale.range([that.plotDim().y, 0]);
+          }
+          scale.axis = d3.svg.axis().scale(scale.scale());
+          for(var ax in settings.axis){
+            if(scale.axis.hasOwnProperty(ax)){
+              scale.axis[ax](settings.axis[ax]);
             }
           }
-          for(var s in settings.scale){
-            if(scale.scale().hasOwnProperty(s)){
-              scale.scale()[s](settings.scale[s]);
-            }
+        }
+        for(var s in settings.scale){
+          if(scale.scale().hasOwnProperty(s)){
+            scale.scale()[s](settings.scale[s]);
           }
-          that[aesMap[a]]()[d.selector] = scale;
-          if(i === 0) {
-            that[aesMap[a]]().single = scale;
-          }
-        } else {
-          // copy scale settings, merge with default info that wasn't
-          // declared and create for each facet if needed.
-        } 
-      }
+        }
+        that[aesMap[a]]()[d.selector] = scale;
+        if(i === 0) {
+          that[aesMap[a]]().single = scale;
+        }
+      } else {
+        console.log(that[aesMap[a]]());
+        // copy scale settings, merge with default info that wasn't
+        // declared and create for each facet if needed.
+      } 
     }
   }
-  _.map(data, function(d,i) {return makeScale(d, i);});
+  _.map(_.keys(aes), function(a) {
+    return _.map(data, function(d,i) {return makeScale(d, i, a);});
+  });
   for(var a in aes) {
     // give user-specified scale settings to single facet
     that[aesMap[a]]().single._userOpts = _.cloneDeep(opts[a]);
   }
+
 }
 
 ggd3.tools.defaultScaleSettings = function(dtype, aesthetic) {
@@ -112,20 +115,48 @@ ggd3.tools.defaultScaleSettings = function(dtype, aesthetic) {
                   scale: {}};
     }
   }
+  function legendScale() {
+    if(dtype[0] === "number" || dtype[0] === "date") {
+      if(dtype[1] === "many") {
+        return {type: 'linear',
+                axis: {position:'none'},
+                scale: {}};
+      } else {
+        return {type: 'category10',
+                axis: {position: 'none'},
+                scale: {}};
+      }
+    }
+    if(dtype[0] === "string") {
+      if(dtype[1] === "many") {
+        return {type:"category20",
+                axis: {position: 'none'},
+                scale: {}};
+      } else {
+        return {type:"category10",
+                axis: {position: 'none'},
+                scale: {}};
+      }
+    }
+  }
   var s;
   switch(aesthetic) {
     case "x":
-      s = xyScale(dtype);
+      s = xyScale();
       s.axis.position = "bottom";
       s.axis.orient = "bottom";
       return s;
     case "y":
-      s = xyScale(dtype);
+      s = xyScale();
       s.axis.position = "left";
       s.axis.orient = "left";
       return s;
     case "color":
-      return {type:"category10", 
+      return legendScale();
+    case "fill":
+      return legendScale();
+    case "shape":
+      return {type:"shape", 
             axis: {position:'none'},
             scale: {}};
     case "size":
@@ -145,7 +176,7 @@ ggd3.tools.domain = function(data, rule, zero,
   if(!_.isUndefined(rule) && !_.isDate(extent[0]) ){
     range = Math.abs(extent[1] - extent[0]);
     if(rule === "left" || rule === "both"){
-      extent[0] +=  0.1 * range;
+      extent[0] -=  0.1 * range;
     }
     if(rule === "right" || rule === "both"){
       extent[1] += 0.1 * range;
@@ -155,28 +186,47 @@ ggd3.tools.domain = function(data, rule, zero,
 };
 
 Plot.prototype.setDomains = function() {
+  // when setting domain, this function must
+  // consider the stat calculated on the data
+  // nested, or not.
+  // Perhaps here, calculate the fixed scale
+  // domains, then within layer/geom
+  // adjust it to the free scale if necessary.
+  // I guess initial layer should have all relevant scale info
   var aes = this.aes(),
       that = this,
       facet = this.facet(),
-      layer = this.layers()[0],
+      layer = this.layers()[0], 
       stat = layer.stat(),
       linearScales = ['log', 'linear', 'time', 'date'],
+      globalScales = ['shape', 'fill', 'color', 'size'],
       domain,
       data,
       scale;
   for(var a in aes) {
     var scales = this[aesMap[a]]();
     if(facet.scales() !== "free_" + a &&
-       facet.scales() !== "free"){
+       facet.scales() !== "free" || (_.contains(globalScales, a)) ){
       data = ggd3.tools.unNest(this.data());
       if(_.contains(linearScales, scales.single.opts().type)){
         domain = ggd3.tools.domain(data, 'both', false, aes[a]);
       } else {
         // nest according ordinal axes, group, and color
+        // include warning about large numbers of colors for
+        // color scales.
         domain = _.unique(_.pluck(data, aes[a]));
       }
       for(scale in scales) {
+        if(scales[scale].scaleType() === "log" && domain[0] <= 0){
+          domain[0] = 1;
+        }
         scales[scale].domain(domain);
+      }
+      if(_.contains(globalScales, a)) {
+        that[a](that[aesMap[a]]().single.scale());
+        if(_.contains(linearScales, that[aesMap[a]]().single.scaleType()) ){
+          that[a]().range(that[a + "Range"]());
+        }
       }
     } else {
       data = this.dataList();

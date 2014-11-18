@@ -29,7 +29,8 @@ function Count() {
 }
 Count.prototype = new Stat();
 Count.prototype.compute = function(data) {
-  return data.length;
+  data = data.data || [];
+  return data;
 };
 Count.prototype.name = function() {
   return "count";
@@ -55,6 +56,7 @@ function Identity() {
 }
 Identity.prototype = new Stat();
 Identity.prototype.compute = function(data) {
+  data = data.data || [];
   return data;
 };
 Identity.prototype.name = function() {

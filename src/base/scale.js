@@ -99,6 +99,7 @@ Scale.prototype.range = function(range) {
 
 Scale.prototype.domain = function(domain) {
   if(!arguments.length) { return this.attributes.domain; }
+  this.attributes.domain = domain;
   this.attributes.scale.domain(domain);
 
   return this;
