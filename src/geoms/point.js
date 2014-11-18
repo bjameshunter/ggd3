@@ -19,13 +19,7 @@ function Point(spec) {
 Point.prototype = new Geom();
 
 Point.prototype.draw = function() {
-  // bar takes an array of data, 
-  // nests by a required ordinal axis, optional color and group
-  // variables then calculates the stat and draws
-  // horizontal or vertical bars.
-  // stacked, grouped, expanded or not.
-  // scales first need to be calculated according to output
-  // of the stat. 
+
   var layer     = this.layer(),
       plot      = layer.plot(),
       stat      = layer.stat(),
@@ -57,15 +51,21 @@ Point.prototype.draw = function() {
         .attr("transform", "translate(" + y.positionAxis() + ")")
         .transition().call(y.axis);
     }
-    var notGeom = sel.select('.plot')
-                    .selectAll('.geom' + layerNum)
-                    .selectAll('.geom-point');
+    var notPoints = sel.select('.plot')
+                      .selectAll('.geom-' + layerNum)
+                      .filter(function() {
+                        return d3.select(this)[0][0].nodeName !== "path";
+                      });
+    notPoints.transition().duration(1000)
+      .style('opacity', 0)
+      .remove();
     var points = sel.select('.plot')
                   .selectAll('path.geom-' + layerNum)
                   .data(data);
     // add canvas and svg functions.
 
     points.transition()
+        .attr('class', 'geom-' + layerNum + " geom-point")
         .attr('d', geom)
         .attr('transform', function(d) {
           return "translate(" + x.scale()(d[aes.x])+ 

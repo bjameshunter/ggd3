@@ -15,13 +15,15 @@ var aesMap = {
         fill: 'fillScale',
         shape: 'shapeScale',
       },
-    measureScales = ['x', 'y', 'color', 'size', 'fill', 
-                    'alpha'];
+    measureScales = ['x', 'y', 'color','size', 'fill'
+                    // ,'alpha'
+                    ];
 
 function SetScales() {
   // do nothing if the object doesn't have aes, data and facet
   // if any of them get reset, the scales must be reset
-  if(!this.data() || !this.aes() || !this.facet()){
+  if(!this.data() || !this.aes() || !this.facet() ||
+     _.isEmpty(this.layers()) ){
     console.log('not setting scales');
     return false;
   }
@@ -75,7 +77,6 @@ function SetScales() {
           that[aesMap[a]]().single = scale;
         }
       } else {
-        console.log(that[aesMap[a]]());
         // copy scale settings, merge with default info that wasn't
         // declared and create for each facet if needed.
       } 

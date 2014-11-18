@@ -678,9 +678,15 @@ Plot.prototype.layers = function(layers) {
         this.attributes.layers.push(layer);
       } else if ( l instanceof ggd3.layer ){
         // user specified layer
-        this.attributes.push(l.ownData(true).plot(this));
+        this.attributes.layers.push(l.ownData(true)
+                                    .aes(this.aes())
+                                    .plot(this));
       }
     }, this);
+  } else if (layers instanceof ggd3.layer) {
+    this.attributes.layers.push(layers
+                                .aes(this.aes())
+                                .plot(this));
   }
   return this;
 };
@@ -966,13 +972,15 @@ var aesMap = {
         fill: 'fillScale',
         shape: 'shapeScale',
       },
-    measureScales = ['x', 'y', 'color', 'size', 'fill', 
-                    'alpha'];
+    measureScales = ['x', 'y', 'color','size', 'fill'
+                    // ,'alpha'
+                    ];
 
 function SetScales() {
   // do nothing if the object doesn't have aes, data and facet
   // if any of them get reset, the scales must be reset
-  if(!this.data() || !this.aes() || !this.facet()){
+  if(!this.data() || !this.aes() || !this.facet() ||
+     _.isEmpty(this.layers()) ){
     console.log('not setting scales');
     return false;
   }
@@ -1026,7 +1034,6 @@ function SetScales() {
           that[aesMap[a]]().single = scale;
         }
       } else {
-        console.log(that[aesMap[a]]());
         // copy scale settings, merge with default info that wasn't
         // declared and create for each facet if needed.
       } 
@@ -1323,7 +1330,7 @@ Layer.prototype.ownData = function(tf) {
   // ie.
   // this.attributes.data = this.plot().nest(this.data());
   this.attributes.ownData = tf;
-  return tf;
+  return this;
 };
 
 Layer.prototype.stat = function(stat) {
@@ -1396,13 +1403,7 @@ function Point(spec) {
 Point.prototype = new Geom();
 
 Point.prototype.draw = function() {
-  // bar takes an array of data, 
-  // nests by a required ordinal axis, optional color and group
-  // variables then calculates the stat and draws
-  // horizontal or vertical bars.
-  // stacked, grouped, expanded or not.
-  // scales first need to be calculated according to output
-  // of the stat. 
+
   var layer     = this.layer(),
       plot      = layer.plot(),
       stat      = layer.stat(),
@@ -1434,15 +1435,21 @@ Point.prototype.draw = function() {
         .attr("transform", "translate(" + y.positionAxis() + ")")
         .transition().call(y.axis);
     }
-    var notGeom = sel.select('.plot')
-                    .selectAll('.geom' + layerNum)
-                    .selectAll('.geom-point');
+    var notPoints = sel.select('.plot')
+                      .selectAll('.geom-' + layerNum)
+                      .filter(function() {
+                        return d3.select(this)[0][0].nodeName !== "path";
+                      });
+    notPoints.transition().duration(1000)
+      .style('opacity', 0)
+      .remove();
     var points = sel.select('.plot')
                   .selectAll('path.geom-' + layerNum)
                   .data(data);
     // add canvas and svg functions.
 
     points.transition()
+        .attr('class', 'geom-' + layerNum + " geom-point")
         .attr('d', geom)
         .attr('transform', function(d) {
           return "translate(" + x.scale()(d[aes.x])+ 
@@ -1579,6 +1586,7 @@ function Text(spec) {
     name: "text",
   };
 
+  console.log('instantiating text');
   this.attributes = _.merge(attributes, this.attributes);
 
   for(var attr in this.attributes){
@@ -1591,6 +1599,7 @@ function Text(spec) {
 Text.prototype = new Geom();
 
 Text.prototype.draw = function() {
+
   var layer = this.layer(),
       plot = layer.plot(),
       stat = layer.stat(),
@@ -1613,19 +1622,29 @@ Text.prototype.draw = function() {
         .attr("transform", "translate(" + y.positionAxis() + ")")
         .transition().call(y.axis);
     }
-    var Text = sel.select('.plot')
-                  .selectAll('.geom-' + layerNum)
+    var notText = sel.select('.plot')
+                    .selectAll('.geom-' + layerNum)
+                    .filter(function() {
+                      return d3.select(this)[0][0].nodeName !== "text";
+                    });
+    notText.transition().duration(1000)
+      .style('opacity', 0)
+      .remove();
+    var text = sel.select('.plot')
+                  .selectAll('text.geom-' + layerNum)
                   .data(data);
-    Text.transition()
+    text.transition()
+        .attr('class', 'geom-' + layerNum + " geom-text")
         .text(function(d) { return d[aes.label];})
         .attr('transform', function(d) {
           return "translate(" + x.scale()(d[aes.x])+ 
                   "," + y.scale()(d[aes.y]) + ")";
         })  
         .style('font-size', function(d) { return size(d[aes.size]);})
-        .style('opacity', 0.5)
+        .attr('text-anchor', 'middle')
+        .attr('y', function(d) { return size(d[aes.size])/2; })
         .attr('fill', function(d) { return fill(d[aes.fill]); });
-    Text.enter().append('text')
+    text.enter().append('text')
         .attr('class', 'geom-' + layerNum + " geom-text")
         .text(function(d) { return d[aes.label]; })
         .attr('transform', function(d) {
@@ -1634,8 +1653,10 @@ Text.prototype.draw = function() {
         })
         .style('font-size', function(d) { return size(d[aes.size]);})
         .style('opacity', 0.5)
+        .attr('y', function(d) { return size(d[aes.size])/2; })
+        .attr('text-anchor', 'middle')
         .attr('fill', function(d) { return fill(d[aes.fill]); });
-    Text.exit()
+    text.exit()
       .transition()
       .style('opacity', 0)
       .remove();

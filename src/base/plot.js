@@ -142,9 +142,15 @@ Plot.prototype.layers = function(layers) {
         this.attributes.layers.push(layer);
       } else if ( l instanceof ggd3.layer ){
         // user specified layer
-        this.attributes.push(l.ownData(true).plot(this));
+        this.attributes.layers.push(l.ownData(true)
+                                    .aes(this.aes())
+                                    .plot(this));
       }
     }, this);
+  } else if (layers instanceof ggd3.layer) {
+    this.attributes.layers.push(layers
+                                .aes(this.aes())
+                                .plot(this));
   }
   return this;
 };

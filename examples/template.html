@@ -91,10 +91,17 @@ var geom = {'mtcars.csv': ["point"],
             "ustimeseries.csv": ["point"],
             "wells.csv": ["point"],
           };
+var layers = {'mtcars.csv': ['text'],
+            "iris.csv" : ["point"],
+            "diamonds.csv": "grid",
+            "baseball.csv": ["point"],
+            "nelplo.csv": ["point"],
+            "ustimeseries.csv": ["point"],
+            "wells.csv": ["point"],
+          };
 var charts = {'mtcars.csv': new ggd3.plot()
                     .width(300)
                     .height(300)
-                    .layers(["text"])
                     .yScale({type: 'log', 
                             axis: {ticks: 4, 
                               position:'right',
@@ -103,31 +110,32 @@ var charts = {'mtcars.csv': new ggd3.plot()
                     .margins({top: 5, bottom:10, left:2, right:2})
                     .xScale({type: 'log',
                             axis: {ticks: 4, 
-                              tickFormat: d3.format(",.0f"),
-                              position: "top",
-                            "orient": "bottom"}}),
+                            tickFormat: d3.format(",.0f"),
+                            position: "top",
+                            orient: "bottom"}})
+                    .layers(layers["mtcars.csv"]),
             "iris.csv" : new ggd3.plot()
+                                .layers(layers["iris.csv"])
                                 .width(500)
                                 .height(450)
-                                .layers(["point"])
-                                // .yScale({type: 'log', axis: {ticks: 4, position:'left',
-                                //         "orient": "left"}})
+                                .yScale({type: 'log', axis: {ticks: 4, position:'left',
+                                  orient: "left"}})
                                 .margins({top: 5, bottom:20, left:25, right:5})
                                 .xScale({type:'log', axis: {ticks: 4, position: "bottom",
                                         "orient": "bottom"}}),
             "diamonds.csv": new ggd3.plot()
+                                .layers(layers["diamonds.csv"])
                                 .width(150)
                                 .height(150)
-                                .layers(["bar"])
                                 .yScale({axis: {ticks: 4, position:'right',
                                         "orient": "left"}})
                                 .margins({top: 5, bottom:20, left:2, right:2})
                                 .xScale({axis: {ticks: 4, position: "top",
                                         "orient": "bottom"}}),
             "baseball.csv": new ggd3.plot()
+                                .layers(layers["baseball.csv"])
                                 .width(300)
                                 .height(300)
-                                .layers(["text"])
                                 .sizeRange([5, 20])
                                 .yScale({axis: {ticks: 4, position:'right',
                                         "orient": "left"}})
@@ -135,18 +143,18 @@ var charts = {'mtcars.csv': new ggd3.plot()
                                 .xScale({axis: {ticks: 4, position: "top",
                                         "orient": "bottom"}}),
             "nelplo.csv": new ggd3.plot()
+                                .layers(layers["nelplo.csv"])
                                 .width(300)
                                 .height(150)
-                                .layers(["point"])
                                 .yScale({axis: {ticks: 4, position:'left',
                                         "orient": "left"}})
                                 .margins({top: 15, bottom:20, left:20, right:5})
                                 .xScale({axis: {ticks: 4, position: "bottom",
                                         "orient": "bottom"}}),
             "ustimeseries.csv": new ggd3.plot()
+                                .layers(layers["ustimeseries.csv"])
                                 .width(500)
                                 .height(300)
-                                .layers(["point"])
                                 .yScale({axis: {ticks: 4, position:'left',
                                         "orient": "left"}})
                                 .margins({top: 5, bottom:10, left:30, right:2})
@@ -155,12 +163,12 @@ var charts = {'mtcars.csv': new ggd3.plot()
             "wells.csv": new ggd3.plot()
                                 .width(400)
                                 .height(400)
-                                .layers(["point"])
                                 .yScale({type:'log', 
                                         axis: {ticks: 4, 
                                           tickFormat: d3.format(",.0f"),
                                           position:'right',
                                         orient: "left"}})
+                                .layers(layers["wells.csv"])
                                 .margins({top: 5, bottom:20, left:2, right:2})
                                 .xScale({type: 'log', 
                                         axis: {ticks: 4, 

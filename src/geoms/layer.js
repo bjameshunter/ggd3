@@ -24,7 +24,7 @@ Layer.prototype.ownData = function(tf) {
   // ie.
   // this.attributes.data = this.plot().nest(this.data());
   this.attributes.ownData = tf;
-  return tf;
+  return this;
 };
 
 Layer.prototype.stat = function(stat) {
