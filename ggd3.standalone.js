@@ -1381,7 +1381,7 @@ ggd3.layer = Layer;
 function Point(spec) {
   var attributes = {
     name: "point",
-    shape: "circle",
+    shape: "square",
   };
 
   this.attributes = _.merge(attributes, this.attributes);
@@ -1403,18 +1403,18 @@ Point.prototype.draw = function() {
   // stacked, grouped, expanded or not.
   // scales first need to be calculated according to output
   // of the stat. 
-  var layer = this.layer(),
-      plot = layer.plot(),
-      stat = layer.stat(),
-      facet = plot.facet(),
-      margins = plot.margins(),
-      aes = layer.aes(),
-      fill = d3.functor(plot.fill()),
-      size = d3.functor(plot.size()),
-      shape = d3.functor(this.shape()),
-      that = this,
-      geom = d3.superformula()
-               .segments(10)
+  var layer     = this.layer(),
+      plot      = layer.plot(),
+      stat      = layer.stat(),
+      facet     = plot.facet(),
+      margins   = plot.margins(),
+      aes       = layer.aes(),
+      fill      = d3.functor(plot.fill()),
+      size      = d3.functor(plot.size()),
+      shape     = d3.functor(this.shape()),
+      that      = this,
+      geom      = d3.superformula()
+               .segments(20)
                .type(function(d) { return shape(d[aes.shape]); })
                .size(function(d) { return size(d[aes.size]); });
   function draw(sel, data, i, layerNum) {
@@ -1434,10 +1434,14 @@ Point.prototype.draw = function() {
         .attr("transform", "translate(" + y.positionAxis() + ")")
         .transition().call(y.axis);
     }
+    var notGeom = sel.select('.plot')
+                    .selectAll('.geom' + layerNum)
+                    .selectAll('.geom-point');
     var points = sel.select('.plot')
-                  .selectAll('.geom-' + layerNum)
+                  .selectAll('path.geom-' + layerNum)
                   .data(data);
     // add canvas and svg functions.
+
     points.transition()
         .attr('d', geom)
         .attr('transform', function(d) {

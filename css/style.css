@@ -109,7 +109,9 @@ circle.shade {
 .hist {
   stroke: black;
 }
-
-/*.domain {
+.domain {
   stroke: none !important;
-}*/
+}
+.tick line{
+  stroke: none !important;
+}

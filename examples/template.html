@@ -39,13 +39,13 @@
 <div id='chart01' class='chart-frame'></div>
 <script>
 var ch;
-var div = d3.select('#chart01')
+var div = d3.select('#chart01');
 $("#dataset").on('change', function() {
-  redraw()
-})
+  redraw();
+});
 $("#facet-scales").on('change', function() {
-  redraw()
-})
+  redraw();
+});
 var facets = {'mtcars.csv': {"x": "gear", y: "am"},
             "iris.csv" : null,
             "diamonds.csv": {"x": "color", "y": "cut"},
@@ -60,7 +60,9 @@ var aes = {'mtcars.csv': {x: "mpg" , y: "hp", fill:"cyl", size:"drat",
             , fill: "Petal.Length", size: "Petal.Width"
           },
             "diamonds.csv": {x: "carat", y: "clarity"},
-            "baseball.csv": {x: "ab", y: "h", fill: "hr", size: "g"},
+            "baseball.csv": {x: "hr", y: "h", fill: "hr", size: "g",
+            label: 'id'
+          },
             "nelplo.csv": {x: 'date', y: 'value', fill: 'variable'},
             "ustimeseries.csv": {x: 'date', y: 'value', fill: 'variable'},
             "wells.csv": {x: 'arsenic', y: 'dist', fill: "educ"}
@@ -90,14 +92,20 @@ var geom = {'mtcars.csv': ["point"],
             "wells.csv": ["point"],
           };
 var charts = {'mtcars.csv': new ggd3.plot()
-                                .width(300)
-                                .height(300)
-                                .layers(["text"])
-                                .yScale({axis: {ticks: 4, position:'right',
-                                        "orient": "left"}})
-                                .margins({top: 5, bottom:10, left:2, right:2})
-                                .xScale({axis: {ticks: 4, position: "top",
-                                        "orient": "bottom"}}),
+                    .width(300)
+                    .height(300)
+                    .layers(["text"])
+                    .yScale({type: 'log', 
+                            axis: {ticks: 4, 
+                              position:'right',
+                              tickFormat: d3.format(",.0f"),
+                              orient: "left"}})
+                    .margins({top: 5, bottom:10, left:2, right:2})
+                    .xScale({type: 'log',
+                            axis: {ticks: 4, 
+                              tickFormat: d3.format(",.0f"),
+                              position: "top",
+                            "orient": "bottom"}}),
             "iris.csv" : new ggd3.plot()
                                 .width(500)
                                 .height(450)
@@ -119,7 +127,8 @@ var charts = {'mtcars.csv': new ggd3.plot()
             "baseball.csv": new ggd3.plot()
                                 .width(300)
                                 .height(300)
-                                .layers(["point"])
+                                .layers(["text"])
+                                .sizeRange([5, 20])
                                 .yScale({axis: {ticks: 4, position:'right',
                                         "orient": "left"}})
                                 .margins({top: 10, bottom:20, left:2, right:2})
