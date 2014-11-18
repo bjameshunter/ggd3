@@ -15,10 +15,10 @@ var aesMap = {
         fill: 'fillScale',
         shape: 'shapeScale',
       },
-    scales = ['x', 'y', 'color', 'size', 'fill'];
+    measureScales = ['x', 'y', 'color', 'size', 'fill', 
+                    'alpha'];
 
 function SetScales() {
-
   // do nothing if the object doesn't have aes, data and facet
   // if any of them get reset, the scales must be reset
   if(!this.data() || !this.aes() || !this.facet()){
@@ -41,7 +41,7 @@ function SetScales() {
       });
 
   function makeScale(d, i, a) {
-    if(_.contains(scales, a)){
+    if(_.contains(measureScales, a)){
       // user is not specifying a scale.
       if(!(that[aesMap[a]]() instanceof ggd3.scale)){
         // get plot level options set for scale.
@@ -85,8 +85,10 @@ function SetScales() {
     return _.map(data, function(d,i) {return makeScale(d, i, a);});
   });
   for(var a in aes) {
+    if(_.contains(measureScales, a)){
     // give user-specified scale settings to single facet
-    that[aesMap[a]]().single._userOpts = _.cloneDeep(opts[a]);
+      that[aesMap[a]]().single._userOpts = _.cloneDeep(opts[a]);
+    }
   }
 
 }
@@ -204,40 +206,42 @@ Plot.prototype.setDomains = function() {
       data,
       scale;
   for(var a in aes) {
-    var scales = this[aesMap[a]]();
-    if(facet.scales() !== "free_" + a &&
-       facet.scales() !== "free" || (_.contains(globalScales, a)) ){
-      data = ggd3.tools.unNest(this.data());
-      if(_.contains(linearScales, scales.single.opts().type)){
-        domain = ggd3.tools.domain(data, 'both', false, aes[a]);
-      } else {
-        // nest according ordinal axes, group, and color
-        // include warning about large numbers of colors for
-        // color scales.
-        domain = _.unique(_.pluck(data, aes[a]));
-      }
-      for(scale in scales) {
-        if(scales[scale].scaleType() === "log" && domain[0] <= 0){
-          domain[0] = 1;
-        }
-        scales[scale].domain(domain);
-      }
-      if(_.contains(globalScales, a)) {
-        that[a](that[aesMap[a]]().single.scale());
-        if(_.contains(linearScales, that[aesMap[a]]().single.scaleType()) ){
-          that[a]().range(that[a + "Range"]());
-        }
-      }
-    } else {
-      data = this.dataList();
-      for(var d in data) {
-        scale = scales[data[d].selector];
+    if(_.contains(measureScales, a)) {
+      var scales = this[aesMap[a]]();
+      if(facet.scales() !== "free_" + a &&
+         facet.scales() !== "free" || (_.contains(globalScales, a)) ){
+        data = ggd3.tools.unNest(this.data());
         if(_.contains(linearScales, scales.single.opts().type)){
-          scale.domain(ggd3.tools.domain(_.pluck(data[d].data, aes[a])));
+          domain = ggd3.tools.domain(data, 'both', false, aes[a]);
         } else {
-          scale.domain(_.unique(_.pluck(data[d].data, aes[a])));
+          // nest according ordinal axes, group, and color
+          // include warning about large numbers of colors for
+          // color scales.
+          domain = _.unique(_.pluck(data, aes[a]));
         }
+        for(scale in scales) {
+          if(scales[scale].scaleType() === "log" && domain[0] <= 0){
+            domain[0] = 1;
+          }
+          scales[scale].domain(domain);
+        }
+        if(_.contains(globalScales, a)) {
+          that[a](that[aesMap[a]]().single.scale());
+          if(_.contains(linearScales, that[aesMap[a]]().single.scaleType()) ){
+            that[a]().range(that[a + "Range"]());
+          }
+        }
+      } else {
+        data = this.dataList();
+        for(var d in data) {
+          scale = scales[data[d].selector];
+          if(_.contains(linearScales, scales.single.opts().type)){
+            scale.domain(ggd3.tools.domain(_.pluck(data[d].data, aes[a])));
+          } else {
+            scale.domain(_.unique(_.pluck(data[d].data, aes[a])));
+          }
 
+        }
       }
     }
   }

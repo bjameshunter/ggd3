@@ -5,17 +5,21 @@ Grammar of graphics in D3.js
 
 Roadmap:
 
-- scaleX and scaleY accept objects with settings values for axes and scales
+- xScale and yScale accept objects with settings values for axes and scales
   - orientation, position, ticks, type etc.
 - Scales should be reset any time a new aes, facet, or data is entered
   - if facet or aes requires variable name not in data, throw error.
-- fixed/free scales and fixed/free space
+- Come up with reasonable way to pass geoms to layers
+  - .layers([ggd3.geoms.bar().aes({x: '1',y: '2'}).alpha(0.5),
+  ggd3.geoms.point().aes({x: '1', y: '2'}).alpha(1)])
+  - ie. a layer will look for aesthetics on it's geom, then on the main plot object.
+- fixed/free x/y scales and fixed/free space
 - Pan and zoom on x and y axes.
-- Brush on one or both axis
+- Brush on one axis or both axes
   - Scatterplot highlights according to datapoint value or id
-- Context brush for either axis
+- Context brush for either axis, [linear, ordinal, or time]
 - opts is an object literal with assorted options
-  - overriding margins of facets
+  - overriding margins of facets, perhaps
 - More generic methods for aggregating data that has been nested
 - Initial geoms:
   - geom bar with stack, group and expand options

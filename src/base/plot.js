@@ -12,6 +12,7 @@ function Plot(aes) {
     sizeScale: {single: new ggd3.scale()},
     fillScale: {single: new ggd3.scale()},
     shapeScale: {single: new ggd3.scale()},
+    alphaScale: {single: new ggd3.scale()},
     opts: {},
     theme: "ggd3",
     margins: {left:20, right:20, top:20, bottom:20},
@@ -23,10 +24,12 @@ function Plot(aes) {
     xAdjust: false,
     yAdjust: false,
     dtypes: {},
+    alpha: 0.5,
+    alphaRange: [0.1, 1],
     size: 30,
     sizeRange: [10, 100],
     fill: 'lightsteelblue',
-    fillRange: ["lightgreen", "lightsteelblue"],
+    fillRange: ["blue", "red"],
     color: 'lightsteelblue', // default color for geoms
     colorRange: ["green", "blue"],
   };
@@ -223,6 +226,7 @@ Plot.prototype.draw = function() {
   // use identity, otherwise use the stat summary.
   // get basic info about scales/aes;
   this.setScales();
+  
   // set fixed/free domains
   this.setDomains();
   function draw(sel) {

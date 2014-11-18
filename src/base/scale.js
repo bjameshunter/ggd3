@@ -94,6 +94,7 @@ Scale.prototype.range = function(range) {
   } else {
     this.attributes.scale.range(range);
   }
+  this.attributes.range = range;
   return this;
 };
 

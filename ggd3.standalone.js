@@ -548,6 +548,7 @@ function Plot(aes) {
     sizeScale: {single: new ggd3.scale()},
     fillScale: {single: new ggd3.scale()},
     shapeScale: {single: new ggd3.scale()},
+    alphaScale: {single: new ggd3.scale()},
     opts: {},
     theme: "ggd3",
     margins: {left:20, right:20, top:20, bottom:20},
@@ -559,10 +560,12 @@ function Plot(aes) {
     xAdjust: false,
     yAdjust: false,
     dtypes: {},
+    alpha: 0.5,
+    alphaRange: [0.1, 1],
     size: 30,
     sizeRange: [10, 100],
     fill: 'lightsteelblue',
-    fillRange: ["lightgreen", "lightsteelblue"],
+    fillRange: ["blue", "red"],
     color: 'lightsteelblue', // default color for geoms
     colorRange: ["green", "blue"],
   };
@@ -759,6 +762,7 @@ Plot.prototype.draw = function() {
   // use identity, otherwise use the stat summary.
   // get basic info about scales/aes;
   this.setScales();
+  
   // set fixed/free domains
   this.setDomains();
   function draw(sel) {
@@ -910,6 +914,7 @@ Scale.prototype.range = function(range) {
   } else {
     this.attributes.scale.range(range);
   }
+  this.attributes.range = range;
   return this;
 };
 
@@ -961,10 +966,10 @@ var aesMap = {
         fill: 'fillScale',
         shape: 'shapeScale',
       },
-    scales = ['x', 'y', 'color', 'size', 'fill'];
+    measureScales = ['x', 'y', 'color', 'size', 'fill', 
+                    'alpha'];
 
 function SetScales() {
-
   // do nothing if the object doesn't have aes, data and facet
   // if any of them get reset, the scales must be reset
   if(!this.data() || !this.aes() || !this.facet()){
@@ -987,7 +992,7 @@ function SetScales() {
       });
 
   function makeScale(d, i, a) {
-    if(_.contains(scales, a)){
+    if(_.contains(measureScales, a)){
       // user is not specifying a scale.
       if(!(that[aesMap[a]]() instanceof ggd3.scale)){
         // get plot level options set for scale.
@@ -1031,8 +1036,10 @@ function SetScales() {
     return _.map(data, function(d,i) {return makeScale(d, i, a);});
   });
   for(var a in aes) {
+    if(_.contains(measureScales, a)){
     // give user-specified scale settings to single facet
-    that[aesMap[a]]().single._userOpts = _.cloneDeep(opts[a]);
+      that[aesMap[a]]().single._userOpts = _.cloneDeep(opts[a]);
+    }
   }
 
 }
@@ -1150,40 +1157,42 @@ Plot.prototype.setDomains = function() {
       data,
       scale;
   for(var a in aes) {
-    var scales = this[aesMap[a]]();
-    if(facet.scales() !== "free_" + a &&
-       facet.scales() !== "free" || (_.contains(globalScales, a)) ){
-      data = ggd3.tools.unNest(this.data());
-      if(_.contains(linearScales, scales.single.opts().type)){
-        domain = ggd3.tools.domain(data, 'both', false, aes[a]);
-      } else {
-        // nest according ordinal axes, group, and color
-        // include warning about large numbers of colors for
-        // color scales.
-        domain = _.unique(_.pluck(data, aes[a]));
-      }
-      for(scale in scales) {
-        if(scales[scale].scaleType() === "log" && domain[0] <= 0){
-          domain[0] = 1;
-        }
-        scales[scale].domain(domain);
-      }
-      if(_.contains(globalScales, a)) {
-        that[a](that[aesMap[a]]().single.scale());
-        if(_.contains(linearScales, that[aesMap[a]]().single.scaleType()) ){
-          that[a]().range(that[a + "Range"]());
-        }
-      }
-    } else {
-      data = this.dataList();
-      for(var d in data) {
-        scale = scales[data[d].selector];
+    if(_.contains(measureScales, a)) {
+      var scales = this[aesMap[a]]();
+      if(facet.scales() !== "free_" + a &&
+         facet.scales() !== "free" || (_.contains(globalScales, a)) ){
+        data = ggd3.tools.unNest(this.data());
         if(_.contains(linearScales, scales.single.opts().type)){
-          scale.domain(ggd3.tools.domain(_.pluck(data[d].data, aes[a])));
+          domain = ggd3.tools.domain(data, 'both', false, aes[a]);
         } else {
-          scale.domain(_.unique(_.pluck(data[d].data, aes[a])));
+          // nest according ordinal axes, group, and color
+          // include warning about large numbers of colors for
+          // color scales.
+          domain = _.unique(_.pluck(data, aes[a]));
         }
+        for(scale in scales) {
+          if(scales[scale].scaleType() === "log" && domain[0] <= 0){
+            domain[0] = 1;
+          }
+          scales[scale].domain(domain);
+        }
+        if(_.contains(globalScales, a)) {
+          that[a](that[aesMap[a]]().single.scale());
+          if(_.contains(linearScales, that[aesMap[a]]().single.scaleType()) ){
+            that[a]().range(that[a + "Range"]());
+          }
+        }
+      } else {
+        data = this.dataList();
+        for(var d in data) {
+          scale = scales[data[d].selector];
+          if(_.contains(linearScales, scales.single.opts().type)){
+            scale.domain(ggd3.tools.domain(_.pluck(data[d].data, aes[a])));
+          } else {
+            scale.domain(_.unique(_.pluck(data[d].data, aes[a])));
+          }
 
+        }
       }
     }
   }
@@ -1366,7 +1375,9 @@ Layer.prototype.geom = function(geom) {
 
 ggd3.layer = Layer;
 
-// 
+// allow layer level specifying of size, fill,
+// color, alpha and shape variables/scales
+// but inherit from layer/plot if 
 function Point(spec) {
   var attributes = {
     name: "point",
@@ -1403,6 +1414,7 @@ Point.prototype.draw = function() {
       shape = d3.functor(this.shape()),
       that = this,
       geom = d3.superformula()
+               .segments(10)
                .type(function(d) { return shape(d[aes.shape]); })
                .size(function(d) { return size(d[aes.size]); });
   function draw(sel, data, i, layerNum) {
@@ -1432,6 +1444,7 @@ Point.prototype.draw = function() {
           return "translate(" + x.scale()(d[aes.x])+ 
                   "," + y.scale()(d[aes.y]) + ")";
         })
+        .style('stroke', 'black')
         .attr('fill', function(d) { return fill(d[aes.fill]); });
     points.enter().append('path')
         .attr('class', 'geom-' + layerNum + " geom-point")
@@ -1440,6 +1453,7 @@ Point.prototype.draw = function() {
           return "translate(" + x.scale()(d[aes.x])+ 
                   "," + y.scale()(d[aes.y]) + ")";
         })
+        .style('stroke', 'black')
         .attr('fill', function(d) { return fill(d[aes.fill]); });
     // sel is svg, data is array of objects
     points.exit()
@@ -1556,6 +1570,80 @@ ggd3.geoms.point = Point;
   d3.superformulaTypes = d3.keys(_superformulaTypes);
 })();
 
+function Text(spec) {
+  var attributes = {
+    name: "text",
+  };
+
+  this.attributes = _.merge(attributes, this.attributes);
+
+  for(var attr in this.attributes){
+    if((!this[attr] && this.attributes.hasOwnProperty(attr))){
+      this[attr] = createAccessor(attr);
+    }
+  }
+  return this;
+}
+Text.prototype = new Geom();
+
+Text.prototype.draw = function() {
+  var layer = this.layer(),
+      plot = layer.plot(),
+      stat = layer.stat(),
+      facet = plot.facet(),
+      margins = plot.margins(),
+      aes = layer.aes(),
+      fill = d3.functor(plot.fill()),
+      size = d3.functor(plot.size()),
+      that = this;
+  function draw(sel, data, i, layerNum) {
+    var id = (facet.type() === "grid") ? "single":sel.attr('id'),
+        x = plot.xScale()[id],
+        y = plot.yScale()[id];
+    data = stat.compute(data);
+    if(layerNum === 0){
+      sel.select('.x.axis')
+        .attr("transform", "translate(" + x.positionAxis() + ")")
+        .transition().call(x.axis);
+      sel.select('.y.axis')
+        .attr("transform", "translate(" + y.positionAxis() + ")")
+        .transition().call(y.axis);
+    }
+    var Text = sel.select('.plot')
+                  .selectAll('.geom-' + layerNum)
+                  .data(data);
+    Text.transition()
+        .text(function(d) { return d[aes.label];})
+        .attr('transform', function(d) {
+          return "translate(" + x.scale()(d[aes.x])+ 
+                  "," + y.scale()(d[aes.y]) + ")";
+        })  
+        .style('font-size', function(d) { return size(d[aes.size]);})
+        .style('opacity', 0.5)
+        .attr('fill', function(d) { return fill(d[aes.fill]); });
+    Text.enter().append('text')
+        .attr('class', 'geom-' + layerNum + " geom-text")
+        .text(function(d) { return d[aes.label]; })
+        .attr('transform', function(d) {
+          return "translate(" + x.scale()(d[aes.x])+ 
+                  "," + y.scale()(d[aes.y]) + ")";
+        })
+        .style('font-size', function(d) { return size(d[aes.size]);})
+        .style('opacity', 0.5)
+        .attr('fill', function(d) { return fill(d[aes.fill]); });
+    Text.exit()
+      .transition()
+      .style('opacity', 0)
+      .remove();
+  }
+  return draw;
+};
+
+Text.prototype.defaultStat = function() {
+  return new ggd3.stats.identity();
+};
+
+ggd3.geoms.text = Text;
 
 
 function Stat() {

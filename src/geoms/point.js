@@ -1,4 +1,6 @@
-// 
+// allow layer level specifying of size, fill,
+// color, alpha and shape variables/scales
+// but inherit from layer/plot if 
 function Point(spec) {
   var attributes = {
     name: "point",
@@ -35,6 +37,7 @@ Point.prototype.draw = function() {
       shape = d3.functor(this.shape()),
       that = this,
       geom = d3.superformula()
+               .segments(10)
                .type(function(d) { return shape(d[aes.shape]); })
                .size(function(d) { return size(d[aes.size]); });
   function draw(sel, data, i, layerNum) {
@@ -64,6 +67,7 @@ Point.prototype.draw = function() {
           return "translate(" + x.scale()(d[aes.x])+ 
                   "," + y.scale()(d[aes.y]) + ")";
         })
+        .style('stroke', 'black')
         .attr('fill', function(d) { return fill(d[aes.fill]); });
     points.enter().append('path')
         .attr('class', 'geom-' + layerNum + " geom-point")
@@ -72,6 +76,7 @@ Point.prototype.draw = function() {
           return "translate(" + x.scale()(d[aes.x])+ 
                   "," + y.scale()(d[aes.y]) + ")";
         })
+        .style('stroke', 'black')
         .attr('fill', function(d) { return fill(d[aes.fill]); });
     // sel is svg, data is array of objects
     points.exit()
