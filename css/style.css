@@ -112,6 +112,6 @@ circle.shade {
 .domain {
   stroke: none !important;
 }
-.tick line{
+/*.tick line{
   stroke: none !important;
-}
+}*/

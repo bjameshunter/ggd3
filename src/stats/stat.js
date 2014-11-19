@@ -36,7 +36,7 @@ Count.prototype.name = function() {
   return "count";
 };
 Count.prototype.defaultGeom = function() {
-  return new ggd3.geom.bar();
+  return new ggd3.geoms.bar();
 };
 ggd3.stats.count = Count;
 
@@ -63,7 +63,7 @@ Identity.prototype.name = function() {
   return "identity";
 };
 Identity.prototype.defaultGeom = function() {
-  return new ggd3.geom.point();
+  return new ggd3.geoms.point();
 };
 ggd3.stats.identity = Identity;
 

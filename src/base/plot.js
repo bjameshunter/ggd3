@@ -13,6 +13,7 @@ function Plot(aes) {
     fillScale: {single: new ggd3.scale()},
     shapeScale: {single: new ggd3.scale()},
     alphaScale: {single: new ggd3.scale()},
+    strokeScale: {single: new ggd3.scale()},
     opts: {},
     theme: "ggd3",
     margins: {left:20, right:20, top:20, bottom:20},
@@ -30,7 +31,7 @@ function Plot(aes) {
     sizeRange: [10, 100],
     fill: 'lightsteelblue',
     fillRange: ["blue", "red"],
-    color: 'lightsteelblue', // default color for geoms
+    color: 'none', // default stroke for geoms
     colorRange: ["green", "blue"],
   };
   // aesthetics I might like to support:
@@ -48,7 +49,8 @@ function Plot(aes) {
   var getSet = ["opts", "theme", "margins", 
     "width", "height", "xAdjust", "yAdjust", 
     "color", 'colorRange', 'size', 'sizeRange',
-    'fill', 'fillRange'];
+    'fill', 'fillRange',
+    "alpha", "alphaRange"];
 
   for(var attr in attributes){
     if((!this[attr] && 
@@ -78,6 +80,9 @@ function scaleConfig(type) {
       break;
     case "shape":
       scale = "shapeScale";
+      break;
+    case "alpha":
+      scale = "alphaScale";
       break;
   }
   function scaleGetter(obj){
@@ -121,6 +126,8 @@ Plot.prototype.shapeScale = scaleConfig('shape');
 
 Plot.prototype.fillScale = scaleConfig('fill');
 
+Plot.prototype.alphaScale = scaleConfig('alpha');
+
 Plot.prototype.layers = function(layers) {
   if(!arguments.length) { return this.attributes.layers; }
   if(_.isArray(layers)) {
@@ -142,15 +149,24 @@ Plot.prototype.layers = function(layers) {
         this.attributes.layers.push(layer);
       } else if ( l instanceof ggd3.layer ){
         // user specified layer
-        this.attributes.layers.push(l.ownData(true)
-                                    .aes(this.aes())
-                                    .plot(this));
+        if(!l.data()) { 
+          l.data(this.data()); 
+        } else {
+          l.ownData(true);
+        }
+        if(!l.aes()) { l.aes(this.aes()); }
+        l.plot(this);
+        this.attributes.layers.push(l);
       }
     }, this);
   } else if (layers instanceof ggd3.layer) {
-    this.attributes.layers.push(layers
-                                .aes(this.aes())
-                                .plot(this));
+    if(!layers.data()) { 
+      layers.data(this.data()); 
+    } else {
+      layers.ownData(true);
+    }
+    if(!layers.aes()) { layers.aes(this.aes()); }
+    this.attributes.layers.push(layers.plot(this));
   }
   return this;
 };
@@ -177,8 +193,9 @@ Plot.prototype.data = function(data) {
   } else {
     this.attributes.data = data;
   }
+
   _.each(this.layers(), function(layer){
-    if(!layer.ownData()){
+    if(_.isNull(layer.data()) ){
       layer.data(this.data());
     }
   }, this);
@@ -226,10 +243,6 @@ Plot.prototype.plotDim = function() {
 
 Plot.prototype.draw = function() {
   var that = this;
-  // should the first layer be special? its stat and the top-level
-  // data would be used to calculate the scale ranges.
-  // or, if any of the geoms have 'identity' as the stat
-  // use identity, otherwise use the stat summary.
   // get basic info about scales/aes;
   this.setScales();
   
@@ -237,35 +250,33 @@ Plot.prototype.draw = function() {
   this.setDomains();
   function draw(sel) {
     sel.call(that.facet().updateFacet());
-    // kinda labored way to get rid of unnecessary facets
-    // empty cells are nice to have so the axes are hung
-    // consistently
-    // var divs = [],
-    //     facets = _.pluck(that.dataList(), "selector");
-    // sel.selectAll('.plot-div')
-    //   .each(function(d) {
-    //     divs.push(d3.select(this).attr('id'));
-    //   });
-    // divs = divs.filter(function(d) { return !_.contains(facets, d);});
-    // divs.forEach(function(d) {
-    //   sel.select("#" + d).select('svg.plot-svg').selectAll('*').remove();
-    // });
 
-    // drawing layers
-
+    var classes = _.map(_.range(that.layers().length),
+                    function(n) {
+                      return "g" + (n);
+                    });
     _.each(that.layers(), function(l, i) {
       sel.call(l.draw(i));
+      sel.selectAll('.geom')
+        .filter(function() {
+          var cl = d3.select(this).node().classList;
+          return !_.contains(classes, cl[1]);
+
+        })
+        .transition().style('opacity', 0).remove();
     });
+
   }
   return draw;
 };
 
-
-Plot.prototype.nest = function(data) {
+// generic nesting function
+Nest = function(data) {
   if(_.isNull(data)) { return data; }
-  var nest = d3.nest(),
+  var isLayer = (this instanceof ggd3.layer),
+      nest = d3.nest(),
       that = this,
-      facet = this.facet();
+      facet = isLayer ? this.plot().facet(): this.facet();
   if(facet && !_.isNull(facet.x())){
     nest.key(function(d) { return d[facet.x()]; });
   }
@@ -278,7 +289,7 @@ Plot.prototype.nest = function(data) {
   data = nest.entries(data);
   return data; 
 };
-
+Plot.prototype.nest = Nest;
 // returns array of faceted objects {selector: s, data: data} 
 Plot.prototype.dataList = DataList;
 

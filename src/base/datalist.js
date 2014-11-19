@@ -2,15 +2,10 @@ function DataList() {
   // needs to work for plots and layers.
   // I think this should be cheap enought to not 
   // worry about executing a few times per draw.
-  // it's a layer and doesn't have it's own data
-  if((this instanceof ggd3.layer) && !this.ownData()) {
-    this.data(this.plot().data());
-  }
+
   // it's a layer and has it's own data
-  if((this instanceof ggd3.layer) && this.ownData()){
-    this.attributes.data = this.plot().nest(this.data());
-  }
-  var facet = (this instanceof ggd3.layer) ? this.plot().facet(): this.facet(),
+  var layer = (this instanceof ggd3.layer),
+      facet = layer ? this.plot().facet(): this.facet(),
       x = facet.x(),
       y = facet.y(),
       by = facet.by(),

@@ -44,7 +44,6 @@ Bar.prototype.draw = function() {
     // drawing and positioning axes probably shouldn't be on
     // the geom
     // but here, we're drawing
-    data = stat.compute(data);
     if(layerNum === 0){
       sel.select('.x.axis')
         .attr("transform", "translate(" + x.positionAxis() + ")")
@@ -53,13 +52,14 @@ Bar.prototype.draw = function() {
         .attr("transform", "translate(" + y.positionAxis() + ")")
         .transition().call(y.axis);
     }
+    ggd3.tools.removeElements(sel, layerNum, "rect");
     var bars = sel.select('.plot')
                   .selectAll('.geom-' + layerNum)
                   .data(data);
     // add canvas and svg functions.
 
     bars.enter().append('rect')
-        .attr('class', 'geom-' + layerNum + ' geom-bar');    
+        .attr('class', 'geom g' + layerNum + ' geom-bar');    
     // sel is svg, data is array of objects
     bars.exit()
       .transition().remove();

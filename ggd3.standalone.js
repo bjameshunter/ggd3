@@ -96,15 +96,10 @@ function DataList() {
   // needs to work for plots and layers.
   // I think this should be cheap enought to not 
   // worry about executing a few times per draw.
-  // it's a layer and doesn't have it's own data
-  if((this instanceof ggd3.layer) && !this.ownData()) {
-    this.data(this.plot().data());
-  }
+
   // it's a layer and has it's own data
-  if((this instanceof ggd3.layer) && this.ownData()){
-    this.attributes.data = this.plot().nest(this.data());
-  }
-  var facet = (this instanceof ggd3.layer) ? this.plot().facet(): this.facet(),
+  var layer = (this instanceof ggd3.layer),
+      facet = layer ? this.plot().facet(): this.facet(),
       x = facet.x(),
       y = facet.y(),
       by = facet.by(),
@@ -549,6 +544,7 @@ function Plot(aes) {
     fillScale: {single: new ggd3.scale()},
     shapeScale: {single: new ggd3.scale()},
     alphaScale: {single: new ggd3.scale()},
+    strokeScale: {single: new ggd3.scale()},
     opts: {},
     theme: "ggd3",
     margins: {left:20, right:20, top:20, bottom:20},
@@ -566,7 +562,7 @@ function Plot(aes) {
     sizeRange: [10, 100],
     fill: 'lightsteelblue',
     fillRange: ["blue", "red"],
-    color: 'lightsteelblue', // default color for geoms
+    color: 'none', // default stroke for geoms
     colorRange: ["green", "blue"],
   };
   // aesthetics I might like to support:
@@ -584,7 +580,8 @@ function Plot(aes) {
   var getSet = ["opts", "theme", "margins", 
     "width", "height", "xAdjust", "yAdjust", 
     "color", 'colorRange', 'size', 'sizeRange',
-    'fill', 'fillRange'];
+    'fill', 'fillRange',
+    "alpha", "alphaRange"];
 
   for(var attr in attributes){
     if((!this[attr] && 
@@ -614,6 +611,9 @@ function scaleConfig(type) {
       break;
     case "shape":
       scale = "shapeScale";
+      break;
+    case "alpha":
+      scale = "alphaScale";
       break;
   }
   function scaleGetter(obj){
@@ -657,6 +657,8 @@ Plot.prototype.shapeScale = scaleConfig('shape');
 
 Plot.prototype.fillScale = scaleConfig('fill');
 
+Plot.prototype.alphaScale = scaleConfig('alpha');
+
 Plot.prototype.layers = function(layers) {
   if(!arguments.length) { return this.attributes.layers; }
   if(_.isArray(layers)) {
@@ -678,15 +680,24 @@ Plot.prototype.layers = function(layers) {
         this.attributes.layers.push(layer);
       } else if ( l instanceof ggd3.layer ){
         // user specified layer
-        this.attributes.layers.push(l.ownData(true)
-                                    .aes(this.aes())
-                                    .plot(this));
+        if(!l.data()) { 
+          l.data(this.data()); 
+        } else {
+          l.ownData(true);
+        }
+        if(!l.aes()) { l.aes(this.aes()); }
+        l.plot(this);
+        this.attributes.layers.push(l);
       }
     }, this);
   } else if (layers instanceof ggd3.layer) {
-    this.attributes.layers.push(layers
-                                .aes(this.aes())
-                                .plot(this));
+    if(!layers.data()) { 
+      layers.data(this.data()); 
+    } else {
+      layers.ownData(true);
+    }
+    if(!layers.aes()) { layers.aes(this.aes()); }
+    this.attributes.layers.push(layers.plot(this));
   }
   return this;
 };
@@ -713,8 +724,9 @@ Plot.prototype.data = function(data) {
   } else {
     this.attributes.data = data;
   }
+
   _.each(this.layers(), function(layer){
-    if(!layer.ownData()){
+    if(_.isNull(layer.data()) ){
       layer.data(this.data());
     }
   }, this);
@@ -762,10 +774,6 @@ Plot.prototype.plotDim = function() {
 
 Plot.prototype.draw = function() {
   var that = this;
-  // should the first layer be special? its stat and the top-level
-  // data would be used to calculate the scale ranges.
-  // or, if any of the geoms have 'identity' as the stat
-  // use identity, otherwise use the stat summary.
   // get basic info about scales/aes;
   this.setScales();
   
@@ -773,35 +781,33 @@ Plot.prototype.draw = function() {
   this.setDomains();
   function draw(sel) {
     sel.call(that.facet().updateFacet());
-    // kinda labored way to get rid of unnecessary facets
-    // empty cells are nice to have so the axes are hung
-    // consistently
-    // var divs = [],
-    //     facets = _.pluck(that.dataList(), "selector");
-    // sel.selectAll('.plot-div')
-    //   .each(function(d) {
-    //     divs.push(d3.select(this).attr('id'));
-    //   });
-    // divs = divs.filter(function(d) { return !_.contains(facets, d);});
-    // divs.forEach(function(d) {
-    //   sel.select("#" + d).select('svg.plot-svg').selectAll('*').remove();
-    // });
 
-    // drawing layers
-
+    var classes = _.map(_.range(that.layers().length),
+                    function(n) {
+                      return "g" + (n);
+                    });
     _.each(that.layers(), function(l, i) {
       sel.call(l.draw(i));
+      sel.selectAll('.geom')
+        .filter(function() {
+          var cl = d3.select(this).node().classList;
+          return !_.contains(classes, cl[1]);
+
+        })
+        .transition().style('opacity', 0).remove();
     });
+
   }
   return draw;
 };
 
-
-Plot.prototype.nest = function(data) {
+// generic nesting function
+Nest = function(data) {
   if(_.isNull(data)) { return data; }
-  var nest = d3.nest(),
+  var isLayer = (this instanceof ggd3.layer),
+      nest = d3.nest(),
       that = this,
-      facet = this.facet();
+      facet = isLayer ? this.plot().facet(): this.facet();
   if(facet && !_.isNull(facet.x())){
     nest.key(function(d) { return d[facet.x()]; });
   }
@@ -814,7 +820,7 @@ Plot.prototype.nest = function(data) {
   data = nest.entries(data);
   return data; 
 };
-
+Plot.prototype.nest = Nest;
 // returns array of faceted objects {selector: s, data: data} 
 Plot.prototype.dataList = DataList;
 
@@ -971,10 +977,9 @@ var aesMap = {
         size: 'sizeScale',
         fill: 'fillScale',
         shape: 'shapeScale',
+        alpha: 'alphaScale',
       },
-    measureScales = ['x', 'y', 'color','size', 'fill'
-                    // ,'alpha'
-                    ];
+    measureScales = ['x', 'y', 'color','size', 'fill' ,'alpha'];
 
 function SetScales() {
   // do nothing if the object doesn't have aes, data and facet
@@ -1123,6 +1128,10 @@ ggd3.tools.defaultScaleSettings = function(dtype, aesthetic) {
       return {type: 'linear', 
              axis: {position:'none'},
              scale: {}};
+    case "alpha":
+      return {type: 'linear', 
+             axis: {position:'none'},
+             scale: {}};
   }
 };
 ggd3.tools.domain = function(data, rule, zero,
@@ -1159,7 +1168,7 @@ Plot.prototype.setDomains = function() {
       layer = this.layers()[0], 
       stat = layer.stat(),
       linearScales = ['log', 'linear', 'time', 'date'],
-      globalScales = ['shape', 'fill', 'color', 'size'],
+      globalScales = ['shape', 'fill', 'color', 'size', 'alpha'],
       domain,
       data,
       scale;
@@ -1170,7 +1179,11 @@ Plot.prototype.setDomains = function() {
          facet.scales() !== "free" || (_.contains(globalScales, a)) ){
         data = ggd3.tools.unNest(this.data());
         if(_.contains(linearScales, scales.single.opts().type)){
-          domain = ggd3.tools.domain(data, 'both', false, aes[a]);
+          if(a !== "alpha"){
+            domain = ggd3.tools.domain(data, 'both', false, aes[a]);
+          } else {
+            domain = ggd3.tools.domain(data, undefined, false, aes[a]);
+          }
         } else {
           // nest according ordinal axes, group, and color
           // include warning about large numbers of colors for
@@ -1253,7 +1266,6 @@ Bar.prototype.draw = function() {
     // drawing and positioning axes probably shouldn't be on
     // the geom
     // but here, we're drawing
-    data = stat.compute(data);
     if(layerNum === 0){
       sel.select('.x.axis')
         .attr("transform", "translate(" + x.positionAxis() + ")")
@@ -1262,13 +1274,14 @@ Bar.prototype.draw = function() {
         .attr("transform", "translate(" + y.positionAxis() + ")")
         .transition().call(y.axis);
     }
+    ggd3.tools.removeElements(sel, layerNum, "rect");
     var bars = sel.select('.plot')
                   .selectAll('.geom-' + layerNum)
                   .data(data);
     // add canvas and svg functions.
 
     bars.enter().append('rect')
-        .attr('class', 'geom-' + layerNum + ' geom-bar');    
+        .attr('class', 'geom g' + layerNum + ' geom-bar');    
     // sel is svg, data is array of objects
     bars.exit()
       .transition().remove();
@@ -1289,6 +1302,10 @@ function Geom(aes) {
   var attributes = {
     layer: null,
     stat: null,
+    fill: null,
+    alpha: null,
+    color: null,
+    size: null,
   };
   this.attributes = attributes;
   for(var attr in this.attributes){
@@ -1312,26 +1329,16 @@ function Layer(aes) {
     stat:     null, // identity, sum, mean, percentile, etc.
     position: null, // jitter, dodge, stack, etc.
     aes:      null,
-    ownData: false,
+    ownData:  false,
   };
   this.attributes = attributes;
-  var getSet = ["plot", "data", "position", "aes"];
+  var getSet = ["plot", "position", "aes", "ownData"];
   for(var attr in this.attributes){
     if(!this[attr] && _.contains(getSet, attr) ){
       this[attr] = createAccessor(attr);
     }
   }
 }
-
-Layer.prototype.ownData = function(tf) {
-  if(!arguments.length) { return this.attributes.ownData; }
-  // eventually, when called, this may
-  // nest the data appropriately
-  // ie.
-  // this.attributes.data = this.plot().nest(this.data());
-  this.attributes.ownData = tf;
-  return this;
-};
 
 Layer.prototype.stat = function(stat) {
   if(!arguments.length) { return this.attributes.stat; }
@@ -1344,9 +1351,16 @@ Layer.prototype.stat = function(stat) {
   return this;
 };
 
+Layer.prototype.data = function(data) {
+  if(!arguments.length) { return this.attributes.data; }
+  this.attributes.data = data;
+  return this;
+};
+
 Layer.prototype.draw = function(layerNum) {
   var that = this,
-      facet = this.plot().facet();
+      facet = this.plot().facet(),
+      stat = this.stat();
   // 
   function draw(sel) {
 
@@ -1362,19 +1376,29 @@ Layer.prototype.draw = function(layerNum) {
           d = dataList.filter(function(d) {
             return d.selector === id;
           })[0];
-      s.call(that.geom().draw(), d || [], i, layerNum);
+          if(_.isEmpty(d)) { d = {selector: id, data: []}; }
+      s.call(that.geom().draw(), stat.compute(d), i, layerNum);
     });
   }
   return draw;
 };
 Layer.prototype.dataList = DataList;
 
+Layer.prototype.nest = Nest;
+
 Layer.prototype.geom = function(geom) {
   if(!arguments.length) { return this.attributes.geom; }
-  geom = new ggd3.geoms[geom]()
-                .layer(this);
-  if(_.isNull(this.attributes.stat)) {
-    this.attributes.stat = geom.defaultStat();
+  if(_.isString(geom)){
+    geom = new ggd3.geoms[geom]()
+                  .layer(this);
+    if(_.isNull(this.stat()) ) {
+      this.stat(geom.defaultStat());
+    }
+  } else {
+    geom.layer(this);
+    if(_.isNull(geom.stat()) && _.isNull(this.stat()) ) {
+      this.stat(geom.defaultStat());
+    } 
   }
   this.attributes.geom = geom;
   return this;
@@ -1388,7 +1412,7 @@ ggd3.layer = Layer;
 function Point(spec) {
   var attributes = {
     name: "point",
-    shape: "square",
+    shape: "circle",
   };
 
   this.attributes = _.merge(attributes, this.attributes);
@@ -1410,9 +1434,11 @@ Point.prototype.draw = function() {
       facet     = plot.facet(),
       margins   = plot.margins(),
       aes       = layer.aes(),
-      fill      = d3.functor(plot.fill()),
-      size      = d3.functor(plot.size()),
+      fill      = d3.functor(this.fill() || plot.fill()),
+      size      = d3.functor(this.size() || plot.size()),
       shape     = d3.functor(this.shape()),
+      alpha     = d3.functor(this.alpha() || plot.alpha()),
+      color    = d3.functor(this.color() || plot.color()),
       that      = this,
       geom      = d3.superformula()
                .segments(20)
@@ -1425,9 +1451,8 @@ Point.prototype.draw = function() {
     // drawing and positioning axes probably shouldn't be on
     // the geom
     // but here, we're drawing
-    data = stat.compute(data);
     // here set scales according to fixed/free/grid
-    if(layerNum === 0){
+    if(layerNum === 0 && x && y){
       sel.select('.x.axis')
         .attr("transform", "translate(" + x.positionAxis() + ")")
         .transition().call(x.axis);
@@ -1435,37 +1460,33 @@ Point.prototype.draw = function() {
         .attr("transform", "translate(" + y.positionAxis() + ")")
         .transition().call(y.axis);
     }
-    var notPoints = sel.select('.plot')
-                      .selectAll('.geom-' + layerNum)
-                      .filter(function() {
-                        return d3.select(this)[0][0].nodeName !== "path";
-                      });
-    notPoints.transition().duration(1000)
-      .style('opacity', 0)
-      .remove();
+    // get rid of wrong elements if they exist.
+    ggd3.tools.removeElements(sel, layerNum, "path");
     var points = sel.select('.plot')
-                  .selectAll('path.geom-' + layerNum)
+                  .selectAll('path.geom.g' + layerNum)
                   .data(data);
     // add canvas and svg functions.
 
     points.transition()
-        .attr('class', 'geom-' + layerNum + " geom-point")
+        .attr('class', 'geom g' + layerNum + " geom-point")
         .attr('d', geom)
         .attr('transform', function(d) {
           return "translate(" + x.scale()(d[aes.x])+ 
                   "," + y.scale()(d[aes.y]) + ")";
         })
-        .style('stroke', 'black')
-        .attr('fill', function(d) { return fill(d[aes.fill]); });
+        .attr('fill', function(d) { return fill(d[aes.fill]); })
+        .attr('stroke', function(d) { return color(d[aes.color]); })
+        .attr('fill-opacity', function(d) { return alpha(d[aes.alpha]); });
     points.enter().append('path')
-        .attr('class', 'geom-' + layerNum + " geom-point")
+        .attr('class', 'geom g' + layerNum + " geom-point")
         .attr('d', geom)
         .attr('transform', function(d) {
           return "translate(" + x.scale()(d[aes.x])+ 
                   "," + y.scale()(d[aes.y]) + ")";
         })
-        .style('stroke', 'black')
-        .attr('fill', function(d) { return fill(d[aes.fill]); });
+        .attr('fill', function(d) { return fill(d[aes.fill]); })
+        .attr('stroke', function(d) { return color(d[aes.color]); })
+        .attr('fill-opacity', function(d) { return alpha(d[aes.alpha]); });
     // sel is svg, data is array of objects
     points.exit()
       .transition()
@@ -1584,6 +1605,9 @@ ggd3.geoms.point = Point;
 function Text(spec) {
   var attributes = {
     name: "text",
+    fill: null,
+    color: null,
+    alpha: null,
   };
 
   console.log('instantiating text');
@@ -1604,16 +1628,17 @@ Text.prototype.draw = function() {
       plot = layer.plot(),
       stat = layer.stat(),
       facet = plot.facet(),
-      margins = plot.margins(),
       aes = layer.aes(),
-      fill = d3.functor(plot.fill()),
-      size = d3.functor(plot.size()),
+      fill = d3.functor(this.fill() || plot.fill()),
+      size = d3.functor(this.size() || plot.size()),
+      alpha = d3.functor(this.alpha() || plot.alpha()),
+      color = d3.functor(this.color() || plot.color()),
       that = this;
   function draw(sel, data, i, layerNum) {
     var id = (facet.type() === "grid") ? "single":sel.attr('id'),
         x = plot.xScale()[id],
         y = plot.yScale()[id];
-    data = stat.compute(data);
+    // this is probably done at the layer level
     if(layerNum === 0){
       sel.select('.x.axis')
         .attr("transform", "translate(" + x.positionAxis() + ")")
@@ -1622,37 +1647,31 @@ Text.prototype.draw = function() {
         .attr("transform", "translate(" + y.positionAxis() + ")")
         .transition().call(y.axis);
     }
-    var notText = sel.select('.plot')
-                    .selectAll('.geom-' + layerNum)
-                    .filter(function() {
-                      return d3.select(this)[0][0].nodeName !== "text";
-                    });
-    notText.transition().duration(1000)
-      .style('opacity', 0)
-      .remove();
+    ggd3.tools.removeElements(sel, layerNum, "text");
     var text = sel.select('.plot')
-                  .selectAll('text.geom-' + layerNum)
+                  .selectAll('text.geom.g' + layerNum)
                   .data(data);
     text.transition()
-        .attr('class', 'geom-' + layerNum + " geom-text")
+        .attr('class', 'geom g' + layerNum + " geom-text")
         .text(function(d) { return d[aes.label];})
         .attr('transform', function(d) {
           return "translate(" + x.scale()(d[aes.x])+ 
                   "," + y.scale()(d[aes.y]) + ")";
         })  
         .style('font-size', function(d) { return size(d[aes.size]);})
+        .style('opacity', function(d) { return alpha(d[aes.alpha]); })
         .attr('text-anchor', 'middle')
         .attr('y', function(d) { return size(d[aes.size])/2; })
         .attr('fill', function(d) { return fill(d[aes.fill]); });
     text.enter().append('text')
-        .attr('class', 'geom-' + layerNum + " geom-text")
+        .attr('class', 'geom g' + layerNum + " geom-text")
         .text(function(d) { return d[aes.label]; })
         .attr('transform', function(d) {
           return "translate(" + x.scale()(d[aes.x])+ 
                   "," + y.scale()(d[aes.y]) + ")";
         })
         .style('font-size', function(d) { return size(d[aes.size]);})
-        .style('opacity', 0.5)
+        .style('opacity', function(d) { return alpha(d[aes.alpha]); })
         .attr('y', function(d) { return size(d[aes.size])/2; })
         .attr('text-anchor', 'middle')
         .attr('fill', function(d) { return fill(d[aes.fill]); });
@@ -1709,7 +1728,7 @@ Count.prototype.name = function() {
   return "count";
 };
 Count.prototype.defaultGeom = function() {
-  return new ggd3.geom.bar();
+  return new ggd3.geoms.bar();
 };
 ggd3.stats.count = Count;
 
@@ -1736,10 +1755,21 @@ Identity.prototype.name = function() {
   return "identity";
 };
 Identity.prototype.defaultGeom = function() {
-  return new ggd3.geom.point();
+  return new ggd3.geoms.point();
 };
 ggd3.stats.identity = Identity;
 
+
+ggd3.tools.removeElements = function(sel, layerNum, element) {
+  var remove = sel.select('.plot')
+                    .selectAll('.geom.g' + layerNum)
+                    .filter(function() {
+                      return d3.select(this)[0][0].nodeName !== element;
+                    });
+  remove.transition().duration(1000)
+    .style('opacity', 0)
+    .remove();
+};
 
 function unNest (data) {
   // recurse and flatten nested dataset

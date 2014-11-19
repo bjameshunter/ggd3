@@ -4,7 +4,7 @@
 function Point(spec) {
   var attributes = {
     name: "point",
-    shape: "square",
+    shape: "circle",
   };
 
   this.attributes = _.merge(attributes, this.attributes);
@@ -26,9 +26,11 @@ Point.prototype.draw = function() {
       facet     = plot.facet(),
       margins   = plot.margins(),
       aes       = layer.aes(),
-      fill      = d3.functor(plot.fill()),
-      size      = d3.functor(plot.size()),
+      fill      = d3.functor(this.fill() || plot.fill()),
+      size      = d3.functor(this.size() || plot.size()),
       shape     = d3.functor(this.shape()),
+      alpha     = d3.functor(this.alpha() || plot.alpha()),
+      color    = d3.functor(this.color() || plot.color()),
       that      = this,
       geom      = d3.superformula()
                .segments(20)
@@ -41,9 +43,8 @@ Point.prototype.draw = function() {
     // drawing and positioning axes probably shouldn't be on
     // the geom
     // but here, we're drawing
-    data = stat.compute(data);
     // here set scales according to fixed/free/grid
-    if(layerNum === 0){
+    if(layerNum === 0 && x && y){
       sel.select('.x.axis')
         .attr("transform", "translate(" + x.positionAxis() + ")")
         .transition().call(x.axis);
@@ -51,37 +52,33 @@ Point.prototype.draw = function() {
         .attr("transform", "translate(" + y.positionAxis() + ")")
         .transition().call(y.axis);
     }
-    var notPoints = sel.select('.plot')
-                      .selectAll('.geom-' + layerNum)
-                      .filter(function() {
-                        return d3.select(this)[0][0].nodeName !== "path";
-                      });
-    notPoints.transition().duration(1000)
-      .style('opacity', 0)
-      .remove();
+    // get rid of wrong elements if they exist.
+    ggd3.tools.removeElements(sel, layerNum, "path");
     var points = sel.select('.plot')
-                  .selectAll('path.geom-' + layerNum)
+                  .selectAll('path.geom.g' + layerNum)
                   .data(data);
     // add canvas and svg functions.
 
     points.transition()
-        .attr('class', 'geom-' + layerNum + " geom-point")
+        .attr('class', 'geom g' + layerNum + " geom-point")
         .attr('d', geom)
         .attr('transform', function(d) {
           return "translate(" + x.scale()(d[aes.x])+ 
                   "," + y.scale()(d[aes.y]) + ")";
         })
-        .style('stroke', 'black')
-        .attr('fill', function(d) { return fill(d[aes.fill]); });
+        .attr('fill', function(d) { return fill(d[aes.fill]); })
+        .attr('stroke', function(d) { return color(d[aes.color]); })
+        .attr('fill-opacity', function(d) { return alpha(d[aes.alpha]); });
     points.enter().append('path')
-        .attr('class', 'geom-' + layerNum + " geom-point")
+        .attr('class', 'geom g' + layerNum + " geom-point")
         .attr('d', geom)
         .attr('transform', function(d) {
           return "translate(" + x.scale()(d[aes.x])+ 
                   "," + y.scale()(d[aes.y]) + ")";
         })
-        .style('stroke', 'black')
-        .attr('fill', function(d) { return fill(d[aes.fill]); });
+        .attr('fill', function(d) { return fill(d[aes.fill]); })
+        .attr('stroke', function(d) { return color(d[aes.color]); })
+        .attr('fill-opacity', function(d) { return alpha(d[aes.alpha]); });
     // sel is svg, data is array of objects
     points.exit()
       .transition()

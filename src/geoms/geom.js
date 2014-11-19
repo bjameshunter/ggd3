@@ -3,6 +3,10 @@ function Geom(aes) {
   var attributes = {
     layer: null,
     stat: null,
+    fill: null,
+    alpha: null,
+    color: null,
+    size: null,
   };
   this.attributes = attributes;
   for(var attr in this.attributes){

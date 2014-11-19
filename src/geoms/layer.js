@@ -6,26 +6,16 @@ function Layer(aes) {
     stat:     null, // identity, sum, mean, percentile, etc.
     position: null, // jitter, dodge, stack, etc.
     aes:      null,
-    ownData: false,
+    ownData:  false,
   };
   this.attributes = attributes;
-  var getSet = ["plot", "data", "position", "aes"];
+  var getSet = ["plot", "position", "aes", "ownData"];
   for(var attr in this.attributes){
     if(!this[attr] && _.contains(getSet, attr) ){
       this[attr] = createAccessor(attr);
     }
   }
 }
-
-Layer.prototype.ownData = function(tf) {
-  if(!arguments.length) { return this.attributes.ownData; }
-  // eventually, when called, this may
-  // nest the data appropriately
-  // ie.
-  // this.attributes.data = this.plot().nest(this.data());
-  this.attributes.ownData = tf;
-  return this;
-};
 
 Layer.prototype.stat = function(stat) {
   if(!arguments.length) { return this.attributes.stat; }
@@ -38,9 +28,16 @@ Layer.prototype.stat = function(stat) {
   return this;
 };
 
+Layer.prototype.data = function(data) {
+  if(!arguments.length) { return this.attributes.data; }
+  this.attributes.data = data;
+  return this;
+};
+
 Layer.prototype.draw = function(layerNum) {
   var that = this,
-      facet = this.plot().facet();
+      facet = this.plot().facet(),
+      stat = this.stat();
   // 
   function draw(sel) {
 
@@ -56,19 +53,29 @@ Layer.prototype.draw = function(layerNum) {
           d = dataList.filter(function(d) {
             return d.selector === id;
           })[0];
-      s.call(that.geom().draw(), d || [], i, layerNum);
+          if(_.isEmpty(d)) { d = {selector: id, data: []}; }
+      s.call(that.geom().draw(), stat.compute(d), i, layerNum);
     });
   }
   return draw;
 };
 Layer.prototype.dataList = DataList;
 
+Layer.prototype.nest = Nest;
+
 Layer.prototype.geom = function(geom) {
   if(!arguments.length) { return this.attributes.geom; }
-  geom = new ggd3.geoms[geom]()
-                .layer(this);
-  if(_.isNull(this.attributes.stat)) {
-    this.attributes.stat = geom.defaultStat();
+  if(_.isString(geom)){
+    geom = new ggd3.geoms[geom]()
+                  .layer(this);
+    if(_.isNull(this.stat()) ) {
+      this.stat(geom.defaultStat());
+    }
+  } else {
+    geom.layer(this);
+    if(_.isNull(geom.stat()) && _.isNull(this.stat()) ) {
+      this.stat(geom.defaultStat());
+    } 
   }
   this.attributes.geom = geom;
   return this;

@@ -14,10 +14,9 @@ var aesMap = {
         size: 'sizeScale',
         fill: 'fillScale',
         shape: 'shapeScale',
+        alpha: 'alphaScale',
       },
-    measureScales = ['x', 'y', 'color','size', 'fill'
-                    // ,'alpha'
-                    ];
+    measureScales = ['x', 'y', 'color','size', 'fill' ,'alpha'];
 
 function SetScales() {
   // do nothing if the object doesn't have aes, data and facet
@@ -166,6 +165,10 @@ ggd3.tools.defaultScaleSettings = function(dtype, aesthetic) {
       return {type: 'linear', 
              axis: {position:'none'},
              scale: {}};
+    case "alpha":
+      return {type: 'linear', 
+             axis: {position:'none'},
+             scale: {}};
   }
 };
 ggd3.tools.domain = function(data, rule, zero,
@@ -202,7 +205,7 @@ Plot.prototype.setDomains = function() {
       layer = this.layers()[0], 
       stat = layer.stat(),
       linearScales = ['log', 'linear', 'time', 'date'],
-      globalScales = ['shape', 'fill', 'color', 'size'],
+      globalScales = ['shape', 'fill', 'color', 'size', 'alpha'],
       domain,
       data,
       scale;
@@ -213,7 +216,11 @@ Plot.prototype.setDomains = function() {
          facet.scales() !== "free" || (_.contains(globalScales, a)) ){
         data = ggd3.tools.unNest(this.data());
         if(_.contains(linearScales, scales.single.opts().type)){
-          domain = ggd3.tools.domain(data, 'both', false, aes[a]);
+          if(a !== "alpha"){
+            domain = ggd3.tools.domain(data, 'both', false, aes[a]);
+          } else {
+            domain = ggd3.tools.domain(data, undefined, false, aes[a]);
+          }
         } else {
           // nest according ordinal axes, group, and color
           // include warning about large numbers of colors for
