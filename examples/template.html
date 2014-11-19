@@ -46,7 +46,7 @@ $("#dataset").on('change', function() {
 $("#facet-scales").on('change', function() {
   redraw();
 });
-var facets = {'mtcars.csv': {x: "gear", y: "am"},
+var facets = {'mtcars.csv': {y: "am", ncols: 2},
             "iris.csv" : {x:"Species", ncols: 3},
             "diamonds.csv": {x: "color", y: "cut"},
             "baseball.csv": {x: "decade", y: "team"},
@@ -54,11 +54,10 @@ var facets = {'mtcars.csv': {x: "gear", y: "am"},
             "ustimeseries.csv": {x: 'group', nrows:3},
             "wells.csv": {x: 'switch', y:'assoc'}
           };
-var aes = {'mtcars.csv': {x: "mpg" , y: "hp", fill:"cyl", size:"drat",
-              label:'gear'},
+var aes = {'mtcars.csv': {x: "cyl" },
             "iris.csv" : {x: "Sepal.Length", y: "Sepal.Width"
             , fill: "Species", 
-            // size: "Petal.Width",
+            size: "Petal.Width",
             alpha: "Sepal.Width"
           },
             "diamonds.csv": {x: "carat", y: "clarity"},
@@ -77,7 +76,7 @@ var dtypes = {'mtcars.csv': {"gear": ["string"]},
             "ustimeseries.csv": {"date": ['date', 'many']},
             "wells.csv": {},
           };
-var FacetType = {'mtcars.csv': "grid",
+var FacetType = {'mtcars.csv': "wrap",
             "iris.csv" : "wrap",
             "diamonds.csv": "grid",
             "baseball.csv": "grid",
@@ -99,8 +98,7 @@ var square = new ggd3.geoms.point()
 var text = new ggd3.geoms.text()
                   .fill('white')
                   .alpha(0.6)
-var layers = {'mtcars.csv': [new ggd3.layer().geom(text),
-                            new ggd3.layer().geom(square)],
+var layers = {'mtcars.csv': ['bar'],
             "iris.csv" : ["point"],
             "diamonds.csv": ["bar"],
             "baseball.csv": ["point"],
@@ -111,17 +109,11 @@ var layers = {'mtcars.csv': [new ggd3.layer().geom(text),
 var charts = {'mtcars.csv': new ggd3.plot()
                     .width(300)
                     .height(300)
-                    .yScale({type: 'log', 
-                            axis: {ticks: 4, 
-                              position:'right',
-                              tickFormat: d3.format(",.0f"),
-                              orient: "left"}})
+                    .yScale({axis:{ position:'right', 
+                            orient:'left'}})
+                    .xScale({axis: {position: 'top',
+                            orient: 'bottom'}})
                     .margins({top: 5, bottom:10, left:2, right:2})
-                    .xScale({type: 'log',
-                            axis: {ticks: 4, 
-                            tickFormat: d3.format(",.0f"),
-                            position: "top",
-                            orient: "bottom"}})
                     .layers(layers["mtcars.csv"]),
             "iris.csv" : new ggd3.plot()
                                 .layers(layers["iris.csv"])
@@ -129,46 +121,49 @@ var charts = {'mtcars.csv': new ggd3.plot()
                                 .height(450)
                                 .yScale({type: 'log', axis: {ticks: 4, position:'left',
                                   orient: "left"}})
+                                .sizeRange([5, 100])
                                 .margins({top: 5, bottom:20, left:25, right:5})
                                 .xScale({type:'log', axis: {ticks: 4, position: "bottom",
-                                        "orient": "bottom"}}),
+                                        orient: "bottom"}}),
             "diamonds.csv": new ggd3.plot()
                                 .layers(layers["diamonds.csv"])
                                 .width(150)
                                 .height(150)
                                 .yScale({axis: {ticks: 4, position:'right',
-                                        "orient": "left"}})
+                                        orient: "left"}})
                                 .margins({top: 5, bottom:20, left:2, right:2})
                                 .xScale({axis: {ticks: 4, position: "top",
-                                        "orient": "bottom"}}),
+                                        orient: "bottom"}}),
             "baseball.csv": new ggd3.plot()
                                 .layers(layers["baseball.csv"])
                                 .width(300)
                                 .height(300)
                                 .sizeRange([5, 50])
-                                .yScale({axis: {ticks: 4, position:'right',
-                                        "orient": "left"}})
+                                .yScale({axis: {ticks: 4, 
+                                        position:'right',
+                                        orient: "left"}})
                                 .margins({top: 10, bottom:20, left:2, right:2})
-                                .xScale({axis: {ticks: 4, position: "top",
-                                        "orient": "bottom"}}),
+                                .xScale({axis: {ticks: 4, 
+                                        position: "top",
+                                        orient: "bottom"}}),
             "nelplo.csv": new ggd3.plot()
                                 .layers(layers["nelplo.csv"])
                                 .width(300)
                                 .height(150)
                                 .yScale({axis: {ticks: 4, position:'left',
-                                        "orient": "left"}})
+                                        orient: "left"}})
                                 .margins({top: 15, bottom:20, left:20, right:5})
                                 .xScale({axis: {ticks: 4, position: "bottom",
-                                        "orient": "bottom"}}),
+                                        orient: "bottom"}}),
             "ustimeseries.csv": new ggd3.plot()
                                 .layers(layers["ustimeseries.csv"])
                                 .width(500)
                                 .height(300)
                                 .yScale({axis: {ticks: 4, position:'left',
-                                        "orient": "left"}})
+                                        orient: "left"}})
                                 .margins({top: 5, bottom:10, left:30, right:2})
                                 .xScale({axis: {ticks: 4, position: "top",
-                                        "orient": "bottom"}}),
+                                        orient: "bottom"}}),
             "wells.csv": new ggd3.plot()
                                 .width(300)
                                 .height(300)

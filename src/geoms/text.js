@@ -6,7 +6,6 @@ function Text(spec) {
     alpha: null,
   };
 
-  console.log('instantiating text');
   this.attributes = _.merge(attributes, this.attributes);
 
   for(var attr in this.attributes){
@@ -46,7 +45,7 @@ Text.prototype.draw = function() {
     ggd3.tools.removeElements(sel, layerNum, "text");
     var text = sel.select('.plot')
                   .selectAll('text.geom.g' + layerNum)
-                  .data(data);
+                  .data(stat.compute(data.data));
     text.transition()
         .attr('class', 'geom g' + layerNum + " geom-text")
         .text(function(d) { return d[aes.label];})
@@ -56,6 +55,8 @@ Text.prototype.draw = function() {
         })  
         .style('font-size', function(d) { return size(d[aes.size]);})
         .style('opacity', function(d) { return alpha(d[aes.alpha]); })
+        .style('stroke', function(d) { return color(d[aes.color]); })
+        .style('stroke-width', 1)
         .attr('text-anchor', 'middle')
         .attr('y', function(d) { return size(d[aes.size])/2; })
         .attr('fill', function(d) { return fill(d[aes.fill]); });
@@ -68,6 +69,8 @@ Text.prototype.draw = function() {
         })
         .style('font-size', function(d) { return size(d[aes.size]);})
         .style('opacity', function(d) { return alpha(d[aes.alpha]); })
+        .style('stroke', function(d) { return color(d[aes.color]); })
+        .style('stroke-width', 1)
         .attr('y', function(d) { return size(d[aes.size])/2; })
         .attr('text-anchor', 'middle')
         .attr('fill', function(d) { return fill(d[aes.fill]); });

@@ -16,18 +16,18 @@ var aesMap = {
         shape: 'shapeScale',
         alpha: 'alphaScale',
       },
-    measureScales = ['x', 'y', 'color','size', 'fill' ,'alpha'];
+    measureScales = ['x', 'y', 'color','size', 'fill' ,'alpha'],
+    linearScales = ['log', 'linear', 'time', 'date'],
+    globalScales = ['shape', 'fill', 'color', 'size', 'alpha'];
 
 function SetScales() {
   // do nothing if the object doesn't have aes, data and facet
   // if any of them get reset, the scales must be reset
   if(!this.data() || !this.aes() || !this.facet() ||
      _.isEmpty(this.layers()) ){
-    console.log('not setting scales');
     return false;
   }
   // obj is a layer or main plot
-  console.log('setting scales');
   var aes = this.aes(),
       that = this,
       facet = this.facet(),
@@ -46,7 +46,9 @@ function SetScales() {
       // user is not specifying a scale.
       if(!(that[aesMap[a]]() instanceof ggd3.scale)){
         // get plot level options set for scale.
-        dtype = that.dtypes()[aes[a]];
+        // if a dtype is not found, it's because it's x or y and 
+        // has not been declared. It will be some numerical aggregation.
+        dtype = that.dtypes()[aes[a]] || ['number', 'many'];
         settings = _.merge(ggd3.tools.defaultScaleSettings(dtype, a),
                            opts[a]);
         var scale = new ggd3.scale(settings)
@@ -81,7 +83,7 @@ function SetScales() {
       } 
     }
   }
-  _.map(_.keys(aes), function(a) {
+  _.each(_.union(['x', 'y'], _.keys(aes)), function(a) {
     return _.map(data, function(d,i) {return makeScale(d, i, a);});
   });
   for(var a in aes) {
@@ -98,12 +100,12 @@ ggd3.tools.defaultScaleSettings = function(dtype, aesthetic) {
     if(dtype[0] === "number") {
       if(dtype[1] === "many"){
         return {type: 'linear',
-                  axis: {},
+                  axis: {tickFormat: d3.format(",.2f")},
                   scale: {}};
       } else {
         return {type: 'ordinal',
                   axis: {},
-                  scale: {rangeRoundBands: ""}};
+                  scale: {}};
       }
     }
     if(dtype[0] === "date"){
@@ -203,23 +205,25 @@ Plot.prototype.setDomains = function() {
       that = this,
       facet = this.facet(),
       layer = this.layers()[0], 
-      stat = layer.stat(),
-      linearScales = ['log', 'linear', 'time', 'date'],
-      globalScales = ['shape', 'fill', 'color', 'size', 'alpha'],
+      stat = layer.stat().aes(layer.aes()),
       domain,
-      data,
-      scale;
-  for(var a in aes) {
+      data;
+  _.each(_.union(['x', 'y'], _.keys(aes)), function(a) {
+
     if(_.contains(measureScales, a)) {
-      var scales = this[aesMap[a]]();
+      var scales = that[aesMap[a]](),
+          scale,
+          nest = layer.geomNest();
       if(facet.scales() !== "free_" + a &&
          facet.scales() !== "free" || (_.contains(globalScales, a)) ){
-        data = ggd3.tools.unNest(this.data());
+        // fixed calcs
+        data = ggd3.tools.unNest(that.data());
         if(_.contains(linearScales, scales.single.opts().type)){
+          data = _.map(nest.entries(data), stat.compute, stat);
           if(a !== "alpha"){
-            domain = ggd3.tools.domain(data, 'both', false, aes[a]);
+              domain = ggd3.tools.domain(data, 'both', false, aes[a] || "count");
           } else {
-            domain = ggd3.tools.domain(data, undefined, false, aes[a]);
+            domain = ggd3.tools.domain(data, undefined, false, aes[a] || "count");
           }
         } else {
           // nest according ordinal axes, group, and color
@@ -240,18 +244,20 @@ Plot.prototype.setDomains = function() {
           }
         }
       } else {
-        data = this.dataList();
+        // free calcs
+        data = that.dataList();
         for(var d in data) {
+          nested = _.flatten(_.map(nest.entries(data[d].data), stat.compute, stat));
+          domain = ggd3.tools.domain(nested, undefined, false, aes[a] || "count");
           scale = scales[data[d].selector];
           if(_.contains(linearScales, scales.single.opts().type)){
-            scale.domain(ggd3.tools.domain(_.pluck(data[d].data, aes[a])));
+            scale.domain(domain);
           } else {
             scale.domain(_.unique(_.pluck(data[d].data, aes[a])));
           }
-
         }
       }
     }
-  }
+  });
 };
 Plot.prototype.setScales = SetScales;

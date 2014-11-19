@@ -24,26 +24,35 @@ Bar.prototype.draw = function() {
   // stacked, grouped, expanded or not.
   // scales first need to be calculated according to output
   // of the stat. 
-  var layer = this.layer(),
-      stat = layer.stat(),
-      plot = layer.plot(),
-      facet = plot.facet(),
-      margins = plot.margins(),
-      aes = layer.aes(),
-      that = this;
+  var layer     = this.layer(),
+      position  = layer.position(),
+      plot      = layer.plot(),
+      stat      = layer.stat(),
+      facet     = plot.facet(),
+      margins   = plot.margins(),
+      aes       = layer.aes(),
+      fill      = d3.functor(this.fill() || plot.fill()),
+      size      = d3.functor(this.size() || plot.size()),
+      alpha     = d3.functor(this.alpha() || plot.alpha()),
+      color     = d3.functor(this.color() || plot.color()),
+      that      = this,
+      nest      = layer.geomNest(),
+      geom      = d3.superformula()
+               .segments(20)
+               .type(function(d) { return shape(d[aes.shape]); })
+               .size(function(d) { return size(d[aes.size]); });
   function draw(sel, data, i, layerNum) {
-    // each facet gets it's own axes and scales, regardless,
-    // but for grid and fixed, only 'single' is used to draw
-    // because some facets may not have data in them.
-    // this ensures axes are drawn on the right and top/bottom
-    // for grid
+    // geom bar allows only one scale out of group, fill, and color.
+    // that is, one can be an ordinal scale, but the others must be
+    // constants
+
     var id = (facet.type() === "grid" || 
               facet.scales()==="fixed") ? "single":sel.attr('id'),
         x = plot.xScale()[id],
         y = plot.yScale()[id];
-    // drawing and positioning axes probably shouldn't be on
-    // the geom
-    // but here, we're drawing
+
+
+    // drawing axes goes here because they may be dependent on facet id
     if(layerNum === 0){
       sel.select('.x.axis')
         .attr("transform", "translate(" + x.positionAxis() + ")")
@@ -52,17 +61,30 @@ Bar.prototype.draw = function() {
         .attr("transform", "translate(" + y.positionAxis() + ")")
         .transition().call(y.axis);
     }
+
     ggd3.tools.removeElements(sel, layerNum, "rect");
+    data.data = _.flatten(_.map(nest.entries(data.data), function(d) {
+      return stat.compute(d);
+    }));
+    console.log(data);
+
     var bars = sel.select('.plot')
                   .selectAll('.geom-' + layerNum)
-                  .data(data);
+                  .data(data.data);
     // add canvas and svg functions.
-
+    // update
+    bars
+      .attr('class', 'geom g' + layerNum + ' geom-bar');
+    
+    // enter
     bars.enter().append('rect')
-        .attr('class', 'geom g' + layerNum + ' geom-bar');    
+        .attr('class', 'geom g' + layerNum + ' geom-bar');
     // sel is svg, data is array of objects
+    // exit
     bars.exit()
-      .transition().remove();
+      .transition()
+      .style('opacity', 0)
+      .remove();
 
 
   }

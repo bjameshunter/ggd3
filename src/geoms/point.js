@@ -21,6 +21,7 @@ Point.prototype = new Geom();
 Point.prototype.draw = function() {
 
   var layer     = this.layer(),
+      position  = layer.position(),
       plot      = layer.plot(),
       stat      = layer.stat(),
       facet     = plot.facet(),
@@ -28,9 +29,9 @@ Point.prototype.draw = function() {
       aes       = layer.aes(),
       fill      = d3.functor(this.fill() || plot.fill()),
       size      = d3.functor(this.size() || plot.size()),
-      shape     = d3.functor(this.shape()),
+      shape     = d3.functor(this.shape() || plot.shape()),
       alpha     = d3.functor(this.alpha() || plot.alpha()),
-      color    = d3.functor(this.color() || plot.color()),
+      color     = d3.functor(this.color() || plot.color()),
       that      = this,
       geom      = d3.superformula()
                .segments(20)
@@ -56,7 +57,7 @@ Point.prototype.draw = function() {
     ggd3.tools.removeElements(sel, layerNum, "path");
     var points = sel.select('.plot')
                   .selectAll('path.geom.g' + layerNum)
-                  .data(data);
+                  .data(stat.compute(data.data));
     // add canvas and svg functions.
 
     points.transition()
@@ -67,7 +68,8 @@ Point.prototype.draw = function() {
                   "," + y.scale()(d[aes.y]) + ")";
         })
         .attr('fill', function(d) { return fill(d[aes.fill]); })
-        .attr('stroke', function(d) { return color(d[aes.color]); })
+        .style('stroke', function(d) { return color(d[aes.color]); })
+        .style('stroke-width', 1)
         .attr('fill-opacity', function(d) { return alpha(d[aes.alpha]); });
     points.enter().append('path')
         .attr('class', 'geom g' + layerNum + " geom-point")
@@ -77,7 +79,8 @@ Point.prototype.draw = function() {
                   "," + y.scale()(d[aes.y]) + ")";
         })
         .attr('fill', function(d) { return fill(d[aes.fill]); })
-        .attr('stroke', function(d) { return color(d[aes.color]); })
+        .style('stroke', function(d) { return color(d[aes.color]); })
+        .style('stroke-width', 1)
         .attr('fill-opacity', function(d) { return alpha(d[aes.alpha]); });
     // sel is svg, data is array of objects
     points.exit()

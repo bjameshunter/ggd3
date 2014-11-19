@@ -11,7 +11,10 @@ module.exports = function(grunt){
       dist: {
         src: [
           "begin.js",
-          "src/*/*.js",
+          "src/tools/*.js",
+          "src/base/*.js",
+          "src/geoms/*.js",
+          "src/stats/*.js",
           "end.js"
         ],
         dest: "dist/<%= pkg.name %>.v.<%= pkg.version%>.js"
@@ -34,7 +37,10 @@ module.exports = function(grunt){
         build: {
         src: [
           "begin.js",
-          "src/*/*.js",
+          "src/tools/*.js",
+          "src/base/*.js",
+          "src/geoms/*.js",
+          "src/stats/*.js",
           "end.js"
         ],
         dest: 'build/<%= pkg.name %>.min.js'

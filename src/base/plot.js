@@ -32,7 +32,9 @@ function Plot(aes) {
     fill: 'lightsteelblue',
     fillRange: ["blue", "red"],
     color: 'none', // default stroke for geoms
-    colorRange: ["green", "blue"],
+    colorRange: ["white", "black"],
+    shape: 'circle',
+    shapeRange: d3.superformulaTypes,
   };
   // aesthetics I might like to support:
 // ["alpha", "angle", "color", "fill", "group", "height", "label", "linetype", "lower", "order", "radius", "shape", "size", "slope", "width", "x", "xmax", "xmin", "xintercept", "y", "ymax", "ymin", "yintercept"] 
@@ -61,30 +63,7 @@ function Plot(aes) {
 }
 
 function scaleConfig(type) {
-  var scale;
-  switch(type){
-    case "x":
-      scale = 'xScale';
-      break;
-    case "y":
-      scale = 'yScale';
-      break;
-    case "color":
-      scale = 'colorScale';
-      break;
-    case "size":
-      scale = 'sizeScale';
-      break;
-    case "fill":
-      scale = 'fillScale';
-      break;
-    case "shape":
-      scale = "shapeScale";
-      break;
-    case "alpha":
-      scale = "alphaScale";
-      break;
-  }
+  var scale = type + "Scale";
   function scaleGetter(obj){
     if(!arguments.length) {
       return this.attributes[scale];
@@ -251,10 +230,13 @@ Plot.prototype.draw = function() {
   function draw(sel) {
     sel.call(that.facet().updateFacet());
 
+    // get the number of geom classes that should
+    // be present in the plot
     var classes = _.map(_.range(that.layers().length),
                     function(n) {
                       return "g" + (n);
                     });
+
     _.each(that.layers(), function(l, i) {
       sel.call(l.draw(i));
       sel.selectAll('.geom')
@@ -270,25 +252,6 @@ Plot.prototype.draw = function() {
   return draw;
 };
 
-// generic nesting function
-Nest = function(data) {
-  if(_.isNull(data)) { return data; }
-  var isLayer = (this instanceof ggd3.layer),
-      nest = d3.nest(),
-      that = this,
-      facet = isLayer ? this.plot().facet(): this.facet();
-  if(facet && !_.isNull(facet.x())){
-    nest.key(function(d) { return d[facet.x()]; });
-  }
-  if(facet && !_.isNull(facet.y())){
-    nest.key(function(d) { return d[facet.y()]; });
-  }
-  if(facet && !_.isNull(facet.by())){
-    nest.key(function(d) { return d[facet.by()]; });
-  }
-  data = nest.entries(data);
-  return data; 
-};
 Plot.prototype.nest = Nest;
 // returns array of faceted objects {selector: s, data: data} 
 Plot.prototype.dataList = DataList;
