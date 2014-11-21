@@ -4,8 +4,15 @@
 function Plot(aes) {
   var attributes = {
     data: null,
+    dtypes: {},
     layers: [],
+    aes: null,
+    legends: null, // strings corresponding to scales
+    // that need legends or legend objects
     facet: null,
+    width: 400,
+    height: 400,
+    margins: {left:20, right:20, top:20, bottom:20},
     xScale: {single: new ggd3.scale()}, 
     yScale: {single: new ggd3.scale()},
     colorScale: {single: new ggd3.scale()},
@@ -14,17 +21,8 @@ function Plot(aes) {
     shapeScale: {single: new ggd3.scale()},
     alphaScale: {single: new ggd3.scale()},
     strokeScale: {single: new ggd3.scale()},
-    opts: {},
-    theme: "ggd3",
-    margins: {left:20, right:20, top:20, bottom:20},
-    width: 400,
-    height: 400,
-    aes: null,
-    legends: null, // strings corresponding to scales
-    // that need legends or legend objects
     xAdjust: false,
     yAdjust: false,
-    dtypes: {},
     alpha: 0.5,
     alphaRange: [0.1, 1],
     size: 30,
@@ -35,10 +33,14 @@ function Plot(aes) {
     colorRange: ["white", "black"],
     shape: 'circle',
     shapeRange: d3.superformulaTypes,
+    opts: {},
+    theme: "ggd3",
   };
   // aesthetics I might like to support:
 // ["alpha", "angle", "color", "fill", "group", "height", "label", "linetype", "lower", "order", "radius", "shape", "size", "slope", "width", "x", "xmax", "xmin", "xintercept", "y", "ymax", "ymin", "yintercept"] 
   this.attributes = attributes;
+  // doing more cleaning than necessary, counting it.
+  this.timesCleaned = 0;
   // if the data method has been handed a new dataset, 
   // newData will be true, after the plot is drawn the
   // first time, newData is set to false
@@ -52,7 +54,7 @@ function Plot(aes) {
     "width", "height", "xAdjust", "yAdjust", 
     "color", 'colorRange', 'size', 'sizeRange',
     'fill', 'fillRange',
-    "alpha", "alphaRange"];
+    "alpha", "alphaRange", "shape"];
 
   for(var attr in attributes){
     if((!this[attr] && 
@@ -112,7 +114,7 @@ Plot.prototype.layers = function(layers) {
   if(_.isArray(layers)) {
     // allow reseting of layers by passing empty array
     if(layers.length === 0){
-      this.attributes = layers;
+      this.attributes.layers = layers;
       return this;
     }
     var layer;
@@ -128,8 +130,9 @@ Plot.prototype.layers = function(layers) {
         this.attributes.layers.push(layer);
       } else if ( l instanceof ggd3.layer ){
         // user specified layer
+        console.log('instance of layer');
         if(!l.data()) { 
-          l.data(this.data()); 
+          l.data(this.data()).dtypes(this.dtypes()); 
         } else {
           l.ownData(true);
         }
@@ -140,7 +143,7 @@ Plot.prototype.layers = function(layers) {
     }, this);
   } else if (layers instanceof ggd3.layer) {
     if(!layers.data()) { 
-      layers.data(this.data()); 
+      layers.data(this.data()).dtypes(this.dtypes()); 
     } else {
       layers.ownData(true);
     }
@@ -157,55 +160,53 @@ Plot.prototype.dtypes = function(dtypes) {
 };
 
 Plot.prototype.data = function(data) {
-  if(!arguments.length) { return this.attributes.data; }
+  if(!arguments.length || _.isNull(data)) { return this.attributes.data; }
   // clean data according to data types
   // and set top level ranges of scales.
   // dataset is passed through once here.
   // if passing 'dtypes', must be done before
-  if(!this.nested){
-    data = ggd3.tools.clean(data, this);
-    // after data is declared, nest it according to facets.
-    this.attributes.data = this.nest(data.data);
-    this.dtypes(data.dtypes);
-    this.nested = true;
-    this.newData = false;
-  } else {
-    this.attributes.data = data;
-  }
+  // let's just always nest and unNest
+  data = ggd3.tools.unNest(data);
+  data = ggd3.tools.clean(data, this);
+  this.timesCleaned += 1;
+  // after data is declared, nest it according to facets.
+  this.attributes.data = this.nest(data.data);
+  this.attributes.dtypes = _.merge(this.attributes.dtypes, data.dtypes);
+  this.updateLayers();
+  this.nested = data.data ? true:false;
+  this.newData = data.data ? false:true;
 
-  _.each(this.layers(), function(layer){
-    if(_.isNull(layer.data()) ){
-      layer.data(this.data());
-    }
-  }, this);
   return this;
 };
 
+Plot.prototype.updateLayers = function() {
+  _.each(this.layers(), function(l) {
+    if(!l.ownData()) { l.dtypes(this.dtypes())
+                        .data(this.data())
+                        .aes(this.aes()); }
+  }, this);
+};
 
 Plot.prototype.facet = function(spec) {
   // everytime a facet is passed
   // data nesting must be done again
   if(!arguments.length) { return this.attributes.facet; }
-  var data;
   if(spec instanceof ggd3.facet){
     this.attributes.facet = spec.plot(this);
   } else {
     this.attributes.facet = new ggd3.facet(spec)
                                     .plot(this);
   }
-  data = ggd3.tools.unNest(this.data());
-  this.nested = false;
-  this.data(data);
+  this.data(this.data());
   return this;
 };
 
 Plot.prototype.aes = function(aes) {
   if(!arguments.length) { return this.attributes.aes; }
-  _.each(this.layers(), function(l) {
-    if(_.isNull(l.aes())){
-      l.aes(aes);
-    }
-  }, this);
+  // all layers need aesthetics
+  _.each(this.layers(), function(layer) {
+    layer.aes(aes);
+  });
   this.attributes.aes = aes;
   return this;
 };
@@ -221,14 +222,16 @@ Plot.prototype.plotDim = function() {
 };
 
 Plot.prototype.draw = function() {
-  var that = this;
+  var that = this,
+      updateFacet = that.facet().updateFacet();
   // get basic info about scales/aes;
   this.setScales();
-  
   // set fixed/free domains
   this.setDomains();
   function draw(sel) {
-    sel.call(that.facet().updateFacet());
+    updateFacet(sel);
+    // reset nSVGs after they're drawn.
+    that.facet().nSVGs = 0;
 
     // get the number of geom classes that should
     // be present in the plot
@@ -238,7 +241,7 @@ Plot.prototype.draw = function() {
                     });
 
     _.each(that.layers(), function(l, i) {
-      sel.call(l.draw(i));
+      l.draw(i)(sel);
       sel.selectAll('.geom')
         .filter(function() {
           var cl = d3.select(this).node().classList;

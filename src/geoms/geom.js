@@ -15,8 +15,5 @@ function Geom(aes) {
     }
   }
 }
-Geom.prototype.defaultStat = function() {
-  return null;
-};
 
 ggd3.geom = Geom;

@@ -18,14 +18,14 @@ Nest = function(data) {
   return data; 
 };
 
-function unNest (data) {
+function unNest(data) {
   // recurse and flatten nested dataset
   // this means no dataset can have a 'values' column
-  if(_.isNull(data)){ return data; }
+  if(!data){ return data; }
   var branch = _.all(_.map(data, function(d){
     return d.hasOwnProperty('values');
   }));
-  if(branch === false) { 
+  if(!branch) { 
     return data; 
   }
   var vals = _.flatten(

@@ -209,17 +209,22 @@ Plot.prototype.setDomains = function() {
       domain,
       data;
   _.each(_.union(['x', 'y'], _.keys(aes)), function(a) {
-
     if(_.contains(measureScales, a)) {
       var scales = that[aesMap[a]](),
           scale,
           nest = layer.geomNest();
+      // the aggregated values for fixed axes need to be 
+      // calculated on faceted data. Confusing.
       if(facet.scales() !== "free_" + a &&
          facet.scales() !== "free" || (_.contains(globalScales, a)) ){
         // fixed calcs
-        data = ggd3.tools.unNest(that.data());
+        // data = ggd3.tools.unNest(that.data());
+        data = _.map(that.dataList(), function(d) {
+          return _.map(nest.entries(d.data), stat.compute, stat);
+        });
+        data = _.flatten(_.map(data, ggd3.tools.unNest));
         if(_.contains(linearScales, scales.single.opts().type)){
-          data = _.map(nest.entries(data), stat.compute, stat);
+          console.log(data);
           if(a !== "alpha"){
               domain = ggd3.tools.domain(data, 'both', false, aes[a] || "count");
           } else {
@@ -246,16 +251,19 @@ Plot.prototype.setDomains = function() {
       } else {
         // free calcs
         data = that.dataList();
-        for(var d in data) {
-          nested = _.flatten(_.map(nest.entries(data[d].data), stat.compute, stat));
-          domain = ggd3.tools.domain(nested, undefined, false, aes[a] || "count");
-          scale = scales[data[d].selector];
+        _.each(data, function(d) {
+
+          var grouped = _.flatten(_.map(nest.entries(d.data), stat.compute, stat));
+          grouped = ggd3.tools.unNest(grouped);
+
+          domain = ggd3.tools.domain(grouped, 'both', false, aes[a] || "count");
+          scale = scales[d.selector];
           if(_.contains(linearScales, scales.single.opts().type)){
             scale.domain(domain);
           } else {
-            scale.domain(_.unique(_.pluck(data[d].data, aes[a])));
+            scale.domain(_.unique(_.pluck(grouped, aes[a])));
           }
-        }
+        });
       }
     }
   });

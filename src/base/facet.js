@@ -36,21 +36,21 @@ Facet.prototype.updateFacet = function() {
   var that = this,
       data = this.plot().data(),
       nrows, ncols;
-  this.calculateMargins();
+  that.calculateMargins();
   that.xFacets = ["single"];
   that.yFacets = ["single"];
   // rules of faceting:
   // specify either x and y or an x or y with nrows or ncols
-  if(!_.isNull(that.x())) {
+  if( that.x() ) {
     // x is always first nest
     that.xFacets = _.unique(_.map(data, function(d) {
       return d.key;
     }));
   }
-  if(!_.isNull(that.y()) ){
+  if( that.y() ){
     // if facet.y is specified, it might be the first or
     // second nest
-    if(_.isNull(that.x()) ){
+    if(!that.x() ){
       that.yFacets = _.unique(_.map(data, function(d) {
         return d.key;
       }));
@@ -102,7 +102,7 @@ Facet.prototype.updateFacet = function() {
     that._ncols = that.xFacets.length;
   }
 
-  function update(sel) {
+  this.update = function(sel) {
     var rows = sel.selectAll('div.row')
                 .data(_.range(that._nrows));
     rows
@@ -119,8 +119,8 @@ Facet.prototype.updateFacet = function() {
         that.makeDIV(d3.select(this), d, that._ncols);
       });
     rows.exit().remove();
-  }
-  return update;
+  };
+  return this.update;
 };
 
 Facet.prototype.makeDIV = function(selection, rowNum, ncols) {
@@ -340,12 +340,12 @@ Facet.prototype.makeTitle = function(selection, colNum, rowNum) {
         .select('rect')
         .attr({width: addWidth, height: dim.y});
       ylab.select('text')
-          .attr({'fill': 'black',
-              'opacity': 1,
-              'x': addWidth * 0.8,
-              'y': dim.y/2,
+          .attr({fill: 'black',
+              opacity: 1,
+              x: addWidth * 0.8,
+              y: dim.y/2,
               "text-anchor": 'middle',
-              "transform": "rotate(-90 " + 
+              transform: "rotate(-90 " + 
                 (addWidth * 0.8) + 
                 ", " + (dim.y/2) + ")"})
           .text(_.identity);

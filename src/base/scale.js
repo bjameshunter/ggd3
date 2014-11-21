@@ -35,12 +35,13 @@ function Scale(opts) {
   if(!_.isUndefined(opts)){
     // opts may be updated by later functions
     // _userOpts stays fixed on initiation.
-    this.opts(opts);
+    this.attributes.opts = opts;
     this._userOpts = opts;
     this.scaleType(opts.type ? opts.type:null);
   }
 
 }
+
 Scale.prototype.scaleType = function(scaleType) {
   if(!arguments.length) { return this.attributes.scaleType; }
   var that = this;
@@ -74,7 +75,7 @@ Scale.prototype.scaleType = function(scaleType) {
       that.attributes.scale = d3.scale.category20c();
       break;
   }
-  return this;
+  return that;
 };
 
 Scale.prototype.scale = function(settings){

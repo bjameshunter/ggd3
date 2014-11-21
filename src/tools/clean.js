@@ -1,6 +1,7 @@
 function Clean(data, obj) {
   // coerce each records data to reasonable
   // type and get domains for all scales in aes.
+  if(!data) { return {data: null, dtypes:null}; }
   var vars = {},
       dtypeDict = {"number": parseFloat, 
                   "integer": parseInt,

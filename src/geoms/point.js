@@ -4,21 +4,22 @@
 function Point(spec) {
   var attributes = {
     name: "point",
-    shape: "circle",
+    shape: null,
+    stat: "identity",
   };
 
-  this.attributes = _.merge(attributes, this.attributes);
+  this.attributes = _.merge(this.attributes, attributes);
 
   for(var attr in this.attributes){
-    if((!this[attr] && this.attributes.hasOwnProperty(attr))){
+    // if((!this[attr] && this.attributes.hasOwnProperty(attr))){
       this[attr] = createAccessor(attr);
-    }
+    // }
   }
-  return this;
 }
 Point.prototype = new Geom();
-
+// Point.prototype.constructor = Point;
 Point.prototype.draw = function() {
+  console.log('inside point.draw');
 
   var layer     = this.layer(),
       position  = layer.position(),
@@ -38,6 +39,7 @@ Point.prototype.draw = function() {
                .type(function(d) { return shape(d[aes.shape]); })
                .size(function(d) { return size(d[aes.size]); });
   function draw(sel, data, i, layerNum) {
+
     var id = (facet.type() === "grid") ? "single":sel.attr('id'),
         x = plot.xScale()[id],
         y = plot.yScale()[id];
