@@ -7,9 +7,9 @@
 <body>
 <div>
   <select id="dataset" class='btn btn-primary'>
-  <option value="mtcars.csv" id='cars' selected>cars</option>
+  <option value="mtcars.csv" id='cars' >cars</option>
   <option value="iris.csv" id='iris' >iris</option>
-  <option value="diamonds.csv" id='diamonds' >diamonds</option>
+  <option value="diamonds.csv" id='diamonds' selected>diamonds</option>
   <option value="baseball.csv" id='baseball' >baseball</option>
   <option value="nelplo.csv" id='nelplo' >nelplo</option>
   <option value="wells.csv" id='wells' >wells</option>
@@ -48,7 +48,7 @@ $("#facet-scales").on('change', function() {
 });
 var facets = {'mtcars.csv': {y: "am", x: "gear"},
             "iris.csv" : {x:'Species', ncols:3},
-            "diamonds.csv": {x: "color", y: "cut"},
+            "diamonds.csv": {x: "color", nrows: 3},
             "baseball.csv": {x: "decade", y: "team"},
             "nelplo.csv": {x: 'group', ncols: 3},
             "ustimeseries.csv": {x: 'group', nrows:3},
@@ -60,7 +60,7 @@ var aes = {'mtcars.csv': {x: "cyl"},
             size: "Petal.Width",
             alpha: "Sepal.Width"
           },
-            "diamonds.csv": {x: "clarity", y: "carat"},
+            "diamonds.csv": {y: "cut", fill: "clarity", alpha:'depth'},
             "baseball.csv": {x: "hr", y: "h", fill: "ab", size: "g",
             label: 'id'
           },
@@ -79,7 +79,7 @@ var dtypes = {'mtcars.csv': {"gear": ["string"]},
           };
 var FacetType = {'mtcars.csv': "wrap",
             "iris.csv" : "wrap",
-            "diamonds.csv": "grid",
+            "diamonds.csv": "wrap",
             "baseball.csv": "wrap",
             "nelplo.csv": "wrap",
             "ustimeseries.csv": "wrap",
@@ -129,12 +129,12 @@ var charts = {'mtcars.csv': new ggd3.plot()
                                 .layers(layers["iris.csv"]),
             "diamonds.csv": new ggd3.plot()
                                 .layers(layers["diamonds.csv"])
-                                .width(150)
+                                .width(220)
                                 .height(150)
                                 .yScale({axis: {ticks: 4, position:'right',
                                         orient: "left"}})
                                 .margins({top: 5, bottom:20, left:2, right:2})
-                                .xScale({axis: {ticks: 4, position: "top",
+                                .xScale({axis: {ticks: 4, position: "bottom",
                                         orient: "bottom"}})
 ,
             "baseball.csv": new ggd3.plot()

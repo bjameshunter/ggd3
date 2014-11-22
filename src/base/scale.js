@@ -91,7 +91,7 @@ Scale.prototype.scale = function(settings){
 Scale.prototype.range = function(range) {
   if(!arguments.length) { return this.attributes.range; }
   if(this.scaleType() === "ordinal"){
-    this.attributes.scale.rangeRoundBands(range);
+    this.attributes.scale.rangeRoundBands(range, 0.1, 0.1);
   } else {
     this.attributes.scale.range(range);
   }

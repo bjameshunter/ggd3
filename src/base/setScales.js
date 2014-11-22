@@ -173,25 +173,6 @@ ggd3.tools.defaultScaleSettings = function(dtype, aesthetic) {
              scale: {}};
   }
 };
-ggd3.tools.domain = function(data, rule, zero,
-                             variable) {
-  var extent, range;
-  if(_.isUndefined(variable)){
-    extent = d3.extent(data);
-  } else {
-    extent = d3.extent(_.pluck(data, variable));
-  }
-  if(!_.isUndefined(rule) && !_.isDate(extent[0]) ){
-    range = Math.abs(extent[1] - extent[0]);
-    if(rule === "left" || rule === "both"){
-      extent[0] -=  0.1 * range;
-    }
-    if(rule === "right" || rule === "both"){
-      extent[1] += 0.1 * range;
-    }
-  }
-  return extent;
-};
 
 Plot.prototype.setDomains = function() {
   // when setting domain, this function must
@@ -212,23 +193,26 @@ Plot.prototype.setDomains = function() {
     if(_.contains(measureScales, a)) {
       var scales = that[aesMap[a]](),
           scale,
-          nest = layer.geomNest();
+          nest = layer.geomNest().rollup(_.bind(stat.compute,stat)),
+          data = that.dataList();
       // the aggregated values for fixed axes need to be 
       // calculated on faceted data. Confusing.
       if(facet.scales() !== "free_" + a &&
          facet.scales() !== "free" || (_.contains(globalScales, a)) ){
         // fixed calcs
         // data = ggd3.tools.unNest(that.data());
-        data = _.map(that.dataList(), function(d) {
-          return _.map(nest.entries(d.data), stat.compute, stat);
-        });
-        data = _.flatten(_.map(data, ggd3.tools.unNest));
-        if(_.contains(linearScales, scales.single.opts().type)){
-          console.log(data);
+        data = _.flatten(_.map(data, function(d) {
+          return ggd3.tools.unNest(nest.entries(d.data));
+        }));
+        if(_.contains(linearScales, scales.single.scaleType() )){
           if(a !== "alpha"){
-              domain = ggd3.tools.domain(data, 'both', false, aes[a] || "count");
+              if(!aes[a]) { // calculating count
+                domain = ggd3.tools.domain(data, 'right', true, "count");
+              } else {
+                domain = ggd3.tools.domain(data, 'both', false, aes[a]);
+              }
           } else {
-            domain = ggd3.tools.domain(data, undefined, false, aes[a] || "count");
+            domain = ggd3.tools.domain(data, undefined, false, aes[a]);
           }
         } else {
           // nest according ordinal axes, group, and color
@@ -249,16 +233,20 @@ Plot.prototype.setDomains = function() {
           }
         }
       } else {
-        // free calcs
-        data = that.dataList();
+        // free calcs will need to be done in the geom, I think.
+        // this is calculated twice, unnecessarily.
+        // different layouts may manipulate scale domains, such as
+        // stack layout for stacked bars.
         _.each(data, function(d) {
-
-          var grouped = _.flatten(_.map(nest.entries(d.data), stat.compute, stat));
-          grouped = ggd3.tools.unNest(grouped);
-
-          domain = ggd3.tools.domain(grouped, 'both', false, aes[a] || "count");
+          var grouped = ggd3.tools.unNest(nest.entries(d.data));
+          if(!aes[a]){ // counting 
+            domain = ggd3.tools.domain(grouped, "right", true, "count");
+          } else {
+            domain = ggd3.tools.domain(grouped, 'both', 
+                                       false, aes[a] || "count");
+          }
           scale = scales[d.selector];
-          if(_.contains(linearScales, scales.single.opts().type)){
+          if(_.contains(linearScales, scales.single.scaleType() )){
             scale.domain(domain);
           } else {
             scale.domain(_.unique(_.pluck(grouped, aes[a])));
@@ -268,4 +256,5 @@ Plot.prototype.setDomains = function() {
     }
   });
 };
+
 Plot.prototype.setScales = SetScales;

@@ -84,6 +84,10 @@ function Count() {
     aggFunctions: {
       x: ordinalAxisVar('x'),
       y: ordinalAxisVar('y'),
+      group: ordinalAxisVar('group'),
+      fill: ordinalAxisVar('fill'),
+      alpha: ordinalAxisVar('alpha'),
+      color: ordinalAxisVar('color')
     }
   };
 
@@ -97,12 +101,12 @@ function Count() {
 Count.prototype = new Stat();
 Count.prototype.constructor = Count;
 Count.prototype.compute = function(data) {
-  var out = {"count": data.values.length},
+  var out = {"count": data.length},
       aes = this.aes(),
       layer = this.layer();
   for(var a in aes){
     out[aes[a]] = this.aggFunctions()[a] ? 
-      this.aggFunctions()[a](data.values, a, layer):undefined;
+      this.aggFunctions()[a](data, a, layer):undefined;
   }
   return [out];
 };

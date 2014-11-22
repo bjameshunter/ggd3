@@ -19,7 +19,6 @@ function Point(spec) {
 Point.prototype = new Geom();
 // Point.prototype.constructor = Point;
 Point.prototype.draw = function() {
-  console.log('inside point.draw');
 
   var layer     = this.layer(),
       position  = layer.position(),

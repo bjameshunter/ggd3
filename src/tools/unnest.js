@@ -21,7 +21,9 @@ Nest = function(data) {
 function unNest(data) {
   // recurse and flatten nested dataset
   // this means no dataset can have a 'values' column
-  if(!data){ return data; }
+  if(!data || _.isEmpty(data)){ 
+    return data;
+  }
   var branch = _.all(_.map(data, function(d){
     return d.hasOwnProperty('values');
   }));
