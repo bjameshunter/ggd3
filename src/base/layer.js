@@ -112,15 +112,15 @@ Layer.prototype.geomNest = function() {
   var aes = this.aes(),
       plot = this.plot(),
       nest = d3.nest();
+  if(plot.xScale().single.scaleType() === "ordinal" && 
+     plot.yScale().single.scaleType() === "ordinal"){
+    throw "both x and y scales can't be ordinal for geom bar.";
+  }
   if(aes.group) {
     nest.key(function(d) { return d[aes.group]; });
   }
   if(aes.fill) {
     nest.key(function(d) { return d[aes.fill]; });
-  }
-  if(plot.xScale().single.scaleType() === "ordinal" && 
-     plot.yScale().single.scaleType() === "ordinal"){
-    throw "both x and y scales can't be ordinal for geom bar.";
   }
   _.map(['x', 'y'], function(a) {
     if(plot[a + "Scale"]().single.scaleType() === "ordinal"){

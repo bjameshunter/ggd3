@@ -3,6 +3,7 @@ function Bar(spec) {
   var attributes = {
     name: "bar",
     stat: "count",
+    position: "stack",
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -27,7 +28,7 @@ Bar.prototype.draw = function() {
   // scales first need to be calculated according to output
   // of the stat. 
   var layer     = this.layer(),
-      position  = layer.position(),
+      position  = layer.position() || this.position(),
       plot      = layer.plot(),
       dim       = plot.plotDim(),
       stat      = layer.stat(),
@@ -41,18 +42,30 @@ Bar.prototype.draw = function() {
       that      = this,
       nest      = layer.geomNest()
                       .rollup(_.bind(stat.compute, stat)),
-      grouped   = aes.fill || aes.group || aes.color ? true:false,
       geom      = d3.superformula()
                .segments(20)
                .type(function(d) { return shape(d[aes.shape]); })
-               .size(function(d) { return size(d[aes.size]); });
+               .size(function(d) { return size(d[aes.size]); }),
+      grouped   = false,
+      group;
+      if(aes.fill) {
+        grouped = true;
+        group = aes.fill;
+      } else if(aes.color){
+        grouped = true;
+        group = aes.color;
+      } else if(aes.group){
+        grouped = true;
+        group = aes.group;
+      } 
+
   function draw(sel, data, i, layerNum) {
     // geom bar allows only one scale out of group, fill, and color.
     // that is, one can be an ordinal scale, but the others must be
     // constants
 
     // choose axis
-    var x, y, o, n, rb, xaxis, yaxis;
+    var x, y, o, n, rb, xaxis, yaxis, selector;
     if(!_.contains(["free", "free_x"], facet.scales()) || 
        _.isUndefined(plot.xScale()[data.selector])){
       x = plot.xScale().single;
@@ -77,6 +90,9 @@ Bar.prototype.draw = function() {
       size = {s: "height", p: 'y'};
       width = {s: "width", p: 'x'};
     }
+    if(_.isUndefined(group)) { group = aes[width.s];}
+    selector = data.selector;
+    data = data.data;
     rb = o.scale().rangeBand();
 
 
@@ -104,73 +120,63 @@ Bar.prototype.draw = function() {
     }
 
     ggd3.tools.removeElements(sel, layerNum, "rect");
-    console.log(data.data);
 
-    var stack = d3.layout.stack()
-                  .x(function(d) { return d.key; })
-                  .y(function(d) {
-                    if(grouped) {
-                      return d.values[0][aes[size.p] || 'count'];
-                    }
-                    return d[aes[size.p] || "count"]; })
-                  .values(function(d) { 
-                    return d.values; });
-    if(data.data.length){
-      data.data = nest.entries(data.data);
+    if(data.length){
+      var stack = d3.layout.stack()
+                    .x(function(d) { return d[group]; })
+                    .y(function(d) {
+                      return d[aes[size.p] || "count"]; })
+                    .values(function(d) { 
+                      return d.values; });
+      // calculate stat
+
+      data = nest.entries(data);
+      // get back to array so we can nest for stack
+      data = ggd3.tools.unNest(data);
+      // ? sort ?
+      data = _.sortBy(data, function(d) {
+        return d[aes[width.p]];
+      });
+      data = d3.nest().key(function(d) { return d[group];})
+                .entries(data);
       if(grouped) {
-        data.data = ggd3.tools.fillEmptyStack(data.data);
+        // stack layout requires all layers have same # of groups
+        data = ggd3.tools.fillEmptyStack(data, aes[width.p]);
       }
-      data.data = _.flatten(_.map(stack(data.data),
+      data = _.flatten(_.map(stack(data),
                             function(d) {
-                              return d.values ? d.values[0]: [];
+                              return d.values ? d.values: [];
                             }));
     }
-    console.log(data.data);
+    console.log(data);
 
     var bars = sel.select('.plot')
                   .selectAll('rect.geom.g' + layerNum)
-                  .data(data.data);
+                  .data(data);
     // add canvas and svg functions.
-
-    bars.transition()
-      .attr('class', 'geom g' + layerNum + ' geom-bar')
+    function drawBar(rect) {
+      rect.attr('class', 'geom g' + layerNum + ' geom-bar')
         .attr(size.s, function(d) { 
-          if(size.p === "y") {
-            return dim.y - n.scale()(d[aes[size.p] || "count"]); 
-          } 
-          return n.scale()(d[aes[size.p] || "count"]);
+          return n.scale()(d[aes[size.p] || "count"]); 
         })
         .attr(width.s, rb)
         .attr(size.p, function(d) { 
           if(size.p === "y") {
-            return n.scale()(d.y); 
+            return dim.y - n.scale()(d.y); 
           } 
-          return 0;
+          return n.scale()(d.y0)  ;
         })
-        .attr(width.p, function(d) { return o.scale()(d[aes[width.p]]); })
-        .attr('fill', function(d) { 
-          return fill(d[aes.fill]); })
-        .attr('fill-opacity', function(d) { 
-          return alpha(d[aes.alpha]); });
-    
-    bars.enter().append('rect')
-        .attr('class', 'geom g' + layerNum + ' geom-bar')
-        .attr(size.s, function(d) { 
-          if(size.p === "y") {
-            return dim.y - n.scale()(d[aes[size.p] || "count"]); 
-          } 
-          return n.scale()(d[aes[size.p] || "count"]);
-        })
-        .attr(width.s, rb)
-        .attr(size.p, function(d) { 
-          if(size.p === "y") {
-            return n.scale()(d.y); 
-          } 
-          return 0;
-        })
-        .attr(width.p , function(d) { return o.scale()(d[aes[width.p]]); })
+        .attr(width.p , function(d) { 
+          return o.scale()(d[aes[width.p]]) || 0; })
         .attr('fill', function(d) { return fill(d[aes.fill]); })
-        .attr('fill-opacity', function(d) { return alpha(d[aes.alpha]); });
+        .attr('fill-opacity', function(d) { return alpha(d[aes.alpha]); })
+        .attr('value', function(d) { 
+          return d[group] + "~" + d[aes[width.p]];
+        });
+    }
+    bars.transition().call(drawBar);
+    
+    bars.enter().append('rect').call(drawBar);
 
     bars.exit()
       .transition()

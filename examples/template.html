@@ -48,7 +48,7 @@ $("#facet-scales").on('change', function() {
 });
 var facets = {'mtcars.csv': {y: "am", x: "gear"},
             "iris.csv" : {x:'Species', ncols:3},
-            "diamonds.csv": {x: "color", nrows: 3},
+            "diamonds.csv": {x: "color", y: "clarity"},
             "baseball.csv": {x: "decade", y: "team"},
             "nelplo.csv": {x: 'group', ncols: 3},
             "ustimeseries.csv": {x: 'group', nrows:3},
@@ -60,7 +60,7 @@ var aes = {'mtcars.csv': {x: "cyl"},
             size: "Petal.Width",
             alpha: "Sepal.Width"
           },
-            "diamonds.csv": {y: "cut", fill: "clarity", alpha:'depth'},
+            "diamonds.csv": {y: "cut", fill: "clarity", alpha:'table'},
             "baseball.csv": {x: "hr", y: "h", fill: "ab", size: "g",
             label: 'id'
           },
