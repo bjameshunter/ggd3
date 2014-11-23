@@ -5,7 +5,7 @@ function Layer(aes) {
     dtypes:   null,
     geom:     null,
     stat:     null, // identity, sum, mean, percentile, etc.
-    position: null, // jitter, dodge, stack, etc.
+    position: "identity", // jitter, dodge, stack, etc.
     aes:      null,
     ownData:  false,
   };
@@ -50,6 +50,7 @@ Layer.prototype.geom = function(geom) {
       this.stat(new geom.defaultStat().layer(this));
     } 
   }
+  this.position(geom.position());
   this.attributes.geom = geom;
   return this;
 };

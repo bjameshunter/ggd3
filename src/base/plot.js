@@ -21,17 +21,17 @@ function Plot(aes) {
     shapeScale: {single: new ggd3.scale()},
     alphaScale: {single: new ggd3.scale()},
     strokeScale: {single: new ggd3.scale()},
+    alpha: d3.functor(0.5),
+    fill: d3.functor('steelblue'),
+    color: d3.functor(null),
+    size: d3.functor(30), 
+    shape: d3.functor('circle'),
     xAdjust: false,
     yAdjust: false,
-    alpha: 0.5,
     alphaRange: [0.1, 1],
-    size: 30,
     sizeRange: [10, 100],
-    fill: 'lightsteelblue',
     fillRange: ["blue", "red"],
-    color: 'none', // default stroke for geoms
     colorRange: ["white", "black"],
-    shape: 'circle',
     shapeRange: d3.superformulaTypes,
     opts: {},
     theme: "ggd3",
@@ -52,9 +52,9 @@ function Plot(aes) {
   // getter/setter
   var getSet = ["opts", "theme", "margins", 
     "width", "height", "xAdjust", "yAdjust", 
-    "color", 'colorRange', 'size', 'sizeRange',
-    'fill', 'fillRange',
-    "alpha", "alphaRange", "shape"];
+    'colorRange', 'sizeRange',
+    'fillRange',
+    "alphaRange"];
 
   for(var attr in attributes){
     if((!this[attr] && 
@@ -62,6 +62,20 @@ function Plot(aes) {
       this[attr] = createAccessor(attr);
     }
   }
+}
+
+function setGlobalScale(scale) {
+  function globalScale(obj) {
+    if(!arguments.length) { return this.attributes[scale]; }
+    // if function, string, or number is passed,
+    // set it as new scale function.
+    if(_.isPlainObject(obj)){
+      return this.attributes[scale](obj);
+    }
+    this.attributes[scale] = d3.functor(obj);
+    return this;
+  }
+  return globalScale;
 }
 
 function scaleConfig(type) {
@@ -94,6 +108,16 @@ function scaleConfig(type) {
   }
   return scaleGetter;
 }
+
+Plot.prototype.alpha = setGlobalScale('alpha');
+
+Plot.prototype.fill = setGlobalScale('fill');
+
+Plot.prototype.color = setGlobalScale('color');
+
+Plot.prototype.size = setGlobalScale('size');
+
+Plot.prototype.shape = setGlobalScale('shape');
 
 Plot.prototype.xScale = scaleConfig('x');
 

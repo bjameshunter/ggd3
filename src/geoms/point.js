@@ -6,6 +6,7 @@ function Point(spec) {
     name: "point",
     shape: null,
     stat: "identity",
+    position: "identity"
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -17,6 +18,27 @@ function Point(spec) {
   }
 }
 Point.prototype = new Geom();
+
+Point.prototype.domain = function(data, a) {
+  var layer = this.layer(),
+      plot = layer.plot(),
+      aes = layer.aes(),
+      extent = d3.extent(_.pluck(data, aes[a])),
+      range = extent[1] - extent[0];
+
+  // done if date
+  if(_.contains(["date", "time"], plot.dtypes()[aes[a]][0]) ){
+    return extent;
+  }
+  // point always extends both ways
+  if(range === 0){
+    extent[0] -= 1;
+    extent[1] += 1;
+  }
+  extent[0] -= 0.1 * range;
+  extent[1] += 0.1 * range;
+  return extent;
+};
 // Point.prototype.constructor = Point;
 Point.prototype.draw = function() {
 
@@ -35,8 +57,8 @@ Point.prototype.draw = function() {
       that      = this,
       geom      = d3.superformula()
                .segments(20)
-               .type(function(d) { return shape(d[aes.shape]); })
-               .size(function(d) { return size(d[aes.size]); });
+               .type(shape)
+               .size(size);
   function draw(sel, data, i, layerNum) {
 
     var id = (facet.type() === "grid") ? "single":sel.attr('id'),
@@ -61,28 +83,22 @@ Point.prototype.draw = function() {
                   .data(stat.compute(data.data));
     // add canvas and svg functions.
 
-    points.transition()
+    function drawPoint(point) {
+      point
         .attr('class', 'geom g' + layerNum + " geom-point")
         .attr('d', geom)
         .attr('transform', function(d) {
           return "translate(" + x.scale()(d[aes.x])+ 
                   "," + y.scale()(d[aes.y]) + ")";
         })
-        .attr('fill', function(d) { return fill(d[aes.fill]); })
-        .style('stroke', function(d) { return color(d[aes.color]); })
+        .attr('fill', fill)
+        .style('stroke', color)
         .style('stroke-width', 1)
-        .attr('fill-opacity', function(d) { return alpha(d[aes.alpha]); });
-    points.enter().append('path')
-        .attr('class', 'geom g' + layerNum + " geom-point")
-        .attr('d', geom)
-        .attr('transform', function(d) {
-          return "translate(" + x.scale()(d[aes.x])+ 
-                  "," + y.scale()(d[aes.y]) + ")";
-        })
-        .attr('fill', function(d) { return fill(d[aes.fill]); })
-        .style('stroke', function(d) { return color(d[aes.color]); })
-        .style('stroke-width', 1)
-        .attr('fill-opacity', function(d) { return alpha(d[aes.alpha]); });
+        .style('fill-opacity', alpha);
+    }
+
+    points.transition().call(drawPoint);
+    points.enter().append('path').call(drawPoint);
     // sel is svg, data is array of objects
     points.exit()
       .transition()

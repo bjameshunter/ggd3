@@ -1,4 +1,4 @@
-ggd3.tools.fillEmptyStack = function(data, v) {
+ggd3.tools.fillEmptyStack = function(data, v, v2) {
   // every object in data must have same length
   // array in its 'value' slot
   var keys = _.unique(_.flatten(_.map(data, function(d) {
@@ -19,6 +19,7 @@ ggd3.tools.fillEmptyStack = function(data, v) {
     }));
     if(!_.isEmpty(missing)) {
       _.each(missing, function(m) {
+        // must fill other values, too.
         var e = _.clone(filler);
         e[v] = m;
         d.values.push(e);

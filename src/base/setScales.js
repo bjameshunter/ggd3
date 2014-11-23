@@ -18,7 +18,7 @@ var aesMap = {
       },
     measureScales = ['x', 'y', 'color','size', 'fill' ,'alpha'],
     linearScales = ['log', 'linear', 'time', 'date'],
-    globalScales = ['shape', 'fill', 'color', 'size', 'alpha'];
+    globalScales = ['alpha','fill', 'color', 'size', 'shape'];
 
 function SetScales() {
   // do nothing if the object doesn't have aes, data and facet
@@ -178,59 +178,61 @@ Plot.prototype.setDomains = function() {
   // when setting domain, this function must
   // consider the stat calculated on the data
   // nested, or not.
-  // Perhaps here, calculate the fixed scale
-  // domains, then within layer/geom
-  // adjust it to the free scale if necessary.
-  // I guess initial layer should have all relevant scale info
+  // Initial layer should have all relevant scale info
+  // 
   var aes = this.aes(),
       that = this,
       facet = this.facet(),
       layer = this.layers()[0], 
       stat = layer.stat().aes(layer.aes()),
+      geom = layer.geom(),
       domain,
       data;
   _.each(_.union(['x', 'y'], _.keys(aes)), function(a) {
     if(_.contains(measureScales, a)) {
       var scales = that[aesMap[a]](),
           scale,
-          nest = layer.geomNest().rollup(_.bind(stat.compute,stat)),
+          nest = layer.geomNest()
+                    .rollup(_.bind(stat.compute,stat)),
           data = that.dataList();
       // the aggregated values for fixed axes need to be 
       // calculated on faceted data. Confusing.
       if(facet.scales() !== "free_" + a &&
          facet.scales() !== "free" || (_.contains(globalScales, a)) ){
-        // fixed calcs
-        // data = ggd3.tools.unNest(that.data());
         data = _.flatten(_.map(data, function(d) {
+          // this is a convoluted way to get an array of 
+          // calculated values;
+          // does nothing for text and point, groups 
+          // and calcs for bars/boxes, etc.
           return ggd3.tools.unNest(nest.entries(d.data));
         }));
+
         if(_.contains(linearScales, scales.single.scaleType() )){
-          if(a !== "alpha"){
-              if(!aes[a]) { // calculating count
-                domain = ggd3.tools.domain(data, 'right', true, "count");
-              } else {
-                domain = ggd3.tools.domain(data, 'both', false, aes[a]);
-              }
-          } else {
-            domain = ggd3.tools.domain(data, undefined, false, aes[a]);
-          }
+          domain = geom.domain(data, a);
         } else {
-          // nest according ordinal axes, group, and color
           // include warning about large numbers of colors for
           // color scales.
           domain = _.unique(_.pluck(data, aes[a]));
         }
+        // is this what I'm supposed to do with log scales?
         for(scale in scales) {
           if(scales[scale].scaleType() === "log" && domain[0] <= 0){
             domain[0] = 1;
           }
           scales[scale].domain(domain);
         }
+        // I guess I'm doing this mess in case, for some
+        // stupid reason, I want free scales across
+        // color, size, alpha, fill and shape
         if(_.contains(globalScales, a)) {
-          that[a](that[aesMap[a]]().single.scale());
-          if(_.contains(linearScales, that[aesMap[a]]().single.scaleType()) ){
-            that[a]().range(that[a + "Range"]());
+          if(_.contains(linearScales, 
+                        that[aesMap[a]]().single.scaleType()) ){
+            that[aesMap[a]]().single.range(that[a + "Range"]());
           }
+          that[a](function(d) {
+            var aes = that.aes();
+            return that[aesMap[a]]().single.scale()(d[aes[a]]);
+          });
         }
       } else {
         // free calcs will need to be done in the geom, I think.
@@ -239,12 +241,7 @@ Plot.prototype.setDomains = function() {
         // stack layout for stacked bars.
         _.each(data, function(d) {
           var grouped = ggd3.tools.unNest(nest.entries(d.data));
-          if(!aes[a]){ // counting 
-            domain = ggd3.tools.domain(grouped, "right", true, "count");
-          } else {
-            domain = ggd3.tools.domain(grouped, 'both', 
-                                       false, aes[a] || "count");
-          }
+          domain = geom.domain(grouped, a);
           scale = scales[d.selector];
           if(_.contains(linearScales, scales.single.scaleType() )){
             scale.domain(domain);

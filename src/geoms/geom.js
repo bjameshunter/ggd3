@@ -15,5 +15,12 @@ function Geom(aes) {
     }
   }
 }
-
+Geom.prototype.defaultPosition = function() {
+  var n = this.name();
+  return {
+    "point": "identity",
+    "text": "identity",
+    "bar": "stack",
+    }[n];
+};
 ggd3.geom = Geom;

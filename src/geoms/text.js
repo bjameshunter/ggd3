@@ -2,6 +2,7 @@ function Text(spec) {
   var attributes = {
     name: "text",
     stat: "identity",
+    position: "identity",
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -14,6 +15,24 @@ function Text(spec) {
 }
 Text.prototype = new Geom();
 // Text.prototype.constructor = Text;
+
+Text.prototype.domain = function(data, a) {
+  // duplicated at point
+  var layer = this.layer(),
+      plot = layer.plot(),
+      aes = layer.aes(),
+      extent = d3.extent(_.pluck(data, aes[a])),
+      range = extent[1] - extent[0];
+
+  // point always extends both ways
+  if(range === 0){
+    extent[0] -= 1;
+    extent[1] += 1;
+  }
+  extent[0] -= 0.1 * range;
+  extent[1] += 0.1 * range;
+  return extent;
+};
 
 Text.prototype.draw = function() {
 
@@ -41,37 +60,29 @@ Text.prototype.draw = function() {
         .transition().call(y.axis);
     }
     ggd3.tools.removeElements(sel, layerNum, "text");
-    var text = sel.select('.plot')
-                  .selectAll('text.geom.g' + layerNum)
-                  .data(stat.compute(data.data));
-    text.transition()
-        .attr('class', 'geom g' + layerNum + " geom-text")
-        .text(function(d) { return d[aes.label];})
-        .attr('transform', function(d) {
-          return "translate(" + x.scale()(d[aes.x])+ 
-                  "," + y.scale()(d[aes.y]) + ")";
-        })  
-        .style('font-size', function(d) { return size(d[aes.size]);})
-        .style('opacity', function(d) { return alpha(d[aes.alpha]); })
-        .style('stroke', function(d) { return color(d[aes.color]); })
-        .style('stroke-width', 1)
-        .attr('text-anchor', 'middle')
-        .attr('y', function(d) { return size(d[aes.size])/2; })
-        .style('fill', function(d) { return fill(d[aes.fill]); });
-    text.enter().append('text')
+
+    function drawText(text) {
+      text
         .attr('class', 'geom g' + layerNum + " geom-text")
         .text(function(d) { return d[aes.label]; })
         .attr('transform', function(d) {
           return "translate(" + x.scale()(d[aes.x])+ 
                   "," + y.scale()(d[aes.y]) + ")";
         })
-        .style('font-size', function(d) { return size(d[aes.size]);})
-        .style('opacity', function(d) { return alpha(d[aes.alpha]); })
-        .style('stroke', function(d) { return color(d[aes.color]); })
+        .style('font-size', size)
+        .attr('fill-opacity', alpha)
+        .style('stroke', color)
         .style('stroke-width', 1)
-        .attr('y', function(d) { return size(d[aes.size])/2; })
+        .attr('y', function(d) { return size(d)/2; })
         .attr('text-anchor', 'middle')
-        .style('fill', function(d) { return fill(d[aes.fill]); });
+        .attr('fill', fill);
+    }
+
+    var text = sel.select('.plot')
+                  .selectAll('text.geom.g' + layerNum)
+                  .data(stat.compute(data.data));
+    text.transition().call(drawText);
+    text.enter().append('text').call(drawText);
     text.exit()
       .transition()
       .style('opacity', 0)
