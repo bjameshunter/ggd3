@@ -1,4 +1,4 @@
-ggd3.tools.fillEmptyStack = function(data, v, v2) {
+ggd3.tools.fillEmptyStackGroups = function(data, v) {
   // every object in data must have same length
   // array in its 'value' slot
   var keys = _.unique(_.flatten(_.map(data, function(d) {
@@ -25,6 +25,15 @@ ggd3.tools.fillEmptyStack = function(data, v, v2) {
         d.values.push(e);
       });
     }
+    d.values = _.sortBy(d.values, function(e) {
+      return e[v];
+    });
   });
+
+  return data;
+};
+
+ggd3.tools.fillEmptyStackLayers = function(data, v){
+
   return data;
 };

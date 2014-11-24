@@ -139,7 +139,24 @@ ggd3.tools.dateFormatter = function(v, format) {
     return new Date(v);
   }
 };
-ggd3.tools.fillEmptyStack = function(data, v, v2) {
+ggd3.tools.linearDomain = function(data, variable, rule, zero) {
+  var extent = d3.extent(_.pluck(data, variable)),
+      range = extent[1] - extent[0];
+  if(rule === "left" || rule === "both"){
+    extent[0] -= 0.1 * range;
+    if(zero) {
+      extent[1] = 0;
+    }
+  }
+  if(rule === "right" || rule === "both"){
+    extent[1] += 0.1 * range;
+    if(zero) {
+      extent[0] = 0;
+    }
+  }
+  return extent;
+};
+ggd3.tools.fillEmptyStackGroups = function(data, v) {
   // every object in data must have same length
   // array in its 'value' slot
   var keys = _.unique(_.flatten(_.map(data, function(d) {
@@ -166,7 +183,16 @@ ggd3.tools.fillEmptyStack = function(data, v, v2) {
         d.values.push(e);
       });
     }
+    d.values = _.sortBy(d.values, function(e) {
+      return e[v];
+    });
   });
+
+  return data;
+};
+
+ggd3.tools.fillEmptyStackLayers = function(data, v){
+
   return data;
 };
 ggd3.tools.removeElements = function(sel, layerNum, element) {
@@ -627,9 +653,10 @@ function Layer(aes) {
     dtypes:   null,
     geom:     null,
     stat:     null, // identity, sum, mean, percentile, etc.
-    position: "identity", // jitter, dodge, stack, etc.
+    position: null, // jitter, dodge, stack, etc.
     aes:      null,
     ownData:  false,
+    aggFunctions: {},
   };
   // grouping will occur on x and y axes if they are ordinal
   // and an optional array, "group"
@@ -639,13 +666,22 @@ function Layer(aes) {
   // unique character element, or it's unique character element
   // will have the scale applied to it.
   this.attributes = attributes;
-  var getSet = ["plot", "position", "ownData", 'dtypes'];
+  var getSet = ["plot", "ownData", 'dtypes'];
   for(var attr in this.attributes){
     if(!this[attr] && _.contains(getSet, attr) ){
       this[attr] = createAccessor(attr);
     }
   }
+  return this;
 }
+Layer.prototype.position = function(position){
+  if(!arguments.length) { return this.attributes.position; }
+  if(this.geom()){
+    this.geom().position(position);
+  }
+  this.attributes.position = position;
+  return this;
+};
 Layer.prototype.aes = function(aes) {
   if(!arguments.length) { return this.attributes.aes; }
   this.attributes.aes = aes;
@@ -672,14 +708,15 @@ Layer.prototype.geom = function(geom) {
       this.stat(new geom.defaultStat().layer(this));
     } 
   }
-  this.position(geom.position());
   this.attributes.geom = geom;
+  if(!this.position()){
+    this.position(geom.defaultPosition());
+  }
   return this;
 };
 
 Layer.prototype.stat = function(stat) {
   if(!arguments.length) { return this.attributes.stat; }
-  this.attributes.stat = stat;
   // usually, default stat is accepted from geom
   // but you can choose a stat and get a default geom
   if(_.isString(stat)){
@@ -756,10 +793,13 @@ Layer.prototype.geomNest = function() {
 
 ggd3.layer = Layer;
 
-// aes is an object literal with 
-// x, y, yintercept, xintercept, shape, size, 
-// color, etc.
-function Plot(aes) {
+// 1. jittering points on ordinal axes.
+// 2. figure out how to make aggregated values on barcharts
+// work with stacking. 
+// 3. Build in expand to stack bar. 
+// 4. Maybe start thinking about tooltip.
+
+function Plot() {
   var attributes = {
     data: null,
     dtypes: {},
@@ -1281,7 +1321,7 @@ ggd3.tools.defaultScaleSettings = function(dtype, aesthetic) {
     if(dtype[0] === "number") {
       if(dtype[1] === "many"){
         return {type: 'linear',
-                  axis: {tickFormat: d3.format(",.2f")},
+                  axis: {tickFormat: d3.format(",.0f")},
                   scale: {}};
       } else {
         return {type: 'ordinal',
@@ -1357,10 +1397,12 @@ ggd3.tools.defaultScaleSettings = function(dtype, aesthetic) {
 
 Plot.prototype.setDomains = function() {
   // when setting domain, this function must
-  // consider the stat calculated on the data
-  // nested, or not.
+  // consider the stat calculated on the data,
+  // be it nested, or not.
   // Initial layer should have all relevant scale info
-  // 
+  // granted, that doesn't make a lot of sense.
+  // rather, better idea to keep track of what aesthetics
+  // have a scale set for it, and pass over if so.
   var aes = this.aes(),
       that = this,
       facet = this.facet(),
@@ -1380,20 +1422,25 @@ Plot.prototype.setDomains = function() {
       // calculated on faceted data. Confusing.
       if(facet.scales() !== "free_" + a &&
          facet.scales() !== "free" || (_.contains(globalScales, a)) ){
-        data = _.flatten(_.map(data, function(d) {
-          // this is a convoluted way to get an array of 
-          // calculated values;
-          // does nothing for text and point, groups 
-          // and calcs for bars/boxes, etc.
-          return ggd3.tools.unNest(nest.entries(d.data));
-        }));
-
         if(_.contains(linearScales, scales.single.scaleType() )){
-          domain = geom.domain(data, a);
+          if(a === "alpha") {
+            data = _.flatten(_.map(data, function(d) {
+              return ggd3.tools.unNest(nest.entries(d.data));
+            }));
+            domain = ggd3.tools.linearDomain(data, aes[a]);
+          } else {
+            data = _.map(data, function(d) {
+              return geom.domain(ggd3.tools.unNest(nest.entries(d.data)), a);
+            });
+            domain = [_.min(data, function(d) {
+              return d[0];
+            })[0], _.max(data, function(d) { return d[1];})[1]];
+          }
         } else {
           // include warning about large numbers of colors for
           // color scales.
-          domain = _.unique(_.pluck(data, aes[a]));
+          domain = _.unique(_.pluck(ggd3.tools.unNest(that.data()), 
+                            aes[a]));
         }
         // is this what I'm supposed to do with log scales?
         for(scale in scales) {
@@ -1422,9 +1469,13 @@ Plot.prototype.setDomains = function() {
         // stack layout for stacked bars.
         _.each(data, function(d) {
           var grouped = ggd3.tools.unNest(nest.entries(d.data));
-          domain = geom.domain(grouped, a);
           scale = scales[d.selector];
           if(_.contains(linearScales, scales.single.scaleType() )){
+            if(a === "alpha") {
+              domain = ggd3.tools.linearDomain(grouped, aes[a]);
+            } else {
+              domain = geom.domain(grouped, a);
+            }
             scale.domain(domain);
           } else {
             scale.domain(_.unique(_.pluck(grouped, aes[a])));
@@ -1443,8 +1494,10 @@ function Bar(spec) {
   var attributes = {
     name: "bar",
     stat: "count",
-    position: "stack",
-    lineWidth: 1
+    position: null,
+    lineWidth: 1,
+    groupSum: 0,
+    stackSum: 0,
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -1458,7 +1511,7 @@ function Bar(spec) {
 
 Bar.prototype = new Geom();
 
-// Bar.prototype.constructor = Bar;
+Bar.prototype.constructor = Bar;
 
 Bar.prototype.domain = function(data, a) {
   // data passed here have been computed and 
@@ -1468,17 +1521,38 @@ Bar.prototype.domain = function(data, a) {
   var layer = this.layer(),
       plot = layer.plot(),
       aes = layer.aes(),
-      position = this.position(),
-      valueVar = aes[a] ? aes[a]: "count";
+      position = layer.position() || this.position(),
+      valueVar = aes[a] ? aes[a]: "count",
+      group, ord,
+      groupSum, stackSum;
 
   // I need the ordinal axis variable
   // and group axis variable to do this.
-  if(position === "stack"){
-
-  } else if(position === "dodge"){
-
-  }
-  return extent;
+  group = aes.fill || aes.color || aes.group;
+  ord = a === "x" ? aes.y: aes.x;
+  stackSum = _.mapValues(_.groupBy(data, function(d) {
+    return d[ord];
+  }), function(v, k) {
+    return _.reduce(_.pluck(v, valueVar), function(a,b) {
+      return a + b;
+    });
+  });
+  stackSum = d3.extent(_.map(stackSum, function(v, k) { return v; }));
+  groupSum = d3.extent(data, function(d) {
+    return d[valueVar];
+  });
+  this.stackSum(stackSum);
+  this.groupSum(groupSum);
+  if(valueVar === "count"){
+    stackSum[0] = 0;
+    groupSum[0] = 0;
+  } else {
+    stackSum[0] *= 0.9;
+    groupSum[0] *= 0.9;
+  } 
+  stackSum[1] *= 1.1;
+  groupSum[1] *= 1.1;
+  return position === "stack" ? stackSum: groupSum;
 };
 
 Bar.prototype.draw = function() {
@@ -1519,7 +1593,7 @@ Bar.prototype.draw = function() {
       } else if(aes.group){
         grouped = true;
         group = aes.group;
-      } 
+      }
 
   function draw(sel, data, i, layerNum) {
     // geom bar allows only one scale out of group, fill, and color.
@@ -1531,7 +1605,9 @@ Bar.prototype.draw = function() {
         xaxis, yaxis, selector, 
         xfree, yfree,
         stackMax, groupMax,
-        valueVar;
+        valueVar,
+        groups, // array holding unique group elements
+        groupOrd = d3.scale.ordinal();
     if(!_.contains(["free", "free_x"], facet.scales()) || 
        _.isUndefined(plot.xScale()[data.selector])){
       x = plot.xScale().single;
@@ -1555,7 +1631,6 @@ Bar.prototype.draw = function() {
     // y.scale().range().reverse();
     // x.scale().range().reverse();
     // for bars, one scale will be ordinal, one will not
-    if(_.isUndefined(group)) { group = aes[width.s];}
     selector = data.selector;
     data = data.data;
 
@@ -1576,6 +1651,7 @@ Bar.prototype.draw = function() {
       size = {s: "height", p: 'y'};
       width = {s: "width", p: 'x'};
     }
+    // if(_.isUndefined(group)) { group = aes[width.s];}
     rb = o.scale().rangeBand();
     valueVar = aes[size.p] || "count";
 
@@ -1593,33 +1669,66 @@ Bar.prototype.draw = function() {
       data = nest.entries(data);
       // get back to array so we can nest for stack
       data = ggd3.tools.unNest(data);
-      // sort so layers line up
-      data = _.sortBy(data, function(d) {
-        return d[aes[width.p]];
-      });
-      data = d3.nest().key(function(d) { return d[group];})
-                .entries(data);
-      if(grouped) {
+      // nest so we can pass to stack
+      // but not necessary if we have no group
+      if(group !== aes[width.p]){
+        data = d3.nest().key(function(d) { return d[group];})
+                  .entries(data);
+        groups = _.pluck(data, 'key');
         // stack layout requires all layers have same # of groups
-        data = ggd3.tools.fillEmptyStack(data, aes[width.p]);
-      }
-      var stack = d3.layout.stack()
-                    .x(function(d) { return d[group]; })
-                    .y(function(d) {
-                      return d[aes[size.p] || "count"]; })
-                    .order('inside-out')
-                    .values(function(d) { 
-                      return d.values; });
-      data = _.flatten(_.map(stack(data),
-                            function(d) {
-                              return d.values ? d.values: [];
-                            }));
-      if(position === 'dodge') {
-
-      } else {
-        // position is stack
+        // and sort each layer by group;
+        data = ggd3.tools.fillEmptyStackGroups(data, aes[width.p]);
+        var stack = d3.layout.stack()
+                      .x(function(d) { return d[aes[width.p]]; })
+                      .y(function(d) {
+                        return d[valueVar]; })
+                      .values(function(d) { 
+                        return d.values; });
+        data = _.flatten(_.map(stack(data),
+                              function(d) {
+                                return d.values ? d.values: [];
+                              }));
+        if(position === 'dodge') {
+          // make ordinal scale for group
+          groupOrd.rangeRoundBands([0, rb])
+                  .domain(groups);
+          rb = groupOrd.rangeBand();
+        }
+        if(position !== "dodge"){
+          console.log('position is: ' + that.position());
+          groupOrd = function(d) {
+            return 0;
+          };
+        }
       }
     }
+    var placeBar = function(d) {
+      var p = o.scale()(d[aes[width.p]]);
+      p += groupOrd(d[group]);
+      return p;
+    };
+    var calcSizeP = (function () {
+      if(position === "stack" && size.p === "y"){
+        return function(d) { 
+          return n.scale()(d[valueVar] + d.y0); 
+          };
+      }
+      if(position === "stack"){
+        return function(d) {
+          return n.scale()(d.y0) || 0;
+        };
+      }
+      if(position === "dodge" && size.p === "y") {
+        return function(d) {
+          return n.scale()(d[valueVar]);
+        };
+      }
+      if(position === "dodge"){
+        return function(d) {
+          return 0;
+        };
+      }
+    } ) ();
 
     // drawing axes goes in geom because they may be dependent on facet id
     // if a facet has no data, therefore, no x or y, draw single
@@ -1645,17 +1754,14 @@ Bar.prototype.draw = function() {
     function drawBar(rect) {
       rect.attr('class', 'geom g' + layerNum + ' geom-bar')
         .attr(size.s, function(d) { 
+          if(size.p === "y"){
+            return dim.y - n.scale()(d[valueVar]);
+          }
           return n.scale()(d[valueVar]); 
         })
         .attr(width.s, rb)
-        .attr(size.p, function(d) { 
-          if(size.p === "y") {
-            return dim.y - n.scale()(d[valueVar]); 
-          } 
-          return n.scale()(d.y0)  ;
-        })
-        .attr(width.p , function(d) { 
-          return o.scale()(d[aes[width.p]]) || 0; })
+        .attr(size.p, calcSizeP)
+        .attr(width.p , placeBar)
         .style('fill-opacity', alpha)
         .attr('fill', fill)
         .style('stroke', color)
@@ -1664,6 +1770,7 @@ Bar.prototype.draw = function() {
           return d[group] + "~" + d[aes[width.p]];
         });
     }
+
     bars.transition().call(drawBar);
     
     bars.enter().append('rect').call(drawBar);
@@ -1685,6 +1792,8 @@ Bar.prototype.defaultStat = function() {
 
 ggd3.geoms.bar = Bar;
 
+
+
 // Base geom from which all geoms inherit
 function Geom(aes) {
   var attributes = {
@@ -1696,11 +1805,6 @@ function Geom(aes) {
     size: null,
   };
   this.attributes = attributes;
-  for(var attr in this.attributes){
-    if((!this[attr] && this.attributes.hasOwnProperty(attr))){
-      this[attr] = createAccessor(attr);
-    }
-  }
 }
 Geom.prototype.defaultPosition = function() {
   var n = this.name();
@@ -1713,6 +1817,7 @@ Geom.prototype.defaultPosition = function() {
 ggd3.geom = Geom;
 
 
+
 // allow layer level specifying of size, fill,
 // color, alpha and shape variables/scales
 // but inherit from layer/plot if 
@@ -1721,7 +1826,7 @@ function Point(spec) {
     name: "point",
     shape: null,
     stat: "identity",
-    position: "identity"
+    position: null
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -1830,6 +1935,7 @@ Point.prototype.defaultStat = function() {
 ggd3.geoms.point = Point;
 
 
+
 (function() {
   var _symbol = d3.svg.symbol(),
       _line = d3.svg.line();
@@ -1933,7 +2039,7 @@ function Text(spec) {
   var attributes = {
     name: "text",
     stat: "identity",
-    position: "identity",
+    position: null,
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -2029,16 +2135,26 @@ Text.prototype.defaultStat = function() {
 ggd3.geoms.text = Text;
 
 
-function Stat() {
+// this is more than I need, I think.
+// All a stat is is a mapping from aesthetics to 
+// statistics. So points can map aesthetics to 
+// statistics, but usually don't.
+// Bars map one of x or y to identity and
+// the other to some aggregate, default count.
+// Box is like bars, but maps one to the five figure summary
+// In this sense, jitter goes here as well. But it probably won't.
+
+function Stat(aggFuncs) {
   var attributes = {
     aes: null,
     layer: null,
     aggFunctions: {
-      x: this.calcAgg('x'),
-      y: this.calcAgg('y'),
-      color: this.calcAgg('color'),
-      fill: this.calcAgg('fill'),
-      alpha: this.calcAgg('alpha')
+      x: this.aesVar('x'),
+      y: this.aesVar('y'),
+      color: this.aesVar('color'),
+      fill: this.aesVar('fill'),
+      alpha: this.aesVar('alpha'),
+      group: this.aesVar('group'),
       // write default aesthetic functions to handle 
       // number and character data to be included in tooltip
       // and to be used to 
@@ -2055,23 +2171,64 @@ function Stat() {
   }
 }
 
-Stat.prototype.calcAgg = function(a) {
+
+// generic agg calc. returns median for number and
+// nothing for characters;
+Stat.prototype.aesVar = function(xy) {
   var that = this;
-  return function(arr, a, layer) {
+  // each of these guys needs to know the layer/plot
+  // do get dtypes, and aesthetic
+  return function(arr, a, layer){
     var aes = layer.aes(),
-        dtype = layer.dtypes()[aes[a]];
-    if(dtype[0] === "number" && dtype[1] === "many"){
-      return that.calcNumeric(arr, aes[a]);
+        dtype = layer.plot().dtypes()[aes[a]];
+    // keep first element of character vectors because
+    // many times it will be nested by that variable.
+    // making it unique in the array.
+    if(dtype[0] === "string"){
+      return _.unique(_.pluck(arr, aes[a]))[0];
     }
-    return that.calcCharacter(arr, aes[a]);
+    if(dtype[0] === "number" && dtype[1] === "many"){
+      return that.median(_.pluck(arr, aes[a]));
+    }
+    return false;
   };
 };
-// default to the median/mean for numeric columns
-Stat.prototype.calcNumeric = function(arr, name) {
-  if(arr.length > 100000) { 
-    return {type: 'mean', val: d3.mean(_.pluck(arr, name))}; 
+
+Stat.prototype.compute = function(data) {
+  var out = {"count": data.length},
+      aes = this.aes(),
+      layer = this.layer();
+  for(var a in aes){
+    out[aes[a]] = this.aggFunctions()[a] ? 
+      this.aggFunctions()[a](data, a, layer):undefined;
   }
-  return {type: 'median', val: d3.median(_.pluck(arr, name))};
+  return out;
+};
+
+Stat.prototype.median = function(arr) {
+  if(arr.length > 100000) { 
+    console.warn("Default behavior of returning median overridden " + 
+                 "because array length > 1,000,000.");
+    return d3.mean(arr); 
+  }
+  return d3.median(arr);
+};
+// don't know why I feel need to do this.
+Stat.prototype.min = function(arr) {
+  return d3.min(arr);
+};
+Stat.prototype.max = function(arr) {
+  return d3.max(arr);
+};
+Stat.prototype.mean = function(arr) {
+  return d3.mean(arr);
+};
+Stat.prototype.iqr = function(arr, name) {
+  arr = _.sortBy(arr);
+  return {"25th percentile": d3.quantile(arr, 0.25),
+          "50th percentile": d3.quantile(arr, 0.5),
+          "75th percentile": d3.quantile(arr, 0.75)
+        };
 };
 
 // don't do anything with character columns
@@ -2092,8 +2249,10 @@ function Bin() {
 Bin.prototype = new Stat();
 Bin.prototype.constructor = Bin;
 Bin.prototype.compute = function(data, nbins) {
-
-  };
+  if(_.isUndefined(nbins)) {
+    nbins = 20;
+  }
+};
 Bin.prototype.name = function() {
   return "bin";
 };
@@ -2104,22 +2263,8 @@ ggd3.stats.bin = Bin;
 function Count() {
   // for count, one of x or y should be ordinal and 
   // it should always have one unique value
-  function ordinalAxisVar(xy) {
-
-    return function(arr, a, layer){
-      var aes = layer.aes();
-      return _.unique(_.pluck(arr, aes[a]))[0];
-    };
-  }
+  var that = this;
   var attributes = {
-    aggFunctions: {
-      x: ordinalAxisVar('x'),
-      y: ordinalAxisVar('y'),
-      group: ordinalAxisVar('group'),
-      fill: ordinalAxisVar('fill'),
-      alpha: ordinalAxisVar('alpha'),
-      color: ordinalAxisVar('color')
-    }
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -2131,16 +2276,6 @@ function Count() {
 }
 Count.prototype = new Stat();
 Count.prototype.constructor = Count;
-Count.prototype.compute = function(data) {
-  var out = {"count": data.length},
-      aes = this.aes(),
-      layer = this.layer();
-  for(var a in aes){
-    out[aes[a]] = this.aggFunctions()[a] ? 
-      this.aggFunctions()[a](data, a, layer):undefined;
-  }
-  return [out];
-};
 Count.prototype.name = function() {
   return "count";
 };
@@ -2149,15 +2284,132 @@ Count.prototype.defaultGeom = function() {
 };
 ggd3.stats.count = Count;
 
-// sum
+
+//sum
+function Sum(aggFuncs) {
+
+}
+
+Sum.prototype = new Stat();
+
+Sum.prototype.compute = function() {
+
+};
+
+Sum.prototype.name = function() {
+  return "sum";
+};
+
 
 // mean
+function Mean(aggFuncs) {
+
+}
+
+Mean.prototype = new Stat();
+
+Mean.prototype.compute = function() {
+
+};
+
+Mean.prototype.name = function() {
+  return "mean";
+};
 
 // median
+function Median(aggFuncs){
 
-// max
+}
+Median.prototype = new Stat();
 
-// min 
+Median.constructor = Median;
+
+Median.prototype.compute = function(data) {
+  var out = {"_n_obs": data.length},
+      aes = this.aes(),
+      layer = this.layer(),
+      plot = layer.plot();
+
+
+  for(var a in aes){
+    out[aes[a]] = this.aggFunctions()[a] ? 
+      this.aggFunctions()[a](data, a, layer):undefined;
+  }
+
+  return out;
+};
+
+Median.prototype.name = function() {
+  return "median";
+};
+
+ggd3.stats.median = Median;
+
+// min
+function Min(aggFuncs){
+
+}
+Min.prototype = new Stat();
+
+Min.constructor = Min;
+
+Min.prototype.compute = function(data) {
+  var out = {"_n_obs": data.length},
+      aes = this.aes(),
+      layer = this.layer(),
+      plot = layer.plot();
+
+
+
+  for(var a in aes){
+    out[aes[a]] = this.aggFunctions()[a] ? 
+      this.aggFunctions()[a](data, a, layer):undefined;
+  }
+
+  return out;
+};
+
+Min.prototype.name = function() {
+  return "min";
+};
+
+Min.prototype.defaultGeom = function() {
+  return new ggd3.geoms.bar();
+};
+
+ggd3.stats.min = Min;
+
+// max 
+function Max(aggFuncs){
+
+}
+Max.prototype = new Stat();
+
+Max.constructor = Max;
+
+Max.prototype.compute = function(data) {
+  var out = {"_n_obs": data.length},
+      aes = this.aes(),
+      layer = this.layer(),
+      plot = layer.plot();
+
+
+  for(var a in aes){
+    out[aes[a]] = this.aggFunctions()[a] ? 
+      this.aggFunctions()[a](data, a, layer):undefined;
+  }
+
+  return out;
+};
+
+Max.prototype.name = function() {
+  return "min";
+};
+Max.prototype.defaultGeom = function() {
+  return new ggd3.geoms.bar();
+};
+
+ggd3.stats.Max = Max;
 
 // identity
 function Identity() {
@@ -2167,6 +2419,7 @@ Identity.prototype = new Stat();
 
 Identity.prototype.constructor = Identity;
 
+// override base compute
 Identity.prototype.compute = function(data) {
   return data || [];
 };
@@ -2177,6 +2430,27 @@ Identity.prototype.defaultGeom = function() {
   return new ggd3.geoms.point();
 };
 ggd3.stats.identity = Identity;
+
+
+// identity
+function Box(aggFuncs) {
+
+}
+Box.prototype = new Stat();
+
+Box.prototype.constructor = Identity;
+
+Box.prototype.compute = function(data) {
+
+  return out;
+};
+Box.prototype.name = function() {
+  return "Box";
+};
+Box.prototype.defaultGeom = function() {
+  return new ggd3.geoms.box();
+};
+ggd3.stats.box = Box;
 
 
   if(typeof module === "object" && module.exports){

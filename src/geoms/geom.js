@@ -9,11 +9,6 @@ function Geom(aes) {
     size: null,
   };
   this.attributes = attributes;
-  for(var attr in this.attributes){
-    if((!this[attr] && this.attributes.hasOwnProperty(attr))){
-      this[attr] = createAccessor(attr);
-    }
-  }
 }
 Geom.prototype.defaultPosition = function() {
   var n = this.name();

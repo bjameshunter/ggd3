@@ -2,7 +2,7 @@ function Text(spec) {
   var attributes = {
     name: "text",
     stat: "identity",
-    position: "identity",
+    position: null,
   };
 
   this.attributes = _.merge(this.attributes, attributes);

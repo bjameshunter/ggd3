@@ -100,7 +100,7 @@ ggd3.tools.defaultScaleSettings = function(dtype, aesthetic) {
     if(dtype[0] === "number") {
       if(dtype[1] === "many"){
         return {type: 'linear',
-                  axis: {tickFormat: d3.format(",.2f")},
+                  axis: {tickFormat: d3.format(",.0f")},
                   scale: {}};
       } else {
         return {type: 'ordinal',
@@ -176,10 +176,12 @@ ggd3.tools.defaultScaleSettings = function(dtype, aesthetic) {
 
 Plot.prototype.setDomains = function() {
   // when setting domain, this function must
-  // consider the stat calculated on the data
-  // nested, or not.
+  // consider the stat calculated on the data,
+  // be it nested, or not.
   // Initial layer should have all relevant scale info
-  // 
+  // granted, that doesn't make a lot of sense.
+  // rather, better idea to keep track of what aesthetics
+  // have a scale set for it, and pass over if so.
   var aes = this.aes(),
       that = this,
       facet = this.facet(),
@@ -199,20 +201,25 @@ Plot.prototype.setDomains = function() {
       // calculated on faceted data. Confusing.
       if(facet.scales() !== "free_" + a &&
          facet.scales() !== "free" || (_.contains(globalScales, a)) ){
-        data = _.flatten(_.map(data, function(d) {
-          // this is a convoluted way to get an array of 
-          // calculated values;
-          // does nothing for text and point, groups 
-          // and calcs for bars/boxes, etc.
-          return ggd3.tools.unNest(nest.entries(d.data));
-        }));
-
         if(_.contains(linearScales, scales.single.scaleType() )){
-          domain = geom.domain(data, a);
+          if(a === "alpha") {
+            data = _.flatten(_.map(data, function(d) {
+              return ggd3.tools.unNest(nest.entries(d.data));
+            }));
+            domain = ggd3.tools.linearDomain(data, aes[a]);
+          } else {
+            data = _.map(data, function(d) {
+              return geom.domain(ggd3.tools.unNest(nest.entries(d.data)), a);
+            });
+            domain = [_.min(data, function(d) {
+              return d[0];
+            })[0], _.max(data, function(d) { return d[1];})[1]];
+          }
         } else {
           // include warning about large numbers of colors for
           // color scales.
-          domain = _.unique(_.pluck(data, aes[a]));
+          domain = _.unique(_.pluck(ggd3.tools.unNest(that.data()), 
+                            aes[a]));
         }
         // is this what I'm supposed to do with log scales?
         for(scale in scales) {
@@ -241,9 +248,13 @@ Plot.prototype.setDomains = function() {
         // stack layout for stacked bars.
         _.each(data, function(d) {
           var grouped = ggd3.tools.unNest(nest.entries(d.data));
-          domain = geom.domain(grouped, a);
           scale = scales[d.selector];
           if(_.contains(linearScales, scales.single.scaleType() )){
+            if(a === "alpha") {
+              domain = ggd3.tools.linearDomain(grouped, aes[a]);
+            } else {
+              domain = geom.domain(grouped, a);
+            }
             scale.domain(domain);
           } else {
             scale.domain(_.unique(_.pluck(grouped, aes[a])));

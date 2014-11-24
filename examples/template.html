@@ -7,9 +7,9 @@
 <body>
 <div>
   <select id="dataset" class='btn btn-primary'>
-  <option value="mtcars.csv" id='cars' >cars</option>
+  <option value="mtcars.csv" id='cars' selected>cars</option>
   <option value="iris.csv" id='iris' >iris</option>
-  <option value="diamonds.csv" id='diamonds' selected>diamonds</option>
+  <option value="diamonds.csv" id='diamonds' >diamonds</option>
   <option value="baseball.csv" id='baseball' >baseball</option>
   <option value="nelplo.csv" id='nelplo' >nelplo</option>
   <option value="wells.csv" id='wells' >wells</option>
@@ -46,22 +46,27 @@ $("#dataset").on('change', function() {
 $("#facet-scales").on('change', function() {
   redraw();
 });
-var facets = {'mtcars.csv': {y: "am", x: "gear"},
+var facets = {'mtcars.csv': {y: "am", nrows: 2},
             "iris.csv" : {x:'Species', ncols:3},
-            "diamonds.csv": {y: "clarity", ncols: 3},
+            "diamonds.csv": {x: "clarity", nrows:1},
             "baseball.csv": {x: "decade", y: "team"},
             "nelplo.csv": {x: 'group', ncols: 3},
             "ustimeseries.csv": {x: 'group', nrows:3},
             "wells.csv": {x: 'switch', y:'assoc'}
           };
-var aes = {'mtcars.csv': {x: "cyl", alpha:"wt", fill: "carb"},
+var aes = {'mtcars.csv': {y: "cyl", fill: "gear"},
             "iris.csv" : {x: "Sepal.Length", y: "Sepal.Width",
             fill: "Species", 
             label: "Species",
             size: "Sepal.Width",
             alpha: "Sepal.Width"
           },
-            "diamonds.csv": {y: "cut", fill: "color", alpha:'table'},
+            "diamonds.csv": { y: "cut",
+            // group: "color", 
+            fill: "color", 
+            alpha:'price',
+            // color: 'carat'
+          },
             "baseball.csv": {x: "hr", y: "h", fill: "ab", size: "g",
             label: 'id'
           },
@@ -74,13 +79,13 @@ var dtypes = {'mtcars.csv': {"gear": ["string"], "cyl": ["string"]},
             "iris.csv" : {},
             "diamonds.csv": {},
             "baseball.csv": {"year": ['date', 'many', "%Y"]},
-            "nelplo.csv": {"date": ['date', 'many']},
-            "ustimeseries.csv": {"date": ['date', 'many']},
+            "nelplo.csv": {"date": ['date', 'many', "%Y-%m"]},
+            "ustimeseries.csv": {"date": ['date', 'many', "%Y-%m"]},
             "wells.csv": {},
           };
 var FacetType = {'mtcars.csv': "wrap",
             "iris.csv" : "wrap",
-            "diamonds.csv": "wrap",
+            "diamonds.csv": "grid",
             "baseball.csv": "grid",
             "nelplo.csv": "wrap",
             "ustimeseries.csv": "wrap",
@@ -94,13 +99,18 @@ var geom = {'mtcars.csv': ["bar"],
             "ustimeseries.csv": ["point"],
             "wells.csv": ["point"],
           };
+// I don't understand why setting scales (alpha, fill, etc.)
+// here sets them for all future geoms of that type.
 var square = new ggd3.geoms.point()
-                  .shape('square')
-                  .alpha(1);
-var text = new ggd3.geoms.text()
+                  .shape('square');
+var text = new ggd3.geoms.text();
 var layers = {'mtcars.csv': ['bar'],
             "iris.csv" : ["text"],
-            "diamonds.csv": ["bar"],
+            "diamonds.csv": new ggd3.layer()
+                                  .geom('bar')
+                                  .position('stack')
+                                  .stat('count')
+                                  ,
             "baseball.csv": ["point"],
             "nelplo.csv": ["point"],
             "ustimeseries.csv": ["point"],
@@ -109,7 +119,6 @@ var layers = {'mtcars.csv': ['bar'],
 var charts = {'mtcars.csv': new ggd3.plot()
                     .width(300)
                     .height(300)
-                    .color('blue')
                     .yScale({axis:{ position:'left', 
                             orient:'left'}})
                     .xScale({axis: {position: 'top',
@@ -118,77 +127,77 @@ var charts = {'mtcars.csv': new ggd3.plot()
                     .margins({top: 5, bottom:10, left:35, right:10})
                     .layers(layers["mtcars.csv"]),
             "iris.csv" : new ggd3.plot()
-                                .width(300)
-                                .height(300)
-                                .yScale({type: 'log', axis: {ticks: 4, position:'left',
-                                  orient: "left"}})
-                                .sizeRange([5, 50])
-                                .color('white')
-                                .margins({top: 5, bottom:20, left:25, right:5})
-                                .xScale({type:'log', axis: {ticks: 4, position: "bottom",
-                                        orient: "bottom"}})
-                                .layers(layers["iris.csv"]),
+                    .width(300)
+                    .height(300)
+                    .yScale({type: 'log', axis: {ticks: 4, position:'left',
+                      orient: "left"}})
+                    .sizeRange([5, 50])
+                    .color('white')
+                    .margins({top: 5, bottom:20, left:25, right:5})
+                    .xScale({type:'log', axis: {ticks: 4, position: "bottom",
+                            orient: "bottom"}})
+                    .layers(layers["iris.csv"]),
             "diamonds.csv": new ggd3.plot()
-                                .layers(layers["diamonds.csv"])
-                                .width(300)
-                                .height(150)
-                                .yScale({axis: {ticks: 4, position:'right',
-                                        orient: "left"}})
-                                .margins({top: 5, bottom:20, left:2, right:2})
-                                .color("black")
-                                .xScale({axis: {ticks: 4, position: "top",
-                                        orient: "bottom"}})
+                  .layers(layers["diamonds.csv"])
+                  .width(150)
+                  .height(300)
+                  // .alpha(0.05)
+                  .yScale({axis: {ticks: 4, position:'right',
+                          orient: "left"}})
+                  .margins({top: 5, bottom:20, left:2, right:2})
+                  .xScale({axis: {ticks: 4, position: "top",
+                          orient: "bottom"}})
 ,
             "baseball.csv": new ggd3.plot()
-                                .layers(layers["baseball.csv"])
-                                .width(300)
-                                .height(300)
-                                .sizeRange([5, 50])
-                                .yScale({axis: {ticks: 4, 
-                                        position:'right',
-                                        orient: "left"}})
-                                .margins({top: 10, bottom:20, left:2, right:2})
-                                .xScale({axis: {ticks: 4, 
-                                        position: "top",
-                                        orient: "bottom"}})
+                  .layers(layers["baseball.csv"])
+                  .width(300)
+                  .height(300)
+                  .sizeRange([5, 50])
+                  .yScale({axis: {ticks: 4, 
+                          position:'right',
+                          orient: "left"}})
+                  .margins({top: 10, bottom:20, left:2, right:2})
+                  .xScale({axis: {ticks: 4, 
+                          position: "top",
+                          orient: "bottom"}})
 ,
             "nelplo.csv": new ggd3.plot()
-                                .layers(layers["nelplo.csv"])
-                                .width(300)
-                                .facet(facets["nelplo.csv"])
-                                .height(150)
-                                // .yScale({axis: {ticks: 4, position:'left',
-                                //         orient: "left"}})
-                                // .margins({top: 15, bottom:20, left:20, right:5})
-                                // .xScale({axis: {ticks: 4, position: "bottom",
-                                //         orient: "bottom"}})
+                  .layers(layers["nelplo.csv"])
+                  .width(300)
+                  .facet(facets["nelplo.csv"])
+                  .height(150)
+                  // .yScale({axis: {ticks: 4, position:'left',
+                  //         orient: "left"}})
+                  // .margins({top: 15, bottom:20, left:20, right:5})
+                  // .xScale({axis: {ticks: 4, position: "bottom",
+                  //         orient: "bottom"}})
 ,
             "ustimeseries.csv": new ggd3.plot()
-                                .layers(layers["ustimeseries.csv"])
-                                .width(500)
-                                .facet(facets["ustimeseries.csv"])
-                                .height(300)
-                                // .yScale({axis: {ticks: 4, position:'left',
-                                //         orient: "left"}})
-                                // .margins({top: 5, bottom:10, left:30, right:2})
-                                // .xScale({axis: {ticks: 4, position: "top",
-                                //         orient: "bottom"}})
+                  .layers(layers["ustimeseries.csv"])
+                  .width(500)
+                  .facet(facets["ustimeseries.csv"])
+                  .height(300)
+                  // .yScale({axis: {ticks: 4, position:'left',
+                  //         orient: "left"}})
+                  // .margins({top: 5, bottom:10, left:30, right:2})
+                  // .xScale({axis: {ticks: 4, position: "top",
+                  //         orient: "bottom"}})
 ,
             "wells.csv": new ggd3.plot()
-                                .width(300)
-                                .height(300)
-                                .yScale({type:'log', 
-                                        axis: {ticks: 4, 
-                                          tickFormat: d3.format(",.0f"),
-                                          position:'right',
-                                        orient: "left"}})
-                                .layers(layers["wells.csv"])
-                                .margins({top: 5, bottom:20, left:2, right:2})
-                                .xScale({type: 'log', 
-                                        axis: {ticks: 4, 
-                                          tickFormat: d3.format(",.0f"),
-                                          position: "top",
-                                          orient: "bottom"}}),
+                  .width(300)
+                  .height(300)
+                  .yScale({type:'log', 
+                          axis: {ticks: 4, 
+                            tickFormat: d3.format(",.0f"),
+                            position:'right',
+                          orient: "left"}})
+                  .layers(layers["wells.csv"])
+                  .margins({top: 5, bottom:20, left:2, right:2})
+                  .xScale({type: 'log', 
+                          axis: {ticks: 4, 
+                            tickFormat: d3.format(",.0f"),
+                            position: "top",
+                            orient: "bottom"}}),
           };
 
 // this should work;

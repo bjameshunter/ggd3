@@ -6,7 +6,7 @@ function Point(spec) {
     name: "point",
     shape: null,
     stat: "identity",
-    position: "identity"
+    position: null
   };
 
   this.attributes = _.merge(this.attributes, attributes);

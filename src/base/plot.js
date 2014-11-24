@@ -1,7 +1,10 @@
-// aes is an object literal with 
-// x, y, yintercept, xintercept, shape, size, 
-// color, etc.
-function Plot(aes) {
+// 1. jittering points on ordinal axes.
+// 2. figure out how to make aggregated values on barcharts
+// work with stacking. 
+// 3. Build in expand to stack bar. 
+// 4. Maybe start thinking about tooltip.
+
+function Plot() {
   var attributes = {
     data: null,
     dtypes: {},

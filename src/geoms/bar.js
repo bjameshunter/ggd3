@@ -3,8 +3,10 @@ function Bar(spec) {
   var attributes = {
     name: "bar",
     stat: "count",
-    position: "stack",
-    lineWidth: 1
+    position: null,
+    lineWidth: 1,
+    groupSum: 0,
+    stackSum: 0,
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -18,7 +20,7 @@ function Bar(spec) {
 
 Bar.prototype = new Geom();
 
-// Bar.prototype.constructor = Bar;
+Bar.prototype.constructor = Bar;
 
 Bar.prototype.domain = function(data, a) {
   // data passed here have been computed and 
@@ -28,17 +30,38 @@ Bar.prototype.domain = function(data, a) {
   var layer = this.layer(),
       plot = layer.plot(),
       aes = layer.aes(),
-      position = this.position(),
-      valueVar = aes[a] ? aes[a]: "count";
+      position = layer.position() || this.position(),
+      valueVar = aes[a] ? aes[a]: "count",
+      group, ord,
+      groupSum, stackSum;
 
   // I need the ordinal axis variable
   // and group axis variable to do this.
-  if(position === "stack"){
-
-  } else if(position === "dodge"){
-
-  }
-  return extent;
+  group = aes.fill || aes.color || aes.group;
+  ord = a === "x" ? aes.y: aes.x;
+  stackSum = _.mapValues(_.groupBy(data, function(d) {
+    return d[ord];
+  }), function(v, k) {
+    return _.reduce(_.pluck(v, valueVar), function(a,b) {
+      return a + b;
+    });
+  });
+  stackSum = d3.extent(_.map(stackSum, function(v, k) { return v; }));
+  groupSum = d3.extent(data, function(d) {
+    return d[valueVar];
+  });
+  this.stackSum(stackSum);
+  this.groupSum(groupSum);
+  if(valueVar === "count"){
+    stackSum[0] = 0;
+    groupSum[0] = 0;
+  } else {
+    stackSum[0] *= 0.9;
+    groupSum[0] *= 0.9;
+  } 
+  stackSum[1] *= 1.1;
+  groupSum[1] *= 1.1;
+  return position === "stack" ? stackSum: groupSum;
 };
 
 Bar.prototype.draw = function() {
@@ -79,7 +102,7 @@ Bar.prototype.draw = function() {
       } else if(aes.group){
         grouped = true;
         group = aes.group;
-      } 
+      }
 
   function draw(sel, data, i, layerNum) {
     // geom bar allows only one scale out of group, fill, and color.
@@ -91,7 +114,9 @@ Bar.prototype.draw = function() {
         xaxis, yaxis, selector, 
         xfree, yfree,
         stackMax, groupMax,
-        valueVar;
+        valueVar,
+        groups, // array holding unique group elements
+        groupOrd = d3.scale.ordinal();
     if(!_.contains(["free", "free_x"], facet.scales()) || 
        _.isUndefined(plot.xScale()[data.selector])){
       x = plot.xScale().single;
@@ -115,7 +140,6 @@ Bar.prototype.draw = function() {
     // y.scale().range().reverse();
     // x.scale().range().reverse();
     // for bars, one scale will be ordinal, one will not
-    if(_.isUndefined(group)) { group = aes[width.s];}
     selector = data.selector;
     data = data.data;
 
@@ -136,6 +160,7 @@ Bar.prototype.draw = function() {
       size = {s: "height", p: 'y'};
       width = {s: "width", p: 'x'};
     }
+    // if(_.isUndefined(group)) { group = aes[width.s];}
     rb = o.scale().rangeBand();
     valueVar = aes[size.p] || "count";
 
@@ -153,33 +178,66 @@ Bar.prototype.draw = function() {
       data = nest.entries(data);
       // get back to array so we can nest for stack
       data = ggd3.tools.unNest(data);
-      // sort so layers line up
-      data = _.sortBy(data, function(d) {
-        return d[aes[width.p]];
-      });
-      data = d3.nest().key(function(d) { return d[group];})
-                .entries(data);
-      if(grouped) {
+      // nest so we can pass to stack
+      // but not necessary if we have no group
+      if(group !== aes[width.p]){
+        data = d3.nest().key(function(d) { return d[group];})
+                  .entries(data);
+        groups = _.pluck(data, 'key');
         // stack layout requires all layers have same # of groups
-        data = ggd3.tools.fillEmptyStack(data, aes[width.p]);
-      }
-      var stack = d3.layout.stack()
-                    .x(function(d) { return d[group]; })
-                    .y(function(d) {
-                      return d[aes[size.p] || "count"]; })
-                    .order('inside-out')
-                    .values(function(d) { 
-                      return d.values; });
-      data = _.flatten(_.map(stack(data),
-                            function(d) {
-                              return d.values ? d.values: [];
-                            }));
-      if(position === 'dodge') {
-
-      } else {
-        // position is stack
+        // and sort each layer by group;
+        data = ggd3.tools.fillEmptyStackGroups(data, aes[width.p]);
+        var stack = d3.layout.stack()
+                      .x(function(d) { return d[aes[width.p]]; })
+                      .y(function(d) {
+                        return d[valueVar]; })
+                      .values(function(d) { 
+                        return d.values; });
+        data = _.flatten(_.map(stack(data),
+                              function(d) {
+                                return d.values ? d.values: [];
+                              }));
+        if(position === 'dodge') {
+          // make ordinal scale for group
+          groupOrd.rangeRoundBands([0, rb])
+                  .domain(groups);
+          rb = groupOrd.rangeBand();
+        }
+        if(position !== "dodge"){
+          console.log('position is: ' + that.position());
+          groupOrd = function(d) {
+            return 0;
+          };
+        }
       }
     }
+    var placeBar = function(d) {
+      var p = o.scale()(d[aes[width.p]]);
+      p += groupOrd(d[group]);
+      return p;
+    };
+    var calcSizeP = (function () {
+      if(position === "stack" && size.p === "y"){
+        return function(d) { 
+          return n.scale()(d[valueVar] + d.y0); 
+          };
+      }
+      if(position === "stack"){
+        return function(d) {
+          return n.scale()(d.y0) || 0;
+        };
+      }
+      if(position === "dodge" && size.p === "y") {
+        return function(d) {
+          return n.scale()(d[valueVar]);
+        };
+      }
+      if(position === "dodge"){
+        return function(d) {
+          return 0;
+        };
+      }
+    } ) ();
 
     // drawing axes goes in geom because they may be dependent on facet id
     // if a facet has no data, therefore, no x or y, draw single
@@ -205,17 +263,14 @@ Bar.prototype.draw = function() {
     function drawBar(rect) {
       rect.attr('class', 'geom g' + layerNum + ' geom-bar')
         .attr(size.s, function(d) { 
+          if(size.p === "y"){
+            return dim.y - n.scale()(d[valueVar]);
+          }
           return n.scale()(d[valueVar]); 
         })
         .attr(width.s, rb)
-        .attr(size.p, function(d) { 
-          if(size.p === "y") {
-            return dim.y - n.scale()(d[valueVar]); 
-          } 
-          return n.scale()(d.y0)  ;
-        })
-        .attr(width.p , function(d) { 
-          return o.scale()(d[aes[width.p]]) || 0; })
+        .attr(size.p, calcSizeP)
+        .attr(width.p , placeBar)
         .style('fill-opacity', alpha)
         .attr('fill', fill)
         .style('stroke', color)
@@ -224,6 +279,7 @@ Bar.prototype.draw = function() {
           return d[group] + "~" + d[aes[width.p]];
         });
     }
+
     bars.transition().call(drawBar);
     
     bars.enter().append('rect').call(drawBar);

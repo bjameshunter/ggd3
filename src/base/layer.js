@@ -5,9 +5,10 @@ function Layer(aes) {
     dtypes:   null,
     geom:     null,
     stat:     null, // identity, sum, mean, percentile, etc.
-    position: "identity", // jitter, dodge, stack, etc.
+    position: null, // jitter, dodge, stack, etc.
     aes:      null,
     ownData:  false,
+    aggFunctions: {},
   };
   // grouping will occur on x and y axes if they are ordinal
   // and an optional array, "group"
@@ -17,13 +18,22 @@ function Layer(aes) {
   // unique character element, or it's unique character element
   // will have the scale applied to it.
   this.attributes = attributes;
-  var getSet = ["plot", "position", "ownData", 'dtypes'];
+  var getSet = ["plot", "ownData", 'dtypes'];
   for(var attr in this.attributes){
     if(!this[attr] && _.contains(getSet, attr) ){
       this[attr] = createAccessor(attr);
     }
   }
+  return this;
 }
+Layer.prototype.position = function(position){
+  if(!arguments.length) { return this.attributes.position; }
+  if(this.geom()){
+    this.geom().position(position);
+  }
+  this.attributes.position = position;
+  return this;
+};
 Layer.prototype.aes = function(aes) {
   if(!arguments.length) { return this.attributes.aes; }
   this.attributes.aes = aes;
@@ -50,14 +60,15 @@ Layer.prototype.geom = function(geom) {
       this.stat(new geom.defaultStat().layer(this));
     } 
   }
-  this.position(geom.position());
   this.attributes.geom = geom;
+  if(!this.position()){
+    this.position(geom.defaultPosition());
+  }
   return this;
 };
 
 Layer.prototype.stat = function(stat) {
   if(!arguments.length) { return this.attributes.stat; }
-  this.attributes.stat = stat;
   // usually, default stat is accepted from geom
   // but you can choose a stat and get a default geom
   if(_.isString(stat)){

@@ -1,13 +1,23 @@
-function Stat() {
+// this is more than I need, I think.
+// All a stat is is a mapping from aesthetics to 
+// statistics. So points can map aesthetics to 
+// statistics, but usually don't.
+// Bars map one of x or y to identity and
+// the other to some aggregate, default count.
+// Box is like bars, but maps one to the five figure summary
+// In this sense, jitter goes here as well. But it probably won't.
+
+function Stat(aggFuncs) {
   var attributes = {
     aes: null,
     layer: null,
     aggFunctions: {
-      x: this.calcAgg('x'),
-      y: this.calcAgg('y'),
-      color: this.calcAgg('color'),
-      fill: this.calcAgg('fill'),
-      alpha: this.calcAgg('alpha')
+      x: this.aesVar('x'),
+      y: this.aesVar('y'),
+      color: this.aesVar('color'),
+      fill: this.aesVar('fill'),
+      alpha: this.aesVar('alpha'),
+      group: this.aesVar('group'),
       // write default aesthetic functions to handle 
       // number and character data to be included in tooltip
       // and to be used to 
@@ -24,23 +34,64 @@ function Stat() {
   }
 }
 
-Stat.prototype.calcAgg = function(a) {
+
+// generic agg calc. returns median for number and
+// nothing for characters;
+Stat.prototype.aesVar = function(xy) {
   var that = this;
-  return function(arr, a, layer) {
+  // each of these guys needs to know the layer/plot
+  // do get dtypes, and aesthetic
+  return function(arr, a, layer){
     var aes = layer.aes(),
-        dtype = layer.dtypes()[aes[a]];
-    if(dtype[0] === "number" && dtype[1] === "many"){
-      return that.calcNumeric(arr, aes[a]);
+        dtype = layer.plot().dtypes()[aes[a]];
+    // keep first element of character vectors because
+    // many times it will be nested by that variable.
+    // making it unique in the array.
+    if(dtype[0] === "string"){
+      return _.unique(_.pluck(arr, aes[a]))[0];
     }
-    return that.calcCharacter(arr, aes[a]);
+    if(dtype[0] === "number" && dtype[1] === "many"){
+      return that.median(_.pluck(arr, aes[a]));
+    }
+    return false;
   };
 };
-// default to the median/mean for numeric columns
-Stat.prototype.calcNumeric = function(arr, name) {
-  if(arr.length > 100000) { 
-    return {type: 'mean', val: d3.mean(_.pluck(arr, name))}; 
+
+Stat.prototype.compute = function(data) {
+  var out = {"count": data.length},
+      aes = this.aes(),
+      layer = this.layer();
+  for(var a in aes){
+    out[aes[a]] = this.aggFunctions()[a] ? 
+      this.aggFunctions()[a](data, a, layer):undefined;
   }
-  return {type: 'median', val: d3.median(_.pluck(arr, name))};
+  return out;
+};
+
+Stat.prototype.median = function(arr) {
+  if(arr.length > 100000) { 
+    console.warn("Default behavior of returning median overridden " + 
+                 "because array length > 1,000,000.");
+    return d3.mean(arr); 
+  }
+  return d3.median(arr);
+};
+// don't know why I feel need to do this.
+Stat.prototype.min = function(arr) {
+  return d3.min(arr);
+};
+Stat.prototype.max = function(arr) {
+  return d3.max(arr);
+};
+Stat.prototype.mean = function(arr) {
+  return d3.mean(arr);
+};
+Stat.prototype.iqr = function(arr, name) {
+  arr = _.sortBy(arr);
+  return {"25th percentile": d3.quantile(arr, 0.25),
+          "50th percentile": d3.quantile(arr, 0.5),
+          "75th percentile": d3.quantile(arr, 0.75)
+        };
 };
 
 // don't do anything with character columns
@@ -61,8 +112,10 @@ function Bin() {
 Bin.prototype = new Stat();
 Bin.prototype.constructor = Bin;
 Bin.prototype.compute = function(data, nbins) {
-
-  };
+  if(_.isUndefined(nbins)) {
+    nbins = 20;
+  }
+};
 Bin.prototype.name = function() {
   return "bin";
 };
@@ -73,22 +126,8 @@ ggd3.stats.bin = Bin;
 function Count() {
   // for count, one of x or y should be ordinal and 
   // it should always have one unique value
-  function ordinalAxisVar(xy) {
-
-    return function(arr, a, layer){
-      var aes = layer.aes();
-      return _.unique(_.pluck(arr, aes[a]))[0];
-    };
-  }
+  var that = this;
   var attributes = {
-    aggFunctions: {
-      x: ordinalAxisVar('x'),
-      y: ordinalAxisVar('y'),
-      group: ordinalAxisVar('group'),
-      fill: ordinalAxisVar('fill'),
-      alpha: ordinalAxisVar('alpha'),
-      color: ordinalAxisVar('color')
-    }
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -100,16 +139,6 @@ function Count() {
 }
 Count.prototype = new Stat();
 Count.prototype.constructor = Count;
-Count.prototype.compute = function(data) {
-  var out = {"count": data.length},
-      aes = this.aes(),
-      layer = this.layer();
-  for(var a in aes){
-    out[aes[a]] = this.aggFunctions()[a] ? 
-      this.aggFunctions()[a](data, a, layer):undefined;
-  }
-  return [out];
-};
 Count.prototype.name = function() {
   return "count";
 };
@@ -118,15 +147,132 @@ Count.prototype.defaultGeom = function() {
 };
 ggd3.stats.count = Count;
 
-// sum
+
+//sum
+function Sum(aggFuncs) {
+
+}
+
+Sum.prototype = new Stat();
+
+Sum.prototype.compute = function() {
+
+};
+
+Sum.prototype.name = function() {
+  return "sum";
+};
+
 
 // mean
+function Mean(aggFuncs) {
+
+}
+
+Mean.prototype = new Stat();
+
+Mean.prototype.compute = function() {
+
+};
+
+Mean.prototype.name = function() {
+  return "mean";
+};
 
 // median
+function Median(aggFuncs){
 
-// max
+}
+Median.prototype = new Stat();
 
-// min 
+Median.constructor = Median;
+
+Median.prototype.compute = function(data) {
+  var out = {"_n_obs": data.length},
+      aes = this.aes(),
+      layer = this.layer(),
+      plot = layer.plot();
+
+
+  for(var a in aes){
+    out[aes[a]] = this.aggFunctions()[a] ? 
+      this.aggFunctions()[a](data, a, layer):undefined;
+  }
+
+  return out;
+};
+
+Median.prototype.name = function() {
+  return "median";
+};
+
+ggd3.stats.median = Median;
+
+// min
+function Min(aggFuncs){
+
+}
+Min.prototype = new Stat();
+
+Min.constructor = Min;
+
+Min.prototype.compute = function(data) {
+  var out = {"_n_obs": data.length},
+      aes = this.aes(),
+      layer = this.layer(),
+      plot = layer.plot();
+
+
+
+  for(var a in aes){
+    out[aes[a]] = this.aggFunctions()[a] ? 
+      this.aggFunctions()[a](data, a, layer):undefined;
+  }
+
+  return out;
+};
+
+Min.prototype.name = function() {
+  return "min";
+};
+
+Min.prototype.defaultGeom = function() {
+  return new ggd3.geoms.bar();
+};
+
+ggd3.stats.min = Min;
+
+// max 
+function Max(aggFuncs){
+
+}
+Max.prototype = new Stat();
+
+Max.constructor = Max;
+
+Max.prototype.compute = function(data) {
+  var out = {"_n_obs": data.length},
+      aes = this.aes(),
+      layer = this.layer(),
+      plot = layer.plot();
+
+
+  for(var a in aes){
+    out[aes[a]] = this.aggFunctions()[a] ? 
+      this.aggFunctions()[a](data, a, layer):undefined;
+  }
+
+  return out;
+};
+
+Max.prototype.name = function() {
+  return "min";
+};
+Max.prototype.defaultGeom = function() {
+  return new ggd3.geoms.bar();
+};
+
+ggd3.stats.Max = Max;
 
 // identity
 function Identity() {
@@ -136,6 +282,7 @@ Identity.prototype = new Stat();
 
 Identity.prototype.constructor = Identity;
 
+// override base compute
 Identity.prototype.compute = function(data) {
   return data || [];
 };
@@ -146,4 +293,25 @@ Identity.prototype.defaultGeom = function() {
   return new ggd3.geoms.point();
 };
 ggd3.stats.identity = Identity;
+
+
+// identity
+function Box(aggFuncs) {
+
+}
+Box.prototype = new Stat();
+
+Box.prototype.constructor = Identity;
+
+Box.prototype.compute = function(data) {
+
+  return out;
+};
+Box.prototype.name = function() {
+  return "Box";
+};
+Box.prototype.defaultGeom = function() {
+  return new ggd3.geoms.box();
+};
+ggd3.stats.box = Box;
 
