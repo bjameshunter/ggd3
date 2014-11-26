@@ -56,8 +56,6 @@ Layer.prototype.geom = function(geom) {
   geom.layer(this);
   this.attributes.geom = geom;
   if(_.isNull(this.stat())){
-    console.log('stat not declared before geom');
-    console.log(this);
     this.stat(geom.stat());
   }
   if(!this.position()){
@@ -72,8 +70,6 @@ Layer.prototype.stat = function(obj) {
   if(obj instanceof ggd3.stats){
     stat = obj;
   } else {
-    console.log('obj is not stat');
-    console.log(obj);
     stat = ggd3.stats(obj);
   }
   this.attributes.stat = stat.layer(this);
@@ -103,7 +99,6 @@ Layer.prototype.setStat = function() {
   // and should be set to count.
   _.each(['x', 'y'], function(a) {
     if(!stat[a]()){
-      console.log("a is " + a);
       stat[a](stat.linearAgg());
       aes[a] = "n. observations";
       this.aes(aes);
@@ -128,7 +123,6 @@ Layer.prototype.draw = function(layerNum) {
       scaleType;
   
   function draw(sel) {
-
     var dlist = that.plot().dataList(that.plot().data()),
         divs = [];
     sel.selectAll('.plot-div')
@@ -141,6 +135,9 @@ Layer.prototype.draw = function(layerNum) {
           d = dlist.filter(function(d) {
             return d.selector === id;
           })[0];
+      if(that.position() === "jitter") {
+        _.each(d.data, function(r) { r._noise = _.random(-1,1,1); });        
+      }
           if(_.isEmpty(d)) { d = {selector: id, data: []}; }
       that.geom().draw()(s, d, i, layerNum);
     });

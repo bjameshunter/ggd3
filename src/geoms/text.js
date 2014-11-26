@@ -6,7 +6,7 @@ function Text(spec) {
   var attributes = {
     name: "text",
     stat: "identity",
-    position: null,
+    position: "identity",
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -49,14 +49,33 @@ Text.prototype.draw = function() {
       size    = d3.functor(this.size() || plot.size()),
       alpha   = d3.functor(this.alpha() || plot.alpha()),
       color   = d3.functor(this.color() || plot.color()),
-      that    = this;
+      that    = this,
+      grouped   = false,
+      group,
+      groups;
+      if(aes.fill) {
+        grouped = true;
+        group = aes.fill;
+      } else if(aes.color){
+        grouped = true;
+        group = aes.color;
+      } else if(aes.group){
+        grouped = true;
+        group = aes.group;
+      }
+      if(group === aes.x || group === aes.y) {
+        // uninteresting grouping, get rid of it.
+        grouped = false;
+        group = null;
+        groups = null;
+      }
+
   function draw(sel, data, i, layerNum) {
     var x, y;
 
     if(!_.contains(["free", "free_x"], facet.scales()) || 
        _.isUndefined(plot.xScale()[data.selector])){
       x = plot.xScale().single;
-      console.log(x.domain());
       xfree = false;
     } else {
       x = plot.xScale()[data.selector];
@@ -70,6 +89,10 @@ Text.prototype.draw = function() {
       y = plot.yScale()[data.selector];
       yfree = true;
     }
+    if(grouped) {
+      groups = _.unique(_.pluck(data.data, group));
+    }
+
     if(layerNum === 0){
       sel.select('.x.axis')
         .attr("transform", "translate(" + x.positionAxis() + ")")
@@ -78,21 +101,40 @@ Text.prototype.draw = function() {
         .attr("transform", "translate(" + y.positionAxis() + ")")
         .transition().call(y.axis);
     }
+    function position(a) {
+      var s = a === "x" ? x : y,
+          sub,
+          rb = 0;
+      if(s.scaleType() === "ordinal" && grouped){
+        sub = d3.scale.ordinal()
+                    .rangeRoundBands([0, s.scale().rangeBand()], 0.05, 0.05)
+                    .domain(groups);
+        rb = sub.rangeBand();
+      } else if(s.scaleType() === "ordinal") {
+        sub = function() { return s.scale().rangeBand() / 2; };
+        rb = s.scale().rangeBand()/2;
+      } else {
+        sub = function() { return 0;};
+      }
+      return function(d) {
+        return s.scale()(d[aes[a]]) + 
+          sub(d[group]) + 
+          (d._noise || 0) * rb;
+
+      };
+    }
     ggd3.tools.removeElements(sel, layerNum, "text");
 
     function drawText(text) {
       text
         .attr('class', 'geom g' + layerNum + " geom-text")
         .text(function(d) { return d[aes.label]; })
-        .attr('transform', function(d) {
-          return "translate(" + x.scale()(d[aes.x])+ 
-                  "," + y.scale()(d[aes.y]) + ")";
-        })
+        .attr('x', position('x'))
+        .attr('y', position('y'))
         .style('font-size', size)
         .attr('fill-opacity', alpha)
         .style('stroke', color)
         .style('stroke-width', 1)
-        .attr('y', function(d) { return size(d)/2; })
         .attr('text-anchor', 'middle')
         .attr('fill', fill);
     }

@@ -7,8 +7,8 @@
 <body>
 <div>
   <select id="dataset" class='btn btn-primary'>
-  <option value="mtcars.csv" id='cars' selected>cars</option>
-  <option value="iris.csv" id='iris' >iris</option>
+  <option value="mtcars.csv" id='cars' >cars</option>
+  <option value="iris.csv" id='iris' selected>iris</option>
   <option value="diamonds.csv" id='diamonds' >diamonds</option>
   <option value="baseball.csv" id='baseball' >baseball</option>
   <option value="nelplo.csv" id='nelplo' >nelplo</option>
@@ -47,7 +47,7 @@ $("#facet-scales").on('change', function() {
   redraw();
 });
 var facets = {'mtcars.csv': {y: "am", nrows: 2},
-            "iris.csv" : {x:'Species', ncols:3},
+            "iris.csv" : null,
             "diamonds.csv": {x: "clarity", nrows:3},
             "baseball.csv": {x: "decade", y: "team"},
             "nelplo.csv": {x: 'group', ncols: 3},
@@ -55,11 +55,12 @@ var facets = {'mtcars.csv': {y: "am", nrows: 2},
             "wells.csv": {x: 'switch', y:'assoc'}
           };
 var aes = {'mtcars.csv': {x: "cyl", fill: "gear"},
-            "iris.csv" : {x: "Sepal.Length", y: "Sepal.Width",
+            "iris.csv" : {x: "Species", y: "Sepal.Width",
             fill: "Species", 
             label: "Species",
             size: "Sepal.Width",
-            alpha: "Sepal.Width"
+            alpha: "Sepal.Width",
+            color: "Species"
           },
             "diamonds.csv": { x: "cut",
             y: "price",
@@ -105,7 +106,7 @@ var square = ggd3.geoms.point()
                   .shape('square');
 var text = ggd3.geoms.text();
 var layers = {'mtcars.csv': ['bar'],
-            "iris.csv" : ["text"],
+            "iris.csv" : [ggd3.layer().geom(text).position('jitter')],
             "diamonds.csv": [ggd3.layer()
                                 .stat({y:'median'})
                                 .position('stack')

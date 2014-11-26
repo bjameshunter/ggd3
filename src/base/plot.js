@@ -151,7 +151,7 @@ Plot.prototype.layers = function(layers) {
     _.each(layers, function(l) {
       if(_.isString(l)){
         // passed string to get geom with default settings
-        layer = new ggd3.layer()
+        layer = ggd3.layer()
                       .aes(this.aes())
                       .data(this.data())
                       .plot(this)
@@ -168,6 +168,13 @@ Plot.prototype.layers = function(layers) {
         if(!l.aes()) { l.aes(this.aes()); }
         l.plot(this);
         this.attributes.layers.push(l);
+      } else if (l instanceof ggd3.geom){
+        var g = l;
+        l = ggd3.layer()
+                .aes(this.aes())
+                .data(this.data())
+                .plot(this)
+                .geom(g);
       }
     }, this);
   } else if (layers instanceof ggd3.layer) {
@@ -178,7 +185,7 @@ Plot.prototype.layers = function(layers) {
     }
     if(!layers.aes()) { layers.aes(this.aes()); }
     this.attributes.layers.push(layers.plot(this));
-  }
+  } 
   return this;
 };
 

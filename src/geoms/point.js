@@ -10,7 +10,7 @@ function Point(spec) {
     name: "point",
     shape: null,
     stat: "identity",
-    position: null
+    position: "identity",
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -62,7 +62,27 @@ Point.prototype.draw = function() {
       geom      = d3.superformula()
                .segments(20)
                .type(shape)
-               .size(size);
+               .size(size),
+      grouped   = false,
+      group,
+      groups;
+      if(aes.fill) {
+        grouped = true;
+        group = aes.fill;
+      } else if(aes.color){
+        grouped = true;
+        group = aes.color;
+      } else if(aes.group){
+        grouped = true;
+        group = aes.group;
+      }
+      if(group === aes.x || group === aes.y) {
+        // uninteresting grouping, get rid of it.
+        grouped = false;
+        group = null;
+        groups = null;
+      }
+
   function draw(sel, data, i, layerNum) {
 
     var x, y;
@@ -97,6 +117,28 @@ Point.prototype.draw = function() {
         .transition().call(y.axis);
     }
     // get rid of wrong elements if they exist.
+    function position(a) {
+      var s = a === "x" ? x : y,
+          sub,
+          rb = 0;
+      if(s.scaleType() === "ordinal" && grouped){
+        sub = d3.scale.ordinal()
+                    .rangeRoundBands([0, s.scale().rangeBand()], 0.05, 0.05)
+                    .domain(groups);
+        rb = sub.rangeBand();
+      } else if(s.scaleType() === "ordinal") {
+        sub = function() { return s.scale().rangeBand() / 2; };
+        rb = s.scale().rangeBand()/2;
+      } else {
+        sub = function() { return 0;};
+      }
+      return function(d) {
+        return s.scale()(d[aes[a]]) + 
+          sub(d[group]) + 
+          (d._noise || 0) * rb;
+
+      };
+    }
     ggd3.tools.removeElements(sel, layerNum, "path");
     var points = sel.select('.plot')
                   .selectAll('path.geom.g' + layerNum)
@@ -107,10 +149,9 @@ Point.prototype.draw = function() {
       point
         .attr('class', 'geom g' + layerNum + " geom-point")
         .attr('d', geom)
-        .attr('transform', function(d) {
-          return "translate(" + x.scale()(d[aes.x])+ 
-                  "," + y.scale()(d[aes.y]) + ")";
-        })
+        .attr('transform', function(d) { 
+          return "translate(" + position('x')(d) + "," +
+           position('y')(d) + ")"; } )
         .attr('fill', fill)
         .style('stroke', color)
         .style('stroke-width', 1)

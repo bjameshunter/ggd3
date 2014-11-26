@@ -7,7 +7,7 @@ function Bar(spec) {
   var attributes = {
     name: "bar",
     stat: "count",
-    position: null,
+    position: "dodge",
     lineWidth: 1,
     offset: 'zero',
     groupSum: 0,
@@ -229,7 +229,7 @@ Bar.prototype.draw = function() {
     var calcSizeS = (function() {
       if(position === 'stack' && size.p === "y"){
         return function(d) {
-          return dim.y - n.scale()(d[valueVar]);
+          return dim.y - n.scale()(d.y);
         };
       }
       if(position === "stack"){
@@ -239,7 +239,7 @@ Bar.prototype.draw = function() {
       }
       if(position === "dodge" && size.p === "y"){
         return function(d) {
-          return dim.y - n.scale()(d[valueVar]); 
+          return dim.y - n.scale()(d.y); 
         };
       }
       return function(d) {
@@ -249,7 +249,7 @@ Bar.prototype.draw = function() {
     var calcSizeP = (function () {
       if(position === "stack" && size.p === "y"){
         return function(d) { 
-          return n.scale()(d.y0 + d[valueVar]); 
+          return n.scale()(d.y0 + d.y); 
           };
       }
       if(position === "stack"){
@@ -259,7 +259,7 @@ Bar.prototype.draw = function() {
       }
       if(position === "dodge" && size.p === "y") {
         return function(d) {
-          return n.scale()(d[valueVar]);
+          return n.scale()(d.y);
         };
       }
       return function(d) {

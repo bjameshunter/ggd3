@@ -693,8 +693,6 @@ Layer.prototype.geom = function(geom) {
   geom.layer(this);
   this.attributes.geom = geom;
   if(_.isNull(this.stat())){
-    console.log('stat not declared before geom');
-    console.log(this);
     this.stat(geom.stat());
   }
   if(!this.position()){
@@ -709,8 +707,6 @@ Layer.prototype.stat = function(obj) {
   if(obj instanceof ggd3.stats){
     stat = obj;
   } else {
-    console.log('obj is not stat');
-    console.log(obj);
     stat = ggd3.stats(obj);
   }
   this.attributes.stat = stat.layer(this);
@@ -740,7 +736,6 @@ Layer.prototype.setStat = function() {
   // and should be set to count.
   _.each(['x', 'y'], function(a) {
     if(!stat[a]()){
-      console.log("a is " + a);
       stat[a](stat.linearAgg());
       aes[a] = "n. observations";
       this.aes(aes);
@@ -765,7 +760,6 @@ Layer.prototype.draw = function(layerNum) {
       scaleType;
   
   function draw(sel) {
-
     var dlist = that.plot().dataList(that.plot().data()),
         divs = [];
     sel.selectAll('.plot-div')
@@ -778,6 +772,9 @@ Layer.prototype.draw = function(layerNum) {
           d = dlist.filter(function(d) {
             return d.selector === id;
           })[0];
+      if(that.position() === "jitter") {
+        _.each(d.data, function(r) { r._noise = _.random(-1,1,1); });        
+      }
           if(_.isEmpty(d)) { d = {selector: id, data: []}; }
       that.geom().draw()(s, d, i, layerNum);
     });
@@ -974,7 +971,7 @@ Plot.prototype.layers = function(layers) {
     _.each(layers, function(l) {
       if(_.isString(l)){
         // passed string to get geom with default settings
-        layer = new ggd3.layer()
+        layer = ggd3.layer()
                       .aes(this.aes())
                       .data(this.data())
                       .plot(this)
@@ -991,6 +988,13 @@ Plot.prototype.layers = function(layers) {
         if(!l.aes()) { l.aes(this.aes()); }
         l.plot(this);
         this.attributes.layers.push(l);
+      } else if (l instanceof ggd3.geom){
+        var g = l;
+        l = ggd3.layer()
+                .aes(this.aes())
+                .data(this.data())
+                .plot(this)
+                .geom(g);
       }
     }, this);
   } else if (layers instanceof ggd3.layer) {
@@ -1001,7 +1005,7 @@ Plot.prototype.layers = function(layers) {
     }
     if(!layers.aes()) { layers.aes(this.aes()); }
     this.attributes.layers.push(layers.plot(this));
-  }
+  } 
   return this;
 };
 
@@ -1577,7 +1581,7 @@ function Bar(spec) {
   var attributes = {
     name: "bar",
     stat: "count",
-    position: null,
+    position: "dodge",
     lineWidth: 1,
     offset: 'zero',
     groupSum: 0,
@@ -1799,7 +1803,7 @@ Bar.prototype.draw = function() {
     var calcSizeS = (function() {
       if(position === 'stack' && size.p === "y"){
         return function(d) {
-          return dim.y - n.scale()(d[valueVar]);
+          return dim.y - n.scale()(d.y);
         };
       }
       if(position === "stack"){
@@ -1809,7 +1813,7 @@ Bar.prototype.draw = function() {
       }
       if(position === "dodge" && size.p === "y"){
         return function(d) {
-          return dim.y - n.scale()(d[valueVar]); 
+          return dim.y - n.scale()(d.y); 
         };
       }
       return function(d) {
@@ -1819,7 +1823,7 @@ Bar.prototype.draw = function() {
     var calcSizeP = (function () {
       if(position === "stack" && size.p === "y"){
         return function(d) { 
-          return n.scale()(d.y0 + d[valueVar]); 
+          return n.scale()(d.y0 + d.y); 
           };
       }
       if(position === "stack"){
@@ -1829,7 +1833,7 @@ Bar.prototype.draw = function() {
       }
       if(position === "dodge" && size.p === "y") {
         return function(d) {
-          return n.scale()(d[valueVar]);
+          return n.scale()(d.y);
         };
       }
       return function(d) {
@@ -2025,7 +2029,7 @@ function Point(spec) {
     name: "point",
     shape: null,
     stat: "identity",
-    position: null
+    position: "identity",
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -2077,7 +2081,27 @@ Point.prototype.draw = function() {
       geom      = d3.superformula()
                .segments(20)
                .type(shape)
-               .size(size);
+               .size(size),
+      grouped   = false,
+      group,
+      groups;
+      if(aes.fill) {
+        grouped = true;
+        group = aes.fill;
+      } else if(aes.color){
+        grouped = true;
+        group = aes.color;
+      } else if(aes.group){
+        grouped = true;
+        group = aes.group;
+      }
+      if(group === aes.x || group === aes.y) {
+        // uninteresting grouping, get rid of it.
+        grouped = false;
+        group = null;
+        groups = null;
+      }
+
   function draw(sel, data, i, layerNum) {
 
     var x, y;
@@ -2112,6 +2136,28 @@ Point.prototype.draw = function() {
         .transition().call(y.axis);
     }
     // get rid of wrong elements if they exist.
+    function position(a) {
+      var s = a === "x" ? x : y,
+          sub,
+          rb = 0;
+      if(s.scaleType() === "ordinal" && grouped){
+        sub = d3.scale.ordinal()
+                    .rangeRoundBands([0, s.scale().rangeBand()], 0.05, 0.05)
+                    .domain(groups);
+        rb = sub.rangeBand();
+      } else if(s.scaleType() === "ordinal") {
+        sub = function() { return s.scale().rangeBand() / 2; };
+        rb = s.scale().rangeBand()/2;
+      } else {
+        sub = function() { return 0;};
+      }
+      return function(d) {
+        return s.scale()(d[aes[a]]) + 
+          sub(d[group]) + 
+          (d._noise || 0) * rb;
+
+      };
+    }
     ggd3.tools.removeElements(sel, layerNum, "path");
     var points = sel.select('.plot')
                   .selectAll('path.geom.g' + layerNum)
@@ -2122,10 +2168,9 @@ Point.prototype.draw = function() {
       point
         .attr('class', 'geom g' + layerNum + " geom-point")
         .attr('d', geom)
-        .attr('transform', function(d) {
-          return "translate(" + x.scale()(d[aes.x])+ 
-                  "," + y.scale()(d[aes.y]) + ")";
-        })
+        .attr('transform', function(d) { 
+          return "translate(" + position('x')(d) + "," +
+           position('y')(d) + ")"; } )
         .attr('fill', fill)
         .style('stroke', color)
         .style('stroke-width', 1)
@@ -2294,7 +2339,7 @@ function Text(spec) {
   var attributes = {
     name: "text",
     stat: "identity",
-    position: null,
+    position: "identity",
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -2337,14 +2382,33 @@ Text.prototype.draw = function() {
       size    = d3.functor(this.size() || plot.size()),
       alpha   = d3.functor(this.alpha() || plot.alpha()),
       color   = d3.functor(this.color() || plot.color()),
-      that    = this;
+      that    = this,
+      grouped   = false,
+      group,
+      groups;
+      if(aes.fill) {
+        grouped = true;
+        group = aes.fill;
+      } else if(aes.color){
+        grouped = true;
+        group = aes.color;
+      } else if(aes.group){
+        grouped = true;
+        group = aes.group;
+      }
+      if(group === aes.x || group === aes.y) {
+        // uninteresting grouping, get rid of it.
+        grouped = false;
+        group = null;
+        groups = null;
+      }
+
   function draw(sel, data, i, layerNum) {
     var x, y;
 
     if(!_.contains(["free", "free_x"], facet.scales()) || 
        _.isUndefined(plot.xScale()[data.selector])){
       x = plot.xScale().single;
-      console.log(x.domain());
       xfree = false;
     } else {
       x = plot.xScale()[data.selector];
@@ -2358,6 +2422,10 @@ Text.prototype.draw = function() {
       y = plot.yScale()[data.selector];
       yfree = true;
     }
+    if(grouped) {
+      groups = _.unique(_.pluck(data.data, group));
+    }
+
     if(layerNum === 0){
       sel.select('.x.axis')
         .attr("transform", "translate(" + x.positionAxis() + ")")
@@ -2366,21 +2434,40 @@ Text.prototype.draw = function() {
         .attr("transform", "translate(" + y.positionAxis() + ")")
         .transition().call(y.axis);
     }
+    function position(a) {
+      var s = a === "x" ? x : y,
+          sub,
+          rb = 0;
+      if(s.scaleType() === "ordinal" && grouped){
+        sub = d3.scale.ordinal()
+                    .rangeRoundBands([0, s.scale().rangeBand()], 0.05, 0.05)
+                    .domain(groups);
+        rb = sub.rangeBand();
+      } else if(s.scaleType() === "ordinal") {
+        sub = function() { return s.scale().rangeBand() / 2; };
+        rb = s.scale().rangeBand()/2;
+      } else {
+        sub = function() { return 0;};
+      }
+      return function(d) {
+        return s.scale()(d[aes[a]]) + 
+          sub(d[group]) + 
+          (d._noise || 0) * rb;
+
+      };
+    }
     ggd3.tools.removeElements(sel, layerNum, "text");
 
     function drawText(text) {
       text
         .attr('class', 'geom g' + layerNum + " geom-text")
         .text(function(d) { return d[aes.label]; })
-        .attr('transform', function(d) {
-          return "translate(" + x.scale()(d[aes.x])+ 
-                  "," + y.scale()(d[aes.y]) + ")";
-        })
+        .attr('x', position('x'))
+        .attr('y', position('y'))
         .style('font-size', size)
         .attr('fill-opacity', alpha)
         .style('stroke', color)
         .style('stroke-width', 1)
-        .attr('y', function(d) { return size(d)/2; })
         .attr('text-anchor', 'middle')
         .attr('fill', fill);
     }
