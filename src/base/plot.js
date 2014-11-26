@@ -5,6 +5,9 @@
 // 4. Maybe start thinking about tooltip.
 
 function Plot() {
+  if(!(this instanceof Plot)){
+    return new Plot();
+  }
   var attributes = {
     data: null,
     dtypes: {},
@@ -16,14 +19,14 @@ function Plot() {
     width: 400,
     height: 400,
     margins: {left:20, right:20, top:20, bottom:20},
-    xScale: {single: new ggd3.scale()}, 
-    yScale: {single: new ggd3.scale()},
-    colorScale: {single: new ggd3.scale()},
-    sizeScale: {single: new ggd3.scale()},
-    fillScale: {single: new ggd3.scale()},
-    shapeScale: {single: new ggd3.scale()},
-    alphaScale: {single: new ggd3.scale()},
-    strokeScale: {single: new ggd3.scale()},
+    xScale: {single: ggd3.scale()}, 
+    yScale: {single: ggd3.scale()},
+    colorScale: {single: ggd3.scale()},
+    sizeScale: {single: ggd3.scale()},
+    fillScale: {single: ggd3.scale()},
+    shapeScale: {single: ggd3.scale()},
+    alphaScale: {single: ggd3.scale()},
+    strokeScale: {single: ggd3.scale()},
     alpha: d3.functor(0.5),
     fill: d3.functor('steelblue'),
     color: d3.functor(null),
@@ -157,7 +160,6 @@ Plot.prototype.layers = function(layers) {
         this.attributes.layers.push(layer);
       } else if ( l instanceof ggd3.layer ){
         // user specified layer
-        console.log('instance of layer');
         if(!l.data()) { 
           l.data(this.data()).dtypes(this.dtypes()); 
         } else {
@@ -202,11 +204,12 @@ Plot.prototype.data = function(data) {
   this.updateLayers();
   this.nested = data.data ? true:false;
   this.newData = data.data ? false:true;
-
   return this;
 };
 
 Plot.prototype.updateLayers = function() {
+  // for right now we are not planning on having more than
+  // one layer
   _.each(this.layers(), function(l) {
     if(!l.ownData()) { l.dtypes(this.dtypes())
                         .data(this.data())
@@ -251,8 +254,14 @@ Plot.prototype.plotDim = function() {
 Plot.prototype.draw = function() {
   var that = this,
       updateFacet = that.facet().updateFacet();
+  
   // get basic info about scales/aes;
   this.setScales();
+
+  // set stats on layers
+  _.each(that.layers(), function(layer) {
+    layer.setStat();
+  });
   // set fixed/free domains
   this.setDomains();
   function draw(sel) {

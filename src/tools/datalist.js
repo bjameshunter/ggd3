@@ -1,7 +1,6 @@
-function DataList() {
+function DataList(data) {
   // needs to work for plots and layers.
-  // I think this should be cheap enought to not 
-  // worry about executing a few times per draw.
+  // takes nested data.
 
   // it's a layer and has it's own data
   var layer = (this instanceof ggd3.layer),
@@ -12,22 +11,22 @@ function DataList() {
       selector;
   if((x && !y) || (y && !x)){
     selector = x ? x + "-": y + "-";
-    return _.map(this.data(), function(d) {
+    return _.map(data, function(d) {
       return {selector: rep(selector + d.key),
         data: d.values};
     });
 
   } else if(x && y) {
     // loop through both levels
-    data = [];
-    _.each(this.data(), function(l1) {
+    out = [];
+    _.each(data, function(l1) {
       var selectX = x + "-" + l1.key;
       _.each(l1.values, function(l2) {
         var s = rep(y + "-" + l2.key + "_" + selectX);
-        data.push({selector:s, data: l2.values});
+        out.push({selector:s, data: l2.values});
       });
     });
-    return data;
+    return out;
   } else if(x && y && by){
     // nothing yet
   }

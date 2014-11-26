@@ -1,4 +1,8 @@
 function Text(spec) {
+  if(!(this instanceof Geom)){
+    return new Text(spec);
+  }
+  Geom.apply(this);
   var attributes = {
     name: "text",
     stat: "identity",
@@ -47,10 +51,25 @@ Text.prototype.draw = function() {
       color   = d3.functor(this.color() || plot.color()),
       that    = this;
   function draw(sel, data, i, layerNum) {
-    var id = (facet.type() === "grid") ? "single":sel.attr('id'),
-        x = plot.xScale()[id],
-        y = plot.yScale()[id];
+    var x, y;
 
+    if(!_.contains(["free", "free_x"], facet.scales()) || 
+       _.isUndefined(plot.xScale()[data.selector])){
+      x = plot.xScale().single;
+      console.log(x.domain());
+      xfree = false;
+    } else {
+      x = plot.xScale()[data.selector];
+      xfree = true;
+    }
+    if(!_.contains(["free", "free_y"], facet.scales()) || 
+       _.isUndefined(plot.xScale()[data.selector])){
+      y = plot.yScale().single;
+      yfree = false;
+    } else {
+      y = plot.yScale()[data.selector];
+      yfree = true;
+    }
     if(layerNum === 0){
       sel.select('.x.axis')
         .attr("transform", "translate(" + x.positionAxis() + ")")
@@ -89,10 +108,6 @@ Text.prototype.draw = function() {
       .remove();
   }
   return draw;
-};
-
-Text.prototype.defaultStat = function() {
-  return new ggd3.stats.identity();
 };
 
 ggd3.geoms.text = Text;

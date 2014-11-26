@@ -1,5 +1,8 @@
 // Base geom from which all geoms inherit
 function Geom(aes) {
+  if(!(this instanceof Geom)){
+    return new Geom(aes);
+  }
   var attributes = {
     layer: null,
     stat: null,
@@ -16,6 +19,16 @@ Geom.prototype.defaultPosition = function() {
     "point": "identity",
     "text": "identity",
     "bar": "stack",
+    "box": "dodge",
+    "hline": "identity",
+    "vline": "identity",
+    "abline": "identity",
+    "smooth": "loess", 
+    "area" : "identity",
+    "error": "identity",
+    "density": "kernel",
+    "path" : "identity",
+    "ribbon" : "identity",
     }[n];
 };
 ggd3.geom = Geom;

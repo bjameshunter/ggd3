@@ -8,7 +8,9 @@
 // all scales will get passed through "setScales"
 // but opts will override defaults
 function Scale(opts) {
-
+  if(!(this instanceof Scale)){
+    return new Scale(opts);
+  }
   // allow setting of orient, position, scaleType, 
   // scale and axis settings, etc.
   var attributes = {
@@ -101,9 +103,17 @@ Scale.prototype.range = function(range) {
 
 Scale.prototype.domain = function(domain) {
   if(!arguments.length) { return this.attributes.domain; }
+  if(this.scaleType() ==="log"){
+    if(!_.all(domain, function(d) { return d > 0;}) ){
+      console.warn("domain must be greater than 0 for log scale." +
+      " Scale " + this.aesthetic() + " has requested domain " +
+      domain[0] + " - " + domain[1] + ". Setting lower " +
+      "bound to 1. Try setting them manually." );
+      domain[0] = 1;
+    }
+  }
   this.attributes.domain = domain;
   this.attributes.scale.domain(domain);
-
   return this;
 };
 Scale.prototype.positionAxis = function() {

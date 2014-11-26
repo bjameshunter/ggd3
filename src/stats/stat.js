@@ -7,76 +7,105 @@
 // Box is like bars, but maps one to the five figure summary
 // In this sense, jitter goes here as well. But it probably won't.
 
-function Stat(aggFuncs) {
+function Stat(setting) {
+  if(!(this instanceof Stat)){
+    return new Stat(setting);
+  }
   var attributes = {
-    aes: null,
     layer: null,
-    aggFunctions: {
-      x: this.aesVar('x'),
-      y: this.aesVar('y'),
-      color: this.aesVar('color'),
-      fill: this.aesVar('fill'),
-      alpha: this.aesVar('alpha'),
-      group: this.aesVar('group'),
-      // write default aesthetic functions to handle 
-      // number and character data to be included in tooltip
-      // and to be used to 
-    }, // object storing column names and agg functions
-    // to be optionally used on tooltips.
-  };
+    linearAgg: null,
+    x: null,
+    y: null,
+    fill: null,
+    color: null,
+    alpha: null,
+    size: null,
+    shape: null,
+    label: null,
+  }; 
+  if(_.isPlainObject(setting)) {
+    for(var a in setting){
+      if(_.isFunction(setting[a])){
+        attributes[a] = setting[a];
+      } else {
+        // map[a] is a string specifying a function
+        // that lives on Stat
+        attributes[a] = this[setting[a]];
+      }
+    }
+  } else if(_.isString(setting)){
+    attributes.linearAgg = setting;
+  }
+  // object storing column names and agg functions
+  // to be optionally used on tooltips.
   this.attributes = attributes;
-  var getSet = ['aes', 'layer'];
+  var getSet = ["layer", "linearAgg"];
   for(var attr in attributes){
-    if((!this[attr] && 
-       _.contains(getSet, attr))){
+    if(_.contains(getSet, attr)){
       this[attr] = createAccessor(attr);
     }
   }
 }
 
-
-// generic agg calc. returns median for number and
-// nothing for characters;
-Stat.prototype.aesVar = function(xy) {
-  var that = this;
-  // each of these guys needs to know the layer/plot
-  // do get dtypes, and aesthetic
-  return function(arr, a, layer){
-    var aes = layer.aes(),
-        dtype = layer.plot().dtypes()[aes[a]];
-    // keep first element of character vectors because
-    // many times it will be nested by that variable.
-    // making it unique in the array.
-    if(dtype[0] === "string"){
-      return _.unique(_.pluck(arr, aes[a]))[0];
-    }
-    if(dtype[0] === "number" && dtype[1] === "many"){
-      return that.median(_.pluck(arr, aes[a]));
-    }
-    return false;
-  };
+Stat.prototype.compute = function(data) {
+  var out = {},
+      aes = this.layer().aes(),
+      id = _.any(_.map(_.keys(aes), function(k){
+              return this[k]()([]) === "identity";
+            }, this));
+  if(id){
+    return data;
+  }
+  for(var a in aes){
+    out[aes[a]] = this[a]()(_.pluck(data, aes[a]));
+  }
+  return [out];
 };
 
-Stat.prototype.compute = function(data) {
-  var out = {"count": data.length},
-      aes = this.aes(),
-      layer = this.layer();
-  for(var a in aes){
-    out[aes[a]] = this.aggFunctions()[a] ? 
-      this.aggFunctions()[a](data, a, layer):undefined;
-  }
-  return out;
+function aggSetter(a) {
+  return function(f) {
+    if(!arguments.length) { return this.attributes[a]; }
+    if(_.isString(f)){
+      this.attributes[a] = this[f];
+    } else if(_.isFunction(f)){
+      this.attributes[a] = f;
+    } else if(_.isArray(f)){
+      // f is dtype
+      if(f[0] === "string" || f[1] === "few"){
+        // likely just need first
+        this.attributes[a] = this.first;
+      } else if(f[0] === "number" && f[1] === "many"){
+        this.attributes[a] = this.median;
+      }
+    }
+    return this;
+  };
+}
+Stat.prototype.x = aggSetter('x');
+Stat.prototype.y = aggSetter('y');
+Stat.prototype.fill = aggSetter('fill');
+Stat.prototype.color = aggSetter('color');
+Stat.prototype.alpha = aggSetter('alpha');
+Stat.prototype.size = aggSetter('size');
+Stat.prototype.size = aggSetter('size');
+Stat.prototype.label = function() {
+  return function(arr) {
+    return arr[0];
+  };
 };
 
 Stat.prototype.median = function(arr) {
   if(arr.length > 100000) { 
     console.warn("Default behavior of returning median overridden " + 
-                 "because array length > 1,000,000.");
+           "because array length > 1,000,000." + 
+           " Mean is probably good enough.");
     return d3.mean(arr); 
   }
   return d3.median(arr);
 };
-// don't know why I feel need to do this.
+Stat.prototype.count = function(arr) {
+  return arr.length;
+};
 Stat.prototype.min = function(arr) {
   return d3.min(arr);
 };
@@ -86,7 +115,7 @@ Stat.prototype.max = function(arr) {
 Stat.prototype.mean = function(arr) {
   return d3.mean(arr);
 };
-Stat.prototype.iqr = function(arr, name) {
+Stat.prototype.iqr = function(arr) {
   arr = _.sortBy(arr);
   return {"25th percentile": d3.quantile(arr, 0.25),
           "50th percentile": d3.quantile(arr, 0.5),
@@ -95,223 +124,16 @@ Stat.prototype.iqr = function(arr, name) {
 };
 
 // don't do anything with character columns
-Stat.prototype.calcCharacter = d3.functor(null);
-
-Stat.prototype.aggFunctions = function(obj) {
-  if(!arguments.length) { return this.attributes.aggFunctions; }
-  var agg = _.merge(this.attributes.aggFunctions, obj);
-  this.attributes.aggFunctions = agg;
-  return this;
+Stat.prototype.first = function(arr) {
+  return arr[0];
 };
 
-// bin
-function Bin() {
-
-}
-
-Bin.prototype = new Stat();
-Bin.prototype.constructor = Bin;
-Bin.prototype.compute = function(data, nbins) {
-  if(_.isUndefined(nbins)) {
-    nbins = 20;
-  }
+Stat.prototype.mode = function(arr) {
+  return "nuthing yet for mode.";
 };
-Bin.prototype.name = function() {
-  return "bin";
-};
-ggd3.stats.bin = Bin;
-
-
-// count
-function Count() {
-  // for count, one of x or y should be ordinal and 
-  // it should always have one unique value
-  var that = this;
-  var attributes = {
-  };
-
-  this.attributes = _.merge(this.attributes, attributes);
-  for(var attr in this.attributes){
-    if((!this[attr] && this.attributes.hasOwnProperty(attr))){
-      this[attr] = createAccessor(attr);
-    }
-  }
-}
-Count.prototype = new Stat();
-Count.prototype.constructor = Count;
-Count.prototype.name = function() {
-  return "count";
-};
-Count.prototype.defaultGeom = function() {
-  return new ggd3.geoms.bar();
-};
-ggd3.stats.count = Count;
-
-
-//sum
-function Sum(aggFuncs) {
-
-}
-
-Sum.prototype = new Stat();
-
-Sum.prototype.compute = function() {
-
-};
-
-Sum.prototype.name = function() {
-  return "sum";
-};
-
-
-// mean
-function Mean(aggFuncs) {
-
-}
-
-Mean.prototype = new Stat();
-
-Mean.prototype.compute = function() {
-
-};
-
-Mean.prototype.name = function() {
-  return "mean";
-};
-
-// median
-function Median(aggFuncs){
-
-}
-Median.prototype = new Stat();
-
-Median.constructor = Median;
-
-Median.prototype.compute = function(data) {
-  var out = {"_n_obs": data.length},
-      aes = this.aes(),
-      layer = this.layer(),
-      plot = layer.plot();
-
-
-  for(var a in aes){
-    out[aes[a]] = this.aggFunctions()[a] ? 
-      this.aggFunctions()[a](data, a, layer):undefined;
-  }
-
-  return out;
-};
-
-Median.prototype.name = function() {
-  return "median";
-};
-
-ggd3.stats.median = Median;
-
-// min
-function Min(aggFuncs){
-
-}
-Min.prototype = new Stat();
-
-Min.constructor = Min;
-
-Min.prototype.compute = function(data) {
-  var out = {"_n_obs": data.length},
-      aes = this.aes(),
-      layer = this.layer(),
-      plot = layer.plot();
-
-
-
-  for(var a in aes){
-    out[aes[a]] = this.aggFunctions()[a] ? 
-      this.aggFunctions()[a](data, a, layer):undefined;
-  }
-
-  return out;
-};
-
-Min.prototype.name = function() {
-  return "min";
-};
-
-Min.prototype.defaultGeom = function() {
-  return new ggd3.geoms.bar();
-};
-
-ggd3.stats.min = Min;
-
-// max 
-function Max(aggFuncs){
-
-}
-Max.prototype = new Stat();
-
-Max.constructor = Max;
-
-Max.prototype.compute = function(data) {
-  var out = {"_n_obs": data.length},
-      aes = this.aes(),
-      layer = this.layer(),
-      plot = layer.plot();
-
-
-  for(var a in aes){
-    out[aes[a]] = this.aggFunctions()[a] ? 
-      this.aggFunctions()[a](data, a, layer):undefined;
-  }
-
-  return out;
-};
-
-Max.prototype.name = function() {
-  return "min";
-};
-Max.prototype.defaultGeom = function() {
-  return new ggd3.geoms.bar();
-};
-
-ggd3.stats.Max = Max;
-
-// identity
-function Identity() {
-
-}
-Identity.prototype = new Stat();
-
-Identity.prototype.constructor = Identity;
-
-// override base compute
-Identity.prototype.compute = function(data) {
-  return data || [];
-};
-Identity.prototype.name = function() {
+// ugly hack? Most of this is ugly.
+Stat.prototype.identity = function(arr) {
   return "identity";
 };
-Identity.prototype.defaultGeom = function() {
-  return new ggd3.geoms.point();
-};
-ggd3.stats.identity = Identity;
 
-
-// identity
-function Box(aggFuncs) {
-
-}
-Box.prototype = new Stat();
-
-Box.prototype.constructor = Identity;
-
-Box.prototype.compute = function(data) {
-
-  return out;
-};
-Box.prototype.name = function() {
-  return "Box";
-};
-Box.prototype.defaultGeom = function() {
-  return new ggd3.geoms.box();
-};
-ggd3.stats.box = Box;
-
+ggd3.stats = Stat;

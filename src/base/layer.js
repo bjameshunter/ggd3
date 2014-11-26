@@ -1,4 +1,7 @@
 function Layer(aes) {
+  if(!(this instanceof Layer)){
+    return new Layer(aes);
+  }
   var attributes = {
     plot:     null,
     data:     null,
@@ -8,7 +11,6 @@ function Layer(aes) {
     position: null, // jitter, dodge, stack, etc.
     aes:      null,
     ownData:  false,
-    aggFunctions: {},
   };
   // grouping will occur on x and y axes if they are ordinal
   // and an optional array, "group"
@@ -18,7 +20,7 @@ function Layer(aes) {
   // unique character element, or it's unique character element
   // will have the scale applied to it.
   this.attributes = attributes;
-  var getSet = ["plot", "ownData", 'dtypes'];
+  var getSet = ["plot", "ownData", 'dtypes', "aggFunctions"];
   for(var attr in this.attributes){
     if(!this[attr] && _.contains(getSet, attr) ){
       this[attr] = createAccessor(attr);
@@ -34,54 +36,81 @@ Layer.prototype.position = function(position){
   this.attributes.position = position;
   return this;
 };
-Layer.prototype.aes = function(aes) {
-  if(!arguments.length) { return this.attributes.aes; }
-  this.attributes.aes = aes;
-  if(this.stat()) {
-    this.stat().layer(this);
-  }
+Layer.prototype.updateGeom = function() {
   if(this.geom()) {
     this.geom().layer(this);
   }
+};
+Layer.prototype.aes = function(aes) {
+  if(!arguments.length) { return this.attributes.aes; }
+  this.attributes.aes = aes;
+  this.updateGeom();
   return this;
 };
 
 Layer.prototype.geom = function(geom) {
   if(!arguments.length) { return this.attributes.geom; }
   if(_.isString(geom)){
-    geom = new ggd3.geoms[geom]()
-                  .layer(this);
-    if(!this.stat() ) {
-      this.stat(new geom.defaultStat().layer(this));
-    }
-  } else if(_.isObject(geom)){
-    geom.layer(this);
-    if(!geom.stat() && !this.stat() ) {
-      this.stat(new geom.defaultStat().layer(this));
-    } 
+    geom = ggd3.geoms[geom]();
   }
+  geom.layer(this);
   this.attributes.geom = geom;
+  if(_.isNull(this.stat())){
+    console.log('stat not declared before geom');
+    console.log(this);
+    this.stat(geom.stat());
+  }
   if(!this.position()){
     this.position(geom.defaultPosition());
   }
   return this;
 };
 
-Layer.prototype.stat = function(stat) {
+Layer.prototype.stat = function(obj) {
   if(!arguments.length) { return this.attributes.stat; }
-  // usually, default stat is accepted from geom
-  // but you can choose a stat and get a default geom
-  if(_.isString(stat)){
-    stat = new ggd3.stats[stat]()
-                  .layer(this);
+  var stat;
+  if(obj instanceof ggd3.stats){
+    stat = obj;
+  } else {
+    console.log('obj is not stat');
+    console.log(obj);
+    stat = ggd3.stats(obj);
   }
-  if(!this.geom()) {
-    this.geom(new stat.defaultGeom().layer(this));
-  }
-  this.attributes.stat = stat;
+  this.attributes.stat = stat.layer(this);
   return this;
 };
 
+Layer.prototype.setStat = function() {
+  // Set stats not declared when layer initiated
+  var aes = this.aes(),
+      dtypes = this.dtypes(),
+      stat = this.stat(),
+      plot = this.plot(),
+      scaleType, dtype;
+  for(var a in aes){
+    dtype = dtypes[aes[a]];
+    if(!stat[a]() && _.contains(measureScales, a)){
+    scaleType = plot[a + "Scale"]().single.scaleType();
+      if(_.contains(linearScales, scaleType) && 
+         _.contains(['x', 'y'], a)){
+        stat[a](stat.linearAgg());
+      } else {
+        stat[a](dtype);
+      }
+    }
+  }
+  // if a stat has not been set, it is x or y
+  // and should be set to count.
+  _.each(['x', 'y'], function(a) {
+    if(!stat[a]()){
+      console.log("a is " + a);
+      stat[a](stat.linearAgg());
+      aes[a] = "n. observations";
+      this.aes(aes);
+    }
+  }, this);
+
+};
 Layer.prototype.data = function(data) {
   if(!arguments.length) { return this.attributes.data; }
   this.attributes.data = data;
@@ -91,12 +120,16 @@ Layer.prototype.data = function(data) {
 Layer.prototype.draw = function(layerNum) {
   var that = this,
       facet = this.plot().facet(),
-      stat = this.stat()
-                .aes(this.aes());
-  // 
+      plot = this.plot(),
+      aes = this.aes(),
+      dtypes = this.dtypes(),
+      stat = this.stat(),
+      dtype,
+      scaleType;
+  
   function draw(sel) {
 
-    var dataList = that.plot().dataList(),
+    var dlist = that.plot().dataList(that.plot().data()),
         divs = [];
     sel.selectAll('.plot-div')
       .each(function(d) {
@@ -105,7 +138,7 @@ Layer.prototype.draw = function(layerNum) {
     _.each(divs, function(id, i){
       // cycle through all divs, drawing data if it exists.
       var s = sel.select("#" + id),
-          d = dataList.filter(function(d) {
+          d = dlist.filter(function(d) {
             return d.selector === id;
           })[0];
           if(_.isEmpty(d)) { d = {selector: id, data: []}; }
@@ -114,8 +147,14 @@ Layer.prototype.draw = function(layerNum) {
   }
   return draw;
 };
+
+// same as on plot, for when Layer has it's own data
+// accepts output of Nest and returns an array of 
+// {selector: [string], data: [array]} objects
 Layer.prototype.dataList = DataList;
 
+// same as on plot, for when Layer has it's own data
+// Nests according to facets
 Layer.prototype.nest = Nest;
 
 Layer.prototype.geomNest = function() {

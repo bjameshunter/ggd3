@@ -93,10 +93,9 @@ function Clean(data, obj) {
 }
 
 ggd3.tools.clean = Clean;
-function DataList() {
+function DataList(data) {
   // needs to work for plots and layers.
-  // I think this should be cheap enought to not 
-  // worry about executing a few times per draw.
+  // takes nested data.
 
   // it's a layer and has it's own data
   var layer = (this instanceof ggd3.layer),
@@ -107,22 +106,22 @@ function DataList() {
       selector;
   if((x && !y) || (y && !x)){
     selector = x ? x + "-": y + "-";
-    return _.map(this.data(), function(d) {
+    return _.map(data, function(d) {
       return {selector: rep(selector + d.key),
         data: d.values};
     });
 
   } else if(x && y) {
     // loop through both levels
-    data = [];
-    _.each(this.data(), function(l1) {
+    out = [];
+    _.each(data, function(l1) {
       var selectX = x + "-" + l1.key;
       _.each(l1.values, function(l2) {
         var s = rep(y + "-" + l2.key + "_" + selectX);
-        data.push({selector:s, data: l2.values});
+        out.push({selector:s, data: l2.values});
       });
     });
-    return data;
+    return out;
   } else if(x && y && by){
     // nothing yet
   }
@@ -139,6 +138,7 @@ ggd3.tools.dateFormatter = function(v, format) {
     return new Date(v);
   }
 };
+
 ggd3.tools.linearDomain = function(data, variable, rule, zero) {
   var extent = d3.extent(_.pluck(data, variable)),
       range = extent[1] - extent[0];
@@ -647,6 +647,9 @@ Facet.prototype.wrapLabel = function(row, col) {
 ggd3.facet = Facet;
 
 function Layer(aes) {
+  if(!(this instanceof Layer)){
+    return new Layer(aes);
+  }
   var attributes = {
     plot:     null,
     data:     null,
@@ -656,7 +659,6 @@ function Layer(aes) {
     position: null, // jitter, dodge, stack, etc.
     aes:      null,
     ownData:  false,
-    aggFunctions: {},
   };
   // grouping will occur on x and y axes if they are ordinal
   // and an optional array, "group"
@@ -666,7 +668,7 @@ function Layer(aes) {
   // unique character element, or it's unique character element
   // will have the scale applied to it.
   this.attributes = attributes;
-  var getSet = ["plot", "ownData", 'dtypes'];
+  var getSet = ["plot", "ownData", 'dtypes', "aggFunctions"];
   for(var attr in this.attributes){
     if(!this[attr] && _.contains(getSet, attr) ){
       this[attr] = createAccessor(attr);
@@ -682,54 +684,81 @@ Layer.prototype.position = function(position){
   this.attributes.position = position;
   return this;
 };
-Layer.prototype.aes = function(aes) {
-  if(!arguments.length) { return this.attributes.aes; }
-  this.attributes.aes = aes;
-  if(this.stat()) {
-    this.stat().layer(this);
-  }
+Layer.prototype.updateGeom = function() {
   if(this.geom()) {
     this.geom().layer(this);
   }
+};
+Layer.prototype.aes = function(aes) {
+  if(!arguments.length) { return this.attributes.aes; }
+  this.attributes.aes = aes;
+  this.updateGeom();
   return this;
 };
 
 Layer.prototype.geom = function(geom) {
   if(!arguments.length) { return this.attributes.geom; }
   if(_.isString(geom)){
-    geom = new ggd3.geoms[geom]()
-                  .layer(this);
-    if(!this.stat() ) {
-      this.stat(new geom.defaultStat().layer(this));
-    }
-  } else if(_.isObject(geom)){
-    geom.layer(this);
-    if(!geom.stat() && !this.stat() ) {
-      this.stat(new geom.defaultStat().layer(this));
-    } 
+    geom = ggd3.geoms[geom]();
   }
+  geom.layer(this);
   this.attributes.geom = geom;
+  if(_.isNull(this.stat())){
+    console.log('stat not declared before geom');
+    console.log(this);
+    this.stat(geom.stat());
+  }
   if(!this.position()){
     this.position(geom.defaultPosition());
   }
   return this;
 };
 
-Layer.prototype.stat = function(stat) {
+Layer.prototype.stat = function(obj) {
   if(!arguments.length) { return this.attributes.stat; }
-  // usually, default stat is accepted from geom
-  // but you can choose a stat and get a default geom
-  if(_.isString(stat)){
-    stat = new ggd3.stats[stat]()
-                  .layer(this);
+  var stat;
+  if(obj instanceof ggd3.stats){
+    stat = obj;
+  } else {
+    console.log('obj is not stat');
+    console.log(obj);
+    stat = ggd3.stats(obj);
   }
-  if(!this.geom()) {
-    this.geom(new stat.defaultGeom().layer(this));
-  }
-  this.attributes.stat = stat;
+  this.attributes.stat = stat.layer(this);
   return this;
 };
 
+Layer.prototype.setStat = function() {
+  // Set stats not declared when layer initiated
+  var aes = this.aes(),
+      dtypes = this.dtypes(),
+      stat = this.stat(),
+      plot = this.plot(),
+      scaleType, dtype;
+  for(var a in aes){
+    dtype = dtypes[aes[a]];
+    if(!stat[a]() && _.contains(measureScales, a)){
+    scaleType = plot[a + "Scale"]().single.scaleType();
+      if(_.contains(linearScales, scaleType) && 
+         _.contains(['x', 'y'], a)){
+        stat[a](stat.linearAgg());
+      } else {
+        stat[a](dtype);
+      }
+    }
+  }
+  // if a stat has not been set, it is x or y
+  // and should be set to count.
+  _.each(['x', 'y'], function(a) {
+    if(!stat[a]()){
+      console.log("a is " + a);
+      stat[a](stat.linearAgg());
+      aes[a] = "n. observations";
+      this.aes(aes);
+    }
+  }, this);
+
+};
 Layer.prototype.data = function(data) {
   if(!arguments.length) { return this.attributes.data; }
   this.attributes.data = data;
@@ -739,12 +768,16 @@ Layer.prototype.data = function(data) {
 Layer.prototype.draw = function(layerNum) {
   var that = this,
       facet = this.plot().facet(),
-      stat = this.stat()
-                .aes(this.aes());
-  // 
+      plot = this.plot(),
+      aes = this.aes(),
+      dtypes = this.dtypes(),
+      stat = this.stat(),
+      dtype,
+      scaleType;
+  
   function draw(sel) {
 
-    var dataList = that.plot().dataList(),
+    var dlist = that.plot().dataList(that.plot().data()),
         divs = [];
     sel.selectAll('.plot-div')
       .each(function(d) {
@@ -753,7 +786,7 @@ Layer.prototype.draw = function(layerNum) {
     _.each(divs, function(id, i){
       // cycle through all divs, drawing data if it exists.
       var s = sel.select("#" + id),
-          d = dataList.filter(function(d) {
+          d = dlist.filter(function(d) {
             return d.selector === id;
           })[0];
           if(_.isEmpty(d)) { d = {selector: id, data: []}; }
@@ -762,8 +795,14 @@ Layer.prototype.draw = function(layerNum) {
   }
   return draw;
 };
+
+// same as on plot, for when Layer has it's own data
+// accepts output of Nest and returns an array of 
+// {selector: [string], data: [array]} objects
 Layer.prototype.dataList = DataList;
 
+// same as on plot, for when Layer has it's own data
+// Nests according to facets
 Layer.prototype.nest = Nest;
 
 Layer.prototype.geomNest = function() {
@@ -800,6 +839,9 @@ ggd3.layer = Layer;
 // 4. Maybe start thinking about tooltip.
 
 function Plot() {
+  if(!(this instanceof Plot)){
+    return new Plot();
+  }
   var attributes = {
     data: null,
     dtypes: {},
@@ -811,14 +853,14 @@ function Plot() {
     width: 400,
     height: 400,
     margins: {left:20, right:20, top:20, bottom:20},
-    xScale: {single: new ggd3.scale()}, 
-    yScale: {single: new ggd3.scale()},
-    colorScale: {single: new ggd3.scale()},
-    sizeScale: {single: new ggd3.scale()},
-    fillScale: {single: new ggd3.scale()},
-    shapeScale: {single: new ggd3.scale()},
-    alphaScale: {single: new ggd3.scale()},
-    strokeScale: {single: new ggd3.scale()},
+    xScale: {single: ggd3.scale()}, 
+    yScale: {single: ggd3.scale()},
+    colorScale: {single: ggd3.scale()},
+    sizeScale: {single: ggd3.scale()},
+    fillScale: {single: ggd3.scale()},
+    shapeScale: {single: ggd3.scale()},
+    alphaScale: {single: ggd3.scale()},
+    strokeScale: {single: ggd3.scale()},
     alpha: d3.functor(0.5),
     fill: d3.functor('steelblue'),
     color: d3.functor(null),
@@ -952,7 +994,6 @@ Plot.prototype.layers = function(layers) {
         this.attributes.layers.push(layer);
       } else if ( l instanceof ggd3.layer ){
         // user specified layer
-        console.log('instance of layer');
         if(!l.data()) { 
           l.data(this.data()).dtypes(this.dtypes()); 
         } else {
@@ -997,11 +1038,12 @@ Plot.prototype.data = function(data) {
   this.updateLayers();
   this.nested = data.data ? true:false;
   this.newData = data.data ? false:true;
-
   return this;
 };
 
 Plot.prototype.updateLayers = function() {
+  // for right now we are not planning on having more than
+  // one layer
   _.each(this.layers(), function(l) {
     if(!l.ownData()) { l.dtypes(this.dtypes())
                         .data(this.data())
@@ -1046,8 +1088,14 @@ Plot.prototype.plotDim = function() {
 Plot.prototype.draw = function() {
   var that = this,
       updateFacet = that.facet().updateFacet();
+  
   // get basic info about scales/aes;
   this.setScales();
+
+  // set stats on layers
+  _.each(that.layers(), function(layer) {
+    layer.setStat();
+  });
   // set fixed/free domains
   this.setDomains();
   function draw(sel) {
@@ -1097,7 +1145,9 @@ ggd3.plot = Plot;
 // all scales will get passed through "setScales"
 // but opts will override defaults
 function Scale(opts) {
-
+  if(!(this instanceof Scale)){
+    return new Scale(opts);
+  }
   // allow setting of orient, position, scaleType, 
   // scale and axis settings, etc.
   var attributes = {
@@ -1190,9 +1240,17 @@ Scale.prototype.range = function(range) {
 
 Scale.prototype.domain = function(domain) {
   if(!arguments.length) { return this.attributes.domain; }
+  if(this.scaleType() ==="log"){
+    if(!_.all(domain, function(d) { return d > 0;}) ){
+      console.warn("domain must be greater than 0 for log scale." +
+      " Scale " + this.aesthetic() + " has requested domain " +
+      domain[0] + " - " + domain[1] + ". Setting lower " +
+      "bound to 1. Try setting them manually." );
+      domain[0] = 1;
+    }
+  }
   this.attributes.domain = domain;
   this.attributes.scale.domain(domain);
-
   return this;
 };
 Scale.prototype.positionAxis = function() {
@@ -1228,16 +1286,7 @@ ggd3.scale = Scale;
 // with which to make scales per facet if needed.
 // if an aes mapping or facet mapping does exist in data
 // throw error.
-var aesMap = {
-        x: 'xScale',
-        y: 'yScale',
-        color: 'colorScale',
-        size: 'sizeScale',
-        fill: 'fillScale',
-        shape: 'shapeScale',
-        alpha: 'alphaScale',
-      },
-    measureScales = ['x', 'y', 'color','size', 'fill' ,'alpha'],
+var measureScales = ['x', 'y', 'color','size', 'fill' ,'alpha'],
     linearScales = ['log', 'linear', 'time', 'date'],
     globalScales = ['alpha','fill', 'color', 'size', 'shape'];
 
@@ -1252,20 +1301,21 @@ function SetScales() {
   var aes = this.aes(),
       that = this,
       facet = this.facet(),
-      data = this.dataList(),
+      data = this.dataList(this.data()),
       dtype,
       settings,
       // gather user defined settings in opts object
-      opts = _.mapValues(aesMap, function(v, k) {
+      opts = _.zipObject(measureScales, 
+        _.map(measureScales, function(a) {
         // there is a scale "single" that holds the 
         // user defined opts and the fixed scale domain
-        return that[v]().single._userOpts;
-      });
+        return that[a + "Scale"]().single._userOpts;
+      }));
 
   function makeScale(d, i, a) {
     if(_.contains(measureScales, a)){
       // user is not specifying a scale.
-      if(!(that[aesMap[a]]() instanceof ggd3.scale)){
+      if(!(that[a + "Scale"]() instanceof ggd3.scale)){
         // get plot level options set for scale.
         // if a dtype is not found, it's because it's x or y and 
         // has not been declared. It will be some numerical aggregation.
@@ -1294,9 +1344,9 @@ function SetScales() {
             scale.scale()[s](settings.scale[s]);
           }
         }
-        that[aesMap[a]]()[d.selector] = scale;
+        that[a + "Scale"]()[d.selector] = scale;
         if(i === 0) {
-          that[aesMap[a]]().single = scale;
+          that[a + "Scale"]().single = scale;
         }
       } else {
         // copy scale settings, merge with default info that wasn't
@@ -1310,7 +1360,7 @@ function SetScales() {
   for(var a in aes) {
     if(_.contains(measureScales, a)){
     // give user-specified scale settings to single facet
-      that[aesMap[a]]().single._userOpts = _.cloneDeep(opts[a]);
+      that[a + "Scale"]().single._userOpts = _.cloneDeep(opts[a]);
     }
   }
 
@@ -1406,96 +1456,141 @@ Plot.prototype.setDomains = function() {
   var aes = this.aes(),
       that = this,
       facet = this.facet(),
-      layer = this.layers()[0], 
-      stat = layer.stat().aes(layer.aes()),
+      layer = this.layers()[0],
+      nest = layer.geomNest(), 
+      stat = layer.stat(),
       geom = layer.geom(),
       domain,
-      data;
-  _.each(_.union(['x', 'y'], _.keys(aes)), function(a) {
-    if(_.contains(measureScales, a)) {
-      var scales = that[aesMap[a]](),
-          scale,
-          nest = layer.geomNest()
-                    .rollup(_.bind(stat.compute,stat)),
-          data = that.dataList();
-      // the aggregated values for fixed axes need to be 
-      // calculated on faceted data. Confusing.
-      if(facet.scales() !== "free_" + a &&
-         facet.scales() !== "free" || (_.contains(globalScales, a)) ){
-        if(_.contains(linearScales, scales.single.scaleType() )){
-          if(a === "alpha") {
-            data = _.flatten(_.map(data, function(d) {
-              return ggd3.tools.unNest(nest.entries(d.data));
-            }));
-            domain = ggd3.tools.linearDomain(data, aes[a]);
-          } else {
-            data = _.map(data, function(d) {
-              return geom.domain(ggd3.tools.unNest(nest.entries(d.data)), a);
-            });
-            domain = [_.min(data, function(d) {
-              return d[0];
-            })[0], _.max(data, function(d) { return d[1];})[1]];
-          }
+      data = that.dataList(that.data()),
+      scale;
+
+  that.globalScales = globalScales.filter(function(s) {
+    return _.contains(_.keys(aes), s);
+  });
+  that.freeScales = [];
+  _.each(['x', 'y'], function(s) {
+    if(!_.contains(['free', 'free_' + s], facet.scales()) ){
+      that.globalScales.push(s);
+    } else {
+      that.freeScales.push(s);
+    }
+  });
+
+  nest.rollup(function(data) {
+    return stat.compute(data);
+  });
+  // each facet's data rolled up according to stat
+  data = _.map(data, function(d) {
+      d.data = ggd3.tools.unNest(nest.entries(d.data) );
+      return d;
+  });
+
+  // free scales
+  if(!_.isEmpty(that.freeScales)){
+    _.map(data, function(d) {
+      // data is now nested by facet and by geomNest
+      _.map(that.freeScales, function(k){
+        scale = that[k+ "Scale"]()[d.selector];
+        if(_.contains(linearScales, 
+           scale.scaleType()) ){
+          scale.domain(geom.domain(d.data, k));
         } else {
-          // include warning about large numbers of colors for
-          // color scales.
-          domain = _.unique(_.pluck(ggd3.tools.unNest(that.data()), 
-                            aes[a]));
+          // gotta find a way to sort these.
+          scale.domain(_.unique(_.pluck(d.data, aes[k])));
         }
-        // is this what I'm supposed to do with log scales?
-        for(scale in scales) {
-          if(scales[scale].scaleType() === "log" && domain[0] <= 0){
-            domain[0] = 1;
-          }
-          scales[scale].domain(domain);
-        }
-        // I guess I'm doing this mess in case, for some
-        // stupid reason, I want free scales across
-        // color, size, alpha, fill and shape
-        if(_.contains(globalScales, a)) {
-          if(_.contains(linearScales, 
-                        that[aesMap[a]]().single.scaleType()) ){
-            that[aesMap[a]]().single.range(that[a + "Range"]());
-          }
-          that[a](function(d) {
-            var aes = that.aes();
-            return that[aesMap[a]]().single.scale()(d[aes[a]]);
-          });
+      });
+    });
+  } else {
+  }
+  function first(d) {
+    return d[0];
+  }
+  function second(d) {
+    return d[1];
+  }
+  // calculate global scales
+  _.map(that.globalScales, function(g){
+    scale = that[g + "Scale"]().single;
+    if(_.contains(linearScales, scale.scaleType())) {
+      if(_.contains(globalScales, g)){
+        // scale is fill, color, alpha, etc.
+        // with no padding on either side of domain.
+        domain = ggd3.tools.linearDomain(
+                    _.flatten(
+                      _.map(data, function(d) {
+                        return d.data;
+                      })), aes[g]);
+        scale.domain(domain);
+        if(_.contains(linearScales, scale.scaleType()) ){
+          scale.range(that[g + 'Range']());
         }
       } else {
-        // free calcs will need to be done in the geom, I think.
-        // this is calculated twice, unnecessarily.
-        // different layouts may manipulate scale domains, such as
-        // stack layout for stacked bars.
-        _.each(data, function(d) {
-          var grouped = ggd3.tools.unNest(nest.entries(d.data));
-          scale = scales[d.selector];
-          if(_.contains(linearScales, scales.single.scaleType() )){
-            if(a === "alpha") {
-              domain = ggd3.tools.linearDomain(grouped, aes[a]);
-            } else {
-              domain = geom.domain(grouped, a);
-            }
-            scale.domain(domain);
-          } else {
-            scale.domain(_.unique(_.pluck(grouped, aes[a])));
-          }
+        // data must be delivered to geom's domain as faceted,
+        // otherwise aggregates will be calculated on whole dataset
+        // rather than facet. Here we're looking for max facet domains.
+        domain = _.map(data, function(d) {
+          return geom.domain(d.data, g);
         });
+        domain = [_.min(_.map(domain, first)) ,
+        _.max(_.map(domain, second))];
+        scale.domain(domain);
       }
+    } else {
+      scale.domain(
+              _.unique(
+                _.pluck(
+                  _.flatten(
+                    _.map(data, 'data')), aes[g])));
+    }
+    for(var s in scale._userOpts.scale){
+      if(scale.scale().hasOwnProperty(s)){
+        scale.scale()[s](scale._userOpts.scale[s]);
+      }
+    }
+    if(_.contains(globalScales, g)) {
+      var aesScale = _.bind(function(d) {
+        return this.scale()(d[aes[g]]);
+      }, scale);
+      that[g](aesScale);
     }
   });
 };
 
 Plot.prototype.setScales = SetScales;
 
+// 
+function Abline(spec) {
+  Geom.apply(this);
+  var attributes = {
+    name: "abline",
+    stat: "identity",
+    position: null,
+  };
 
+  this.attributes = _.merge(this.attributes, attributes);
+
+  for(var attr in this.attributes){
+    if((!this[attr] && this.attributes.hasOwnProperty(attr))){
+      this[attr] = createAccessor(attr);
+    }
+  }
+}
+
+Abline.prototype.constructor = Abline;
+
+ggd3.geoms.abline = Abline;
 // 
 function Bar(spec) {
+  if(!(this instanceof Geom)){
+    return new Bar(spec);
+  }
+  Geom.apply(this);
   var attributes = {
     name: "bar",
     stat: "count",
     position: null,
     lineWidth: 1,
+    offset: 'zero',
     groupSum: 0,
     stackSum: 0,
   };
@@ -1522,7 +1617,7 @@ Bar.prototype.domain = function(data, a) {
       plot = layer.plot(),
       aes = layer.aes(),
       position = layer.position() || this.position(),
-      valueVar = aes[a] ? aes[a]: "count",
+      valueVar = aes[a] ? aes[a]: "n. observations",
       group, ord,
       groupSum, stackSum;
 
@@ -1543,13 +1638,9 @@ Bar.prototype.domain = function(data, a) {
   });
   this.stackSum(stackSum);
   this.groupSum(groupSum);
-  if(valueVar === "count"){
-    stackSum[0] = 0;
-    groupSum[0] = 0;
-  } else {
-    stackSum[0] *= 0.9;
-    groupSum[0] *= 0.9;
-  } 
+
+  stackSum[0] = 0;
+  groupSum[0] = 0;
   stackSum[1] *= 1.1;
   groupSum[1] *= 1.1;
   return position === "stack" ? stackSum: groupSum;
@@ -1566,8 +1657,10 @@ Bar.prototype.draw = function() {
   var layer     = this.layer(),
       position  = layer.position() || this.position(),
       plot      = layer.plot(),
-      dim       = plot.plotDim(),
+      that      = this,
       stat      = layer.stat(),
+      nest      = layer.geomNest(),
+      dim       = plot.plotDim(),
       facet     = plot.facet(),
       margins   = plot.margins(),
       aes       = layer.aes(),
@@ -1575,9 +1668,6 @@ Bar.prototype.draw = function() {
       size      = d3.functor(this.size() || plot.size()),
       alpha     = d3.functor(this.alpha() || plot.alpha()),
       color     = d3.functor(this.color() || plot.color()),
-      that      = this,
-      nest      = layer.geomNest()
-                      .rollup(_.bind(stat.compute, stat)),
       geom      = d3.superformula()
                .segments(20)
                .type(function(d) { return shape(d[aes.shape]); })
@@ -1602,7 +1692,7 @@ Bar.prototype.draw = function() {
 
     // choose axis
     var x, y, o, n, rb, 
-        xaxis, yaxis, selector, 
+        xaxis, yaxis, 
         xfree, yfree,
         stackMax, groupMax,
         valueVar,
@@ -1631,7 +1721,6 @@ Bar.prototype.draw = function() {
     // y.scale().range().reverse();
     // x.scale().range().reverse();
     // for bars, one scale will be ordinal, one will not
-    selector = data.selector;
     data = data.data;
 
 
@@ -1651,9 +1740,17 @@ Bar.prototype.draw = function() {
       size = {s: "height", p: 'y'};
       width = {s: "width", p: 'x'};
     }
-    // if(_.isUndefined(group)) { group = aes[width.s];}
+    if(that.offset() === "expand"){
+      n.domain([0, 1]);
+    }
+
+
+    // console.log(stat.y());
+    nest.rollup(function(data) {
+      return stat.compute(data);
+    });
     rb = o.scale().rangeBand();
-    valueVar = aes[size.p] || "count";
+    valueVar = aes[size.p] || "n. observations";
 
     // some warnings about nesting with bars
     if(aes.fill && aes.group){
@@ -1682,6 +1779,7 @@ Bar.prototype.draw = function() {
                       .x(function(d) { return d[aes[width.p]]; })
                       .y(function(d) {
                         return d[valueVar]; })
+                      .offset(that.offset())
                       .values(function(d) { 
                         return d.values; });
         data = _.flatten(_.map(stack(data),
@@ -1695,27 +1793,49 @@ Bar.prototype.draw = function() {
           rb = groupOrd.rangeBand();
         }
         if(position !== "dodge"){
-          console.log('position is: ' + that.position());
           groupOrd = function(d) {
             return 0;
           };
         }
       }
     }
+
     var placeBar = function(d) {
       var p = o.scale()(d[aes[width.p]]);
       p += groupOrd(d[group]);
       return p;
     };
+
+    // I think this is unnecessary.
+    var calcSizeS = (function() {
+      if(position === 'stack' && size.p === "y"){
+        return function(d) {
+          return dim.y - n.scale()(d[valueVar]);
+        };
+      }
+      if(position === "stack"){
+        return function(d) {
+          return n.scale()(d[valueVar]);
+        };
+      }
+      if(position === "dodge" && size.p === "y"){
+        return function(d) {
+          return dim.y - n.scale()(d[valueVar]); 
+        };
+      }
+      return function(d) {
+        return n.scale()(d[valueVar]); 
+      };
+    })();
     var calcSizeP = (function () {
       if(position === "stack" && size.p === "y"){
         return function(d) { 
-          return n.scale()(d[valueVar] + d.y0); 
+          return n.scale()(d.y0 + d[valueVar]); 
           };
       }
       if(position === "stack"){
         return function(d) {
-          return n.scale()(d.y0) || 0;
+          return n.scale()(d.y0);
         };
       }
       if(position === "dodge" && size.p === "y") {
@@ -1723,11 +1843,9 @@ Bar.prototype.draw = function() {
           return n.scale()(d[valueVar]);
         };
       }
-      if(position === "dodge"){
-        return function(d) {
-          return 0;
-        };
-      }
+      return function(d) {
+        return 0;
+      };
     } ) ();
 
     // drawing axes goes in geom because they may be dependent on facet id
@@ -1753,12 +1871,7 @@ Bar.prototype.draw = function() {
     // add canvas and svg functions.
     function drawBar(rect) {
       rect.attr('class', 'geom g' + layerNum + ' geom-bar')
-        .attr(size.s, function(d) { 
-          if(size.p === "y"){
-            return dim.y - n.scale()(d[valueVar]);
-          }
-          return n.scale()(d[valueVar]); 
-        })
+        .attr(size.s, calcSizeS)
         .attr(width.s, rb)
         .attr(size.p, calcSizeP)
         .attr(width.p , placeBar)
@@ -1785,17 +1898,58 @@ Bar.prototype.draw = function() {
   return draw;
 };
 
-Bar.prototype.defaultStat = function() {
-  var stat = new ggd3.stats.count();
-  return stat;
-};
-
 ggd3.geoms.bar = Bar;
 
+// 
+function Box(spec) {
+  if(!(this instanceof Geom)){
+    return new Box(spec);
+  }
+  Geom.apply(this);
+  var attributes = {
+    name: "box",
+    stat: "identity",
+    position: null,
+  };
 
+  this.attributes = _.merge(this.attributes, attributes);
 
+  for(var attr in this.attributes){
+    if((!this[attr] && this.attributes.hasOwnProperty(attr))){
+      this[attr] = createAccessor(attr);
+    }
+  }
+}
+
+Box.prototype.constructor = Box;
+
+ggd3.geoms.box = Box;
+// 
+function Density(spec) {
+  Geom.apply(this);
+  var attributes = {
+    name: "density",
+    stat: "identity",
+    position: null,
+  };
+
+  this.attributes = _.merge(this.attributes, attributes);
+
+  for(var attr in this.attributes){
+    if((!this[attr] && this.attributes.hasOwnProperty(attr))){
+      this[attr] = createAccessor(attr);
+    }
+  }
+}
+
+Density.prototype.constructor = Density;
+
+ggd3.geoms.density = Density;
 // Base geom from which all geoms inherit
 function Geom(aes) {
+  if(!(this instanceof Geom)){
+    return new Geom(aes);
+  }
   var attributes = {
     layer: null,
     stat: null,
@@ -1812,16 +1966,72 @@ Geom.prototype.defaultPosition = function() {
     "point": "identity",
     "text": "identity",
     "bar": "stack",
+    "box": "dodge",
+    "hline": "identity",
+    "vline": "identity",
+    "abline": "identity",
+    "smooth": "loess", 
+    "area" : "identity",
+    "error": "identity",
+    "density": "kernel",
+    "path" : "identity",
+    "ribbon" : "identity",
     }[n];
 };
 ggd3.geom = Geom;
 
+// 
+function Hline(spec) {
+  Geom.apply(this);
+  var attributes = {
+    name: "hline",
+    stat: "identity",
+    position: null,
+    lineWidth: 1,
+  };
 
+  this.attributes = _.merge(this.attributes, attributes);
 
+  for(var attr in this.attributes){
+    if((!this[attr] && this.attributes.hasOwnProperty(attr))){
+      this[attr] = createAccessor(attr);
+    }
+  }
+}
+
+Hline.prototype.constructor = Hline;
+
+ggd3.geoms.hline = Hline;
+// 
+function Path(spec) {
+  Geom.apply(this);
+  var attributes = {
+    name: "path",
+    stat: "identity",
+    position: null,
+    lineWidth: 1,
+  };
+
+  this.attributes = _.merge(this.attributes, attributes);
+
+  for(var attr in this.attributes){
+    if((!this[attr] && this.attributes.hasOwnProperty(attr))){
+      this[attr] = createAccessor(attr);
+    }
+  }
+}
+
+Path.prototype.constructor = Path;
+
+ggd3.geoms.path = Path;
 // allow layer level specifying of size, fill,
 // color, alpha and shape variables/scales
 // but inherit from layer/plot if 
 function Point(spec) {
+  if(!(this instanceof Geom)){
+    return new Point(spec);
+  }
+  Geom.apply(this);
   var attributes = {
     name: "point",
     shape: null,
@@ -1881,9 +2091,25 @@ Point.prototype.draw = function() {
                .size(size);
   function draw(sel, data, i, layerNum) {
 
-    var id = (facet.type() === "grid") ? "single":sel.attr('id'),
-        x = plot.xScale()[id],
-        y = plot.yScale()[id];
+    var x, y;
+    // choosing scales based on facet rule,
+    // factor out.
+    if(!_.contains(["free", "free_x"], facet.scales()) || 
+       _.isUndefined(plot.xScale()[data.selector])){
+      x = plot.xScale().single;
+      xfree = false;
+    } else {
+      x = plot.xScale()[data.selector];
+      xfree = true;
+    }
+    if(!_.contains(["free", "free_y"], facet.scales()) || 
+       _.isUndefined(plot.xScale()[data.selector])){
+      y = plot.yScale().single;
+      yfree = false;
+    } else {
+      y = plot.yScale()[data.selector];
+      yfree = true;
+    }
     // drawing and positioning axes probably shouldn't be on
     // the geom
     // but here, we're drawing
@@ -1928,14 +2154,50 @@ Point.prototype.draw = function() {
   return draw;
 };
 
-Point.prototype.defaultStat = function() {
-  return new ggd3.stats.identity();
-};
-
 ggd3.geoms.point = Point;
 
+// 
+function Ribbon(spec) {
+  Geom.apply(this);
+  var attributes = {
+    name: "ribbon",
+    stat: "identity",
+    position: null,
+  };
 
+  this.attributes = _.merge(this.attributes, attributes);
 
+  for(var attr in this.attributes){
+    if((!this[attr] && this.attributes.hasOwnProperty(attr))){
+      this[attr] = createAccessor(attr);
+    }
+  }
+}
+
+Ribbon.prototype.constructor = Ribbon;
+
+ggd3.geoms.ribbon = Ribbon;
+// 
+function Smooth(spec) {
+  Geom.apply(this);
+  var attributes = {
+    name: "smooth",
+    stat: "identity",
+    position: null,
+  };
+
+  this.attributes = _.merge(this.attributes, attributes);
+
+  for(var attr in this.attributes){
+    if((!this[attr] && this.attributes.hasOwnProperty(attr))){
+      this[attr] = createAccessor(attr);
+    }
+  }
+}
+
+Smooth.prototype.constructor = Smooth;
+
+ggd3.geoms.smooth = Smooth;
 (function() {
   var _symbol = d3.svg.symbol(),
       _line = d3.svg.line();
@@ -2036,6 +2298,10 @@ ggd3.geoms.point = Point;
 })();
 
 function Text(spec) {
+  if(!(this instanceof Geom)){
+    return new Text(spec);
+  }
+  Geom.apply(this);
   var attributes = {
     name: "text",
     stat: "identity",
@@ -2084,10 +2350,25 @@ Text.prototype.draw = function() {
       color   = d3.functor(this.color() || plot.color()),
       that    = this;
   function draw(sel, data, i, layerNum) {
-    var id = (facet.type() === "grid") ? "single":sel.attr('id'),
-        x = plot.xScale()[id],
-        y = plot.yScale()[id];
+    var x, y;
 
+    if(!_.contains(["free", "free_x"], facet.scales()) || 
+       _.isUndefined(plot.xScale()[data.selector])){
+      x = plot.xScale().single;
+      console.log(x.domain());
+      xfree = false;
+    } else {
+      x = plot.xScale()[data.selector];
+      xfree = true;
+    }
+    if(!_.contains(["free", "free_y"], facet.scales()) || 
+       _.isUndefined(plot.xScale()[data.selector])){
+      y = plot.yScale().single;
+      yfree = false;
+    } else {
+      y = plot.yScale()[data.selector];
+      yfree = true;
+    }
     if(layerNum === 0){
       sel.select('.x.axis')
         .attr("transform", "translate(" + x.positionAxis() + ")")
@@ -2128,13 +2409,29 @@ Text.prototype.draw = function() {
   return draw;
 };
 
-Text.prototype.defaultStat = function() {
-  return new ggd3.stats.identity();
-};
-
 ggd3.geoms.text = Text;
 
+// 
+function Vline(spec) {
+  Geom.apply(this);
+  var attributes = {
+    name: "vline",
+    stat: "identity",
+    position: null,
+  };
 
+  this.attributes = _.merge(this.attributes, attributes);
+
+  for(var attr in this.attributes){
+    if((!this[attr] && this.attributes.hasOwnProperty(attr))){
+      this[attr] = createAccessor(attr);
+    }
+  }
+}
+
+Vline.prototype.constructor = Vline;
+
+ggd3.geoms.vline = Vline;
 // this is more than I need, I think.
 // All a stat is is a mapping from aesthetics to 
 // statistics. So points can map aesthetics to 
@@ -2144,76 +2441,105 @@ ggd3.geoms.text = Text;
 // Box is like bars, but maps one to the five figure summary
 // In this sense, jitter goes here as well. But it probably won't.
 
-function Stat(aggFuncs) {
+function Stat(setting) {
+  if(!(this instanceof Stat)){
+    return new Stat(setting);
+  }
   var attributes = {
-    aes: null,
     layer: null,
-    aggFunctions: {
-      x: this.aesVar('x'),
-      y: this.aesVar('y'),
-      color: this.aesVar('color'),
-      fill: this.aesVar('fill'),
-      alpha: this.aesVar('alpha'),
-      group: this.aesVar('group'),
-      // write default aesthetic functions to handle 
-      // number and character data to be included in tooltip
-      // and to be used to 
-    }, // object storing column names and agg functions
-    // to be optionally used on tooltips.
-  };
+    linearAgg: null,
+    x: null,
+    y: null,
+    fill: null,
+    color: null,
+    alpha: null,
+    size: null,
+    shape: null,
+    label: null,
+  }; 
+  if(_.isPlainObject(setting)) {
+    for(var a in setting){
+      if(_.isFunction(setting[a])){
+        attributes[a] = setting[a];
+      } else {
+        // map[a] is a string specifying a function
+        // that lives on Stat
+        attributes[a] = this[setting[a]];
+      }
+    }
+  } else if(_.isString(setting)){
+    attributes.linearAgg = setting;
+  }
+  // object storing column names and agg functions
+  // to be optionally used on tooltips.
   this.attributes = attributes;
-  var getSet = ['aes', 'layer'];
+  var getSet = ["layer", "linearAgg"];
   for(var attr in attributes){
-    if((!this[attr] && 
-       _.contains(getSet, attr))){
+    if(_.contains(getSet, attr)){
       this[attr] = createAccessor(attr);
     }
   }
 }
 
-
-// generic agg calc. returns median for number and
-// nothing for characters;
-Stat.prototype.aesVar = function(xy) {
-  var that = this;
-  // each of these guys needs to know the layer/plot
-  // do get dtypes, and aesthetic
-  return function(arr, a, layer){
-    var aes = layer.aes(),
-        dtype = layer.plot().dtypes()[aes[a]];
-    // keep first element of character vectors because
-    // many times it will be nested by that variable.
-    // making it unique in the array.
-    if(dtype[0] === "string"){
-      return _.unique(_.pluck(arr, aes[a]))[0];
-    }
-    if(dtype[0] === "number" && dtype[1] === "many"){
-      return that.median(_.pluck(arr, aes[a]));
-    }
-    return false;
-  };
+Stat.prototype.compute = function(data) {
+  var out = {},
+      aes = this.layer().aes(),
+      id = _.any(_.map(_.keys(aes), function(k){
+              return this[k]()([]) === "identity";
+            }, this));
+  if(id){
+    return data;
+  }
+  for(var a in aes){
+    out[aes[a]] = this[a]()(_.pluck(data, aes[a]));
+  }
+  return [out];
 };
 
-Stat.prototype.compute = function(data) {
-  var out = {"count": data.length},
-      aes = this.aes(),
-      layer = this.layer();
-  for(var a in aes){
-    out[aes[a]] = this.aggFunctions()[a] ? 
-      this.aggFunctions()[a](data, a, layer):undefined;
-  }
-  return out;
+function aggSetter(a) {
+  return function(f) {
+    if(!arguments.length) { return this.attributes[a]; }
+    if(_.isString(f)){
+      this.attributes[a] = this[f];
+    } else if(_.isFunction(f)){
+      this.attributes[a] = f;
+    } else if(_.isArray(f)){
+      // f is dtype
+      if(f[0] === "string" || f[1] === "few"){
+        // likely just need first
+        this.attributes[a] = this.first;
+      } else if(f[0] === "number" && f[1] === "many"){
+        this.attributes[a] = this.median;
+      }
+    }
+    return this;
+  };
+}
+Stat.prototype.x = aggSetter('x');
+Stat.prototype.y = aggSetter('y');
+Stat.prototype.fill = aggSetter('fill');
+Stat.prototype.color = aggSetter('color');
+Stat.prototype.alpha = aggSetter('alpha');
+Stat.prototype.size = aggSetter('size');
+Stat.prototype.size = aggSetter('size');
+Stat.prototype.label = function() {
+  return function(arr) {
+    return arr[0];
+  };
 };
 
 Stat.prototype.median = function(arr) {
   if(arr.length > 100000) { 
     console.warn("Default behavior of returning median overridden " + 
-                 "because array length > 1,000,000.");
+           "because array length > 1,000,000." + 
+           " Mean is probably good enough.");
     return d3.mean(arr); 
   }
   return d3.median(arr);
 };
-// don't know why I feel need to do this.
+Stat.prototype.count = function(arr) {
+  return arr.length;
+};
 Stat.prototype.min = function(arr) {
   return d3.min(arr);
 };
@@ -2223,7 +2549,7 @@ Stat.prototype.max = function(arr) {
 Stat.prototype.mean = function(arr) {
   return d3.mean(arr);
 };
-Stat.prototype.iqr = function(arr, name) {
+Stat.prototype.iqr = function(arr) {
   arr = _.sortBy(arr);
   return {"25th percentile": d3.quantile(arr, 0.25),
           "50th percentile": d3.quantile(arr, 0.5),
@@ -2232,227 +2558,19 @@ Stat.prototype.iqr = function(arr, name) {
 };
 
 // don't do anything with character columns
-Stat.prototype.calcCharacter = d3.functor(null);
-
-Stat.prototype.aggFunctions = function(obj) {
-  if(!arguments.length) { return this.attributes.aggFunctions; }
-  var agg = _.merge(this.attributes.aggFunctions, obj);
-  this.attributes.aggFunctions = agg;
-  return this;
+Stat.prototype.first = function(arr) {
+  return arr[0];
 };
 
-// bin
-function Bin() {
-
-}
-
-Bin.prototype = new Stat();
-Bin.prototype.constructor = Bin;
-Bin.prototype.compute = function(data, nbins) {
-  if(_.isUndefined(nbins)) {
-    nbins = 20;
-  }
+Stat.prototype.mode = function(arr) {
+  return "nuthing yet for mode.";
 };
-Bin.prototype.name = function() {
-  return "bin";
-};
-ggd3.stats.bin = Bin;
-
-
-// count
-function Count() {
-  // for count, one of x or y should be ordinal and 
-  // it should always have one unique value
-  var that = this;
-  var attributes = {
-  };
-
-  this.attributes = _.merge(this.attributes, attributes);
-  for(var attr in this.attributes){
-    if((!this[attr] && this.attributes.hasOwnProperty(attr))){
-      this[attr] = createAccessor(attr);
-    }
-  }
-}
-Count.prototype = new Stat();
-Count.prototype.constructor = Count;
-Count.prototype.name = function() {
-  return "count";
-};
-Count.prototype.defaultGeom = function() {
-  return new ggd3.geoms.bar();
-};
-ggd3.stats.count = Count;
-
-
-//sum
-function Sum(aggFuncs) {
-
-}
-
-Sum.prototype = new Stat();
-
-Sum.prototype.compute = function() {
-
-};
-
-Sum.prototype.name = function() {
-  return "sum";
-};
-
-
-// mean
-function Mean(aggFuncs) {
-
-}
-
-Mean.prototype = new Stat();
-
-Mean.prototype.compute = function() {
-
-};
-
-Mean.prototype.name = function() {
-  return "mean";
-};
-
-// median
-function Median(aggFuncs){
-
-}
-Median.prototype = new Stat();
-
-Median.constructor = Median;
-
-Median.prototype.compute = function(data) {
-  var out = {"_n_obs": data.length},
-      aes = this.aes(),
-      layer = this.layer(),
-      plot = layer.plot();
-
-
-  for(var a in aes){
-    out[aes[a]] = this.aggFunctions()[a] ? 
-      this.aggFunctions()[a](data, a, layer):undefined;
-  }
-
-  return out;
-};
-
-Median.prototype.name = function() {
-  return "median";
-};
-
-ggd3.stats.median = Median;
-
-// min
-function Min(aggFuncs){
-
-}
-Min.prototype = new Stat();
-
-Min.constructor = Min;
-
-Min.prototype.compute = function(data) {
-  var out = {"_n_obs": data.length},
-      aes = this.aes(),
-      layer = this.layer(),
-      plot = layer.plot();
-
-
-
-  for(var a in aes){
-    out[aes[a]] = this.aggFunctions()[a] ? 
-      this.aggFunctions()[a](data, a, layer):undefined;
-  }
-
-  return out;
-};
-
-Min.prototype.name = function() {
-  return "min";
-};
-
-Min.prototype.defaultGeom = function() {
-  return new ggd3.geoms.bar();
-};
-
-ggd3.stats.min = Min;
-
-// max 
-function Max(aggFuncs){
-
-}
-Max.prototype = new Stat();
-
-Max.constructor = Max;
-
-Max.prototype.compute = function(data) {
-  var out = {"_n_obs": data.length},
-      aes = this.aes(),
-      layer = this.layer(),
-      plot = layer.plot();
-
-
-  for(var a in aes){
-    out[aes[a]] = this.aggFunctions()[a] ? 
-      this.aggFunctions()[a](data, a, layer):undefined;
-  }
-
-  return out;
-};
-
-Max.prototype.name = function() {
-  return "min";
-};
-Max.prototype.defaultGeom = function() {
-  return new ggd3.geoms.bar();
-};
-
-ggd3.stats.Max = Max;
-
-// identity
-function Identity() {
-
-}
-Identity.prototype = new Stat();
-
-Identity.prototype.constructor = Identity;
-
-// override base compute
-Identity.prototype.compute = function(data) {
-  return data || [];
-};
-Identity.prototype.name = function() {
+// ugly hack? Most of this is ugly.
+Stat.prototype.identity = function(arr) {
   return "identity";
 };
-Identity.prototype.defaultGeom = function() {
-  return new ggd3.geoms.point();
-};
-ggd3.stats.identity = Identity;
 
-
-// identity
-function Box(aggFuncs) {
-
-}
-Box.prototype = new Stat();
-
-Box.prototype.constructor = Identity;
-
-Box.prototype.compute = function(data) {
-
-  return out;
-};
-Box.prototype.name = function() {
-  return "Box";
-};
-Box.prototype.defaultGeom = function() {
-  return new ggd3.geoms.box();
-};
-ggd3.stats.box = Box;
-
-
+ggd3.stats = Stat;
   if(typeof module === "object" && module.exports){
     // package loaded as node module
     this.ggd3 = ggd3;

@@ -7,16 +7,7 @@
 // with which to make scales per facet if needed.
 // if an aes mapping or facet mapping does exist in data
 // throw error.
-var aesMap = {
-        x: 'xScale',
-        y: 'yScale',
-        color: 'colorScale',
-        size: 'sizeScale',
-        fill: 'fillScale',
-        shape: 'shapeScale',
-        alpha: 'alphaScale',
-      },
-    measureScales = ['x', 'y', 'color','size', 'fill' ,'alpha'],
+var measureScales = ['x', 'y', 'color','size', 'fill' ,'alpha'],
     linearScales = ['log', 'linear', 'time', 'date'],
     globalScales = ['alpha','fill', 'color', 'size', 'shape'];
 
@@ -31,20 +22,21 @@ function SetScales() {
   var aes = this.aes(),
       that = this,
       facet = this.facet(),
-      data = this.dataList(),
+      data = this.dataList(this.data()),
       dtype,
       settings,
       // gather user defined settings in opts object
-      opts = _.mapValues(aesMap, function(v, k) {
+      opts = _.zipObject(measureScales, 
+        _.map(measureScales, function(a) {
         // there is a scale "single" that holds the 
         // user defined opts and the fixed scale domain
-        return that[v]().single._userOpts;
-      });
+        return that[a + "Scale"]().single._userOpts;
+      }));
 
   function makeScale(d, i, a) {
     if(_.contains(measureScales, a)){
       // user is not specifying a scale.
-      if(!(that[aesMap[a]]() instanceof ggd3.scale)){
+      if(!(that[a + "Scale"]() instanceof ggd3.scale)){
         // get plot level options set for scale.
         // if a dtype is not found, it's because it's x or y and 
         // has not been declared. It will be some numerical aggregation.
@@ -73,9 +65,9 @@ function SetScales() {
             scale.scale()[s](settings.scale[s]);
           }
         }
-        that[aesMap[a]]()[d.selector] = scale;
+        that[a + "Scale"]()[d.selector] = scale;
         if(i === 0) {
-          that[aesMap[a]]().single = scale;
+          that[a + "Scale"]().single = scale;
         }
       } else {
         // copy scale settings, merge with default info that wasn't
@@ -89,7 +81,7 @@ function SetScales() {
   for(var a in aes) {
     if(_.contains(measureScales, a)){
     // give user-specified scale settings to single facet
-      that[aesMap[a]]().single._userOpts = _.cloneDeep(opts[a]);
+      that[a + "Scale"]().single._userOpts = _.cloneDeep(opts[a]);
     }
   }
 
@@ -185,82 +177,102 @@ Plot.prototype.setDomains = function() {
   var aes = this.aes(),
       that = this,
       facet = this.facet(),
-      layer = this.layers()[0], 
-      stat = layer.stat().aes(layer.aes()),
+      layer = this.layers()[0],
+      nest = layer.geomNest(), 
+      stat = layer.stat(),
       geom = layer.geom(),
       domain,
-      data;
-  _.each(_.union(['x', 'y'], _.keys(aes)), function(a) {
-    if(_.contains(measureScales, a)) {
-      var scales = that[aesMap[a]](),
-          scale,
-          nest = layer.geomNest()
-                    .rollup(_.bind(stat.compute,stat)),
-          data = that.dataList();
-      // the aggregated values for fixed axes need to be 
-      // calculated on faceted data. Confusing.
-      if(facet.scales() !== "free_" + a &&
-         facet.scales() !== "free" || (_.contains(globalScales, a)) ){
-        if(_.contains(linearScales, scales.single.scaleType() )){
-          if(a === "alpha") {
-            data = _.flatten(_.map(data, function(d) {
-              return ggd3.tools.unNest(nest.entries(d.data));
-            }));
-            domain = ggd3.tools.linearDomain(data, aes[a]);
-          } else {
-            data = _.map(data, function(d) {
-              return geom.domain(ggd3.tools.unNest(nest.entries(d.data)), a);
-            });
-            domain = [_.min(data, function(d) {
-              return d[0];
-            })[0], _.max(data, function(d) { return d[1];})[1]];
-          }
+      data = that.dataList(that.data()),
+      scale;
+
+  that.globalScales = globalScales.filter(function(s) {
+    return _.contains(_.keys(aes), s);
+  });
+  that.freeScales = [];
+  _.each(['x', 'y'], function(s) {
+    if(!_.contains(['free', 'free_' + s], facet.scales()) ){
+      that.globalScales.push(s);
+    } else {
+      that.freeScales.push(s);
+    }
+  });
+
+  nest.rollup(function(data) {
+    return stat.compute(data);
+  });
+  // each facet's data rolled up according to stat
+  data = _.map(data, function(d) {
+      d.data = ggd3.tools.unNest(nest.entries(d.data) );
+      return d;
+  });
+
+  // free scales
+  if(!_.isEmpty(that.freeScales)){
+    _.map(data, function(d) {
+      // data is now nested by facet and by geomNest
+      _.map(that.freeScales, function(k){
+        scale = that[k+ "Scale"]()[d.selector];
+        if(_.contains(linearScales, 
+           scale.scaleType()) ){
+          scale.domain(geom.domain(d.data, k));
         } else {
-          // include warning about large numbers of colors for
-          // color scales.
-          domain = _.unique(_.pluck(ggd3.tools.unNest(that.data()), 
-                            aes[a]));
+          // gotta find a way to sort these.
+          scale.domain(_.unique(_.pluck(d.data, aes[k])));
         }
-        // is this what I'm supposed to do with log scales?
-        for(scale in scales) {
-          if(scales[scale].scaleType() === "log" && domain[0] <= 0){
-            domain[0] = 1;
-          }
-          scales[scale].domain(domain);
-        }
-        // I guess I'm doing this mess in case, for some
-        // stupid reason, I want free scales across
-        // color, size, alpha, fill and shape
-        if(_.contains(globalScales, a)) {
-          if(_.contains(linearScales, 
-                        that[aesMap[a]]().single.scaleType()) ){
-            that[aesMap[a]]().single.range(that[a + "Range"]());
-          }
-          that[a](function(d) {
-            var aes = that.aes();
-            return that[aesMap[a]]().single.scale()(d[aes[a]]);
-          });
+      });
+    });
+  } else {
+  }
+  function first(d) {
+    return d[0];
+  }
+  function second(d) {
+    return d[1];
+  }
+  // calculate global scales
+  _.map(that.globalScales, function(g){
+    scale = that[g + "Scale"]().single;
+    if(_.contains(linearScales, scale.scaleType())) {
+      if(_.contains(globalScales, g)){
+        // scale is fill, color, alpha, etc.
+        // with no padding on either side of domain.
+        domain = ggd3.tools.linearDomain(
+                    _.flatten(
+                      _.map(data, function(d) {
+                        return d.data;
+                      })), aes[g]);
+        scale.domain(domain);
+        if(_.contains(linearScales, scale.scaleType()) ){
+          scale.range(that[g + 'Range']());
         }
       } else {
-        // free calcs will need to be done in the geom, I think.
-        // this is calculated twice, unnecessarily.
-        // different layouts may manipulate scale domains, such as
-        // stack layout for stacked bars.
-        _.each(data, function(d) {
-          var grouped = ggd3.tools.unNest(nest.entries(d.data));
-          scale = scales[d.selector];
-          if(_.contains(linearScales, scales.single.scaleType() )){
-            if(a === "alpha") {
-              domain = ggd3.tools.linearDomain(grouped, aes[a]);
-            } else {
-              domain = geom.domain(grouped, a);
-            }
-            scale.domain(domain);
-          } else {
-            scale.domain(_.unique(_.pluck(grouped, aes[a])));
-          }
+        // data must be delivered to geom's domain as faceted,
+        // otherwise aggregates will be calculated on whole dataset
+        // rather than facet. Here we're looking for max facet domains.
+        domain = _.map(data, function(d) {
+          return geom.domain(d.data, g);
         });
+        domain = [_.min(_.map(domain, first)) ,
+        _.max(_.map(domain, second))];
+        scale.domain(domain);
       }
+    } else {
+      scale.domain(
+              _.unique(
+                _.pluck(
+                  _.flatten(
+                    _.map(data, 'data')), aes[g])));
+    }
+    for(var s in scale._userOpts.scale){
+      if(scale.scale().hasOwnProperty(s)){
+        scale.scale()[s](scale._userOpts.scale[s]);
+      }
+    }
+    if(_.contains(globalScales, g)) {
+      var aesScale = _.bind(function(d) {
+        return this.scale()(d[aes[g]]);
+      }, scale);
+      that[g](aesScale);
     }
   });
 };

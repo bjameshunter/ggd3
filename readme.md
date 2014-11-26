@@ -18,10 +18,9 @@ Roadmap:
 - Brush on one axis or both axes
   - Scatterplot highlights according to datapoint value or id
 - Context brush for either axis, [linear, ordinal, or time]
-- opts is an object literal with assorted options
-  - overriding margins of facets, perhaps
+- opts is an object literal with assorted style options, I think.
 - Each geom has default stat. Stats have default geom. Relationship is not one to one. Many stats will have same geom.
-  - There is only one stat, but each geom sets it differently.
+  - There is only one stat, but each geom sets it differently. "Identity" stat is unique in that it passes the data back as is.
   - All global aesthetics (fill, color, alpha, group, shape) are aggregated according to the facet and groupings, and the mean is calculated if it is numeric. If it is a factor and it was a grouping variable (fill, color, group), the first observation of the array is taken, because the will all be the same. If it was not a grouping variable (fill and color may not be), it is calculated. Other calculations are available. Min, max, mean, percentile. 
 - More generic methods for aggregating data that has been nested
 - tooltip should just display all known data for given point.
@@ -32,7 +31,7 @@ Roadmap:
   - box
   - geom error that mounts on geom point, bar, box, line, etc.
   - smooth with loess or lm methods
-
+- Possible adoption of bin-summarize-smooth methods for plots that draw a lot of DOM elements.
 
 #### Problems:
 

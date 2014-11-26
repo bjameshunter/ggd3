@@ -1,10 +1,15 @@
 // 
 function Bar(spec) {
+  if(!(this instanceof Geom)){
+    return new Bar(spec);
+  }
+  Geom.apply(this);
   var attributes = {
     name: "bar",
     stat: "count",
     position: null,
     lineWidth: 1,
+    offset: 'zero',
     groupSum: 0,
     stackSum: 0,
   };
@@ -31,7 +36,7 @@ Bar.prototype.domain = function(data, a) {
       plot = layer.plot(),
       aes = layer.aes(),
       position = layer.position() || this.position(),
-      valueVar = aes[a] ? aes[a]: "count",
+      valueVar = aes[a] ? aes[a]: "n. observations",
       group, ord,
       groupSum, stackSum;
 
@@ -52,13 +57,9 @@ Bar.prototype.domain = function(data, a) {
   });
   this.stackSum(stackSum);
   this.groupSum(groupSum);
-  if(valueVar === "count"){
-    stackSum[0] = 0;
-    groupSum[0] = 0;
-  } else {
-    stackSum[0] *= 0.9;
-    groupSum[0] *= 0.9;
-  } 
+
+  stackSum[0] = 0;
+  groupSum[0] = 0;
   stackSum[1] *= 1.1;
   groupSum[1] *= 1.1;
   return position === "stack" ? stackSum: groupSum;
@@ -75,8 +76,10 @@ Bar.prototype.draw = function() {
   var layer     = this.layer(),
       position  = layer.position() || this.position(),
       plot      = layer.plot(),
-      dim       = plot.plotDim(),
+      that      = this,
       stat      = layer.stat(),
+      nest      = layer.geomNest(),
+      dim       = plot.plotDim(),
       facet     = plot.facet(),
       margins   = plot.margins(),
       aes       = layer.aes(),
@@ -84,9 +87,6 @@ Bar.prototype.draw = function() {
       size      = d3.functor(this.size() || plot.size()),
       alpha     = d3.functor(this.alpha() || plot.alpha()),
       color     = d3.functor(this.color() || plot.color()),
-      that      = this,
-      nest      = layer.geomNest()
-                      .rollup(_.bind(stat.compute, stat)),
       geom      = d3.superformula()
                .segments(20)
                .type(function(d) { return shape(d[aes.shape]); })
@@ -111,7 +111,7 @@ Bar.prototype.draw = function() {
 
     // choose axis
     var x, y, o, n, rb, 
-        xaxis, yaxis, selector, 
+        xaxis, yaxis, 
         xfree, yfree,
         stackMax, groupMax,
         valueVar,
@@ -140,7 +140,6 @@ Bar.prototype.draw = function() {
     // y.scale().range().reverse();
     // x.scale().range().reverse();
     // for bars, one scale will be ordinal, one will not
-    selector = data.selector;
     data = data.data;
 
 
@@ -160,9 +159,17 @@ Bar.prototype.draw = function() {
       size = {s: "height", p: 'y'};
       width = {s: "width", p: 'x'};
     }
-    // if(_.isUndefined(group)) { group = aes[width.s];}
+    if(that.offset() === "expand"){
+      n.domain([0, 1]);
+    }
+
+
+    // console.log(stat.y());
+    nest.rollup(function(data) {
+      return stat.compute(data);
+    });
     rb = o.scale().rangeBand();
-    valueVar = aes[size.p] || "count";
+    valueVar = aes[size.p] || "n. observations";
 
     // some warnings about nesting with bars
     if(aes.fill && aes.group){
@@ -191,6 +198,7 @@ Bar.prototype.draw = function() {
                       .x(function(d) { return d[aes[width.p]]; })
                       .y(function(d) {
                         return d[valueVar]; })
+                      .offset(that.offset())
                       .values(function(d) { 
                         return d.values; });
         data = _.flatten(_.map(stack(data),
@@ -204,27 +212,49 @@ Bar.prototype.draw = function() {
           rb = groupOrd.rangeBand();
         }
         if(position !== "dodge"){
-          console.log('position is: ' + that.position());
           groupOrd = function(d) {
             return 0;
           };
         }
       }
     }
+
     var placeBar = function(d) {
       var p = o.scale()(d[aes[width.p]]);
       p += groupOrd(d[group]);
       return p;
     };
+
+    // I think this is unnecessary.
+    var calcSizeS = (function() {
+      if(position === 'stack' && size.p === "y"){
+        return function(d) {
+          return dim.y - n.scale()(d[valueVar]);
+        };
+      }
+      if(position === "stack"){
+        return function(d) {
+          return n.scale()(d[valueVar]);
+        };
+      }
+      if(position === "dodge" && size.p === "y"){
+        return function(d) {
+          return dim.y - n.scale()(d[valueVar]); 
+        };
+      }
+      return function(d) {
+        return n.scale()(d[valueVar]); 
+      };
+    })();
     var calcSizeP = (function () {
       if(position === "stack" && size.p === "y"){
         return function(d) { 
-          return n.scale()(d[valueVar] + d.y0); 
+          return n.scale()(d.y0 + d[valueVar]); 
           };
       }
       if(position === "stack"){
         return function(d) {
-          return n.scale()(d.y0) || 0;
+          return n.scale()(d.y0);
         };
       }
       if(position === "dodge" && size.p === "y") {
@@ -232,11 +262,9 @@ Bar.prototype.draw = function() {
           return n.scale()(d[valueVar]);
         };
       }
-      if(position === "dodge"){
-        return function(d) {
-          return 0;
-        };
-      }
+      return function(d) {
+        return 0;
+      };
     } ) ();
 
     // drawing axes goes in geom because they may be dependent on facet id
@@ -262,12 +290,7 @@ Bar.prototype.draw = function() {
     // add canvas and svg functions.
     function drawBar(rect) {
       rect.attr('class', 'geom g' + layerNum + ' geom-bar')
-        .attr(size.s, function(d) { 
-          if(size.p === "y"){
-            return dim.y - n.scale()(d[valueVar]);
-          }
-          return n.scale()(d[valueVar]); 
-        })
+        .attr(size.s, calcSizeS)
         .attr(width.s, rb)
         .attr(size.p, calcSizeP)
         .attr(width.p , placeBar)
@@ -292,11 +315,6 @@ Bar.prototype.draw = function() {
 
   }
   return draw;
-};
-
-Bar.prototype.defaultStat = function() {
-  var stat = new ggd3.stats.count();
-  return stat;
 };
 
 ggd3.geoms.bar = Bar;

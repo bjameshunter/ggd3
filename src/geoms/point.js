@@ -2,6 +2,10 @@
 // color, alpha and shape variables/scales
 // but inherit from layer/plot if 
 function Point(spec) {
+  if(!(this instanceof Geom)){
+    return new Point(spec);
+  }
+  Geom.apply(this);
   var attributes = {
     name: "point",
     shape: null,
@@ -61,9 +65,25 @@ Point.prototype.draw = function() {
                .size(size);
   function draw(sel, data, i, layerNum) {
 
-    var id = (facet.type() === "grid") ? "single":sel.attr('id'),
-        x = plot.xScale()[id],
-        y = plot.yScale()[id];
+    var x, y;
+    // choosing scales based on facet rule,
+    // factor out.
+    if(!_.contains(["free", "free_x"], facet.scales()) || 
+       _.isUndefined(plot.xScale()[data.selector])){
+      x = plot.xScale().single;
+      xfree = false;
+    } else {
+      x = plot.xScale()[data.selector];
+      xfree = true;
+    }
+    if(!_.contains(["free", "free_y"], facet.scales()) || 
+       _.isUndefined(plot.xScale()[data.selector])){
+      y = plot.yScale().single;
+      yfree = false;
+    } else {
+      y = plot.yScale()[data.selector];
+      yfree = true;
+    }
     // drawing and positioning axes probably shouldn't be on
     // the geom
     // but here, we're drawing
@@ -106,10 +126,6 @@ Point.prototype.draw = function() {
       .remove();
   }
   return draw;
-};
-
-Point.prototype.defaultStat = function() {
-  return new ggd3.stats.identity();
 };
 
 ggd3.geoms.point = Point;
