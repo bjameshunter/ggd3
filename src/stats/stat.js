@@ -51,15 +51,51 @@ Stat.prototype.compute = function(data) {
   var out = {},
       aes = this.layer().aes(),
       id = _.any(_.map(_.keys(aes), function(k){
+            console.log(aes[k]);
+              if(!this[k]()){ return null; }
               return this[k]()([]) === "identity";
             }, this));
+  if(this.linearAgg() === "density"){
+    var g, k, r, p;
+    if(aes.y && aes.x) {
+      // we've been through before and density exists on aes
+      d = aes.y === "density" ? 'y': 'x';
+    } else {
+      d = aes.y ? 'x': 'y';
+      aes[d] = "density";
+    }
+    n = d === "y" ? "x": "y";
+    _.map(['color', 'group'], function(a) {
+      if(aes[a]){
+        out[aes[a]] = data[0][aes[a]];
+      }
+    });
+    data = _.pluck(data, aes[n]);
+    g = this.layer().geom();
+    k = g[g.kernel()](g.smooth());
+    r = d3.extent(data);
+    p = _.range(r[0], r[1], (r[1] - r[0])/g.nPoints());
+    kde = g.kde(k, p);
+    data = kde(data);
+    out = _.map(data, function(d) {
+      var o = _.clone(out);
+      o[aes[n]] = d[0];
+      o.density = d[1];
+      return o;
+    });
+    return out;
+  }
+  if(this.linearAgg() === "bin"){
+    
+  }
+  // most situations will need these two
   if(id){
     return data;
   }
   for(var a in aes){
     out[aes[a]] = this[a]()(_.pluck(data, aes[a]));
   }
-  return [out];
+  return out;
 };
 
 function aggSetter(a) {
@@ -116,7 +152,7 @@ Stat.prototype.mean = function(arr) {
   return d3.mean(arr);
 };
 Stat.prototype.iqr = function(arr) {
-  arr = _.sortBy(arr);
+  // arr = _.sortBy(arr);
   return {"25th percentile": d3.quantile(arr, 0.25),
           "50th percentile": d3.quantile(arr, 0.5),
           "75th percentile": d3.quantile(arr, 0.75)
@@ -134,6 +170,14 @@ Stat.prototype.mode = function(arr) {
 // ugly hack? Most of this is ugly.
 Stat.prototype.identity = function(arr) {
   return "identity";
+};
+
+Stat.prototype.density = function(arr) {
+  // console.log(this);
+  // var l = this.layer(),
+  //     g = layer.geom(),
+  //     k = g[g.kernel()](g.smooth());
+  return 'density';
 };
 
 ggd3.stats = Stat;

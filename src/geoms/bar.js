@@ -73,73 +73,52 @@ Bar.prototype.draw = function() {
   // stacked, grouped, expanded or not.
   // scales first need to be calculated according to output
   // of the stat. 
-  var layer     = this.layer(),
-      position  = layer.position() || this.position(),
-      plot      = layer.plot(),
-      that      = this,
-      stat      = layer.stat(),
-      nest      = layer.geomNest(),
-      dim       = plot.plotDim(),
-      facet     = plot.facet(),
-      margins   = plot.margins(),
-      aes       = layer.aes(),
-      fill      = d3.functor(this.fill() || plot.fill()),
-      size      = d3.functor(this.size() || plot.size()),
-      alpha     = d3.functor(this.alpha() || plot.alpha()),
-      color     = d3.functor(this.color() || plot.color()),
-      geom      = d3.superformula()
-               .segments(20)
-               .type(function(d) { return shape(d[aes.shape]); })
-               .size(function(d) { return size(d[aes.size]); }),
-      grouped   = false,
-      group;
-      if(aes.fill) {
-        grouped = true;
-        group = aes.fill;
-      } else if(aes.color){
-        grouped = true;
-        group = aes.color;
-      } else if(aes.group){
-        grouped = true;
-        group = aes.group;
-      }
+  var s     = this.setup(),
+      that  = this;
 
   function draw(sel, data, i, layerNum) {
-    // geom bar allows only one scale out of group, fill, and color.
-    // that is, one can be an ordinal scale, but the others must be
-    // constants
 
-    // choose axis
-    var x, y, o, n, rb, 
-        xaxis, yaxis, 
-        xfree, yfree,
-        stackMax, groupMax,
+    var o, n, rb, 
         valueVar,
-        groups, // array holding unique group elements
-        groupOrd = d3.scale.ordinal();
-    if(!_.contains(["free", "free_x"], facet.scales()) || 
-       _.isUndefined(plot.xScale()[data.selector])){
-      x = plot.xScale().single;
-      xfree = false;
-    } else {
-      x = plot.xScale()[data.selector];
-      xfree = true;
+        groupOrd  = d3.scale.ordinal(),
+        drawX     = true,
+        drawY     = true;
+
+    if(_.contains(['wiggle', 'silhouette'], that.offset()) ){
+      if(s.plot.xScale().single.scaleType() === "ordinal"){
+        // x is ordinal, don't draw Y axis
+        drawY = false;
+        sel.select('.y.axis')
+          .selectAll('*')
+          .transition()
+          .style('opacity', 0)
+          .remove();
+      } else {
+        // y is ordinal, don't draw X.
+        drawX = false;
+        sel.select('.x.axis')
+          .selectAll('*')
+          .transition()
+          .style('opacity', 0)
+          .remove();
+      }
     }
-    if(!_.contains(["free", "free_y"], facet.scales()) || 
-       _.isUndefined(plot.xScale()[data.selector])){
-      y = plot.yScale().single;
-      yfree = false;
-    } else {
-      y = plot.yScale()[data.selector];
-      yfree = true;
+    // gotta do something to reset domains if offset is expand
+    if(that.offset() === "expand"){
+      if(s.plot.xScale().single.scaleType() === "ordinal"){
+        _.mapValues(s.plot.yScale(), function(v, k) {
+          v.domain([0,1]);
+        });
+      } else {
+        _.mapValues(s.plot.xScale(), function(v, k) {
+          v.domain([0,1]);
+        });  
+      }
     }
 
-    // work with this to get bars going top to bottom or right to left
-    // y.scale().domain().reverse();
-    // x.scale().domain().reverse();
-    // y.scale().range().reverse();
-    // x.scale().range().reverse();
-    // for bars, one scale will be ordinal, one will not
+
+    var scales = that.scalesAxes(sel, s, data.selector, layerNum,
+                                 drawX, drawY);
     data = data.data;
 
 
@@ -148,31 +127,27 @@ Bar.prototype.draw = function() {
     // width refers to scale defining rangeband of bars
     // size refers to scale defining its length along numeric axis
     // s and p on those objects are for size and position, respectively.
-    if(y.scaleType() === 'ordinal'){
-      o = y;
-      n = x;
+    if(scales.y.scaleType() === 'ordinal'){
+      o = scales.y;
+      n = scales.x;
       size = {s: "width", p:'x'};
       width = {s:"height", p: 'y'};
     } else {
-      o = x;
-      n = y;
+      o = scales.x;
+      n = scales.y;
       size = {s: "height", p: 'y'};
       width = {s: "width", p: 'x'};
     }
-    if(that.offset() === "expand"){
-      n.domain([0, 1]);
-    }
 
 
-    // console.log(stat.y());
-    nest.rollup(function(data) {
-      return stat.compute(data);
+    s.nest.rollup(function(data) {
+      return s.stat.compute(data);
     });
     rb = o.scale().rangeBand();
-    valueVar = aes[size.p] || "n. observations";
+    valueVar = s.aes[size.p] || "n. observations";
 
     // some warnings about nesting with bars
-    if(aes.fill && aes.group){
+    if(s.aes.fill && s.aes.group){
       console.warn("Doesn't make a lot of sense with bars to set" +
                    " aes.fill and aes.group. That's too many groupings." +
                    " Maybe write a custom geom and specify fewer aesthetics.");
@@ -182,20 +157,20 @@ Bar.prototype.draw = function() {
 
     if(data.length){
       // calculate stat
-      data = nest.entries(data);
+      data = s.nest.entries(data);
       // get back to array so we can nest for stack
       data = ggd3.tools.unNest(data);
       // nest so we can pass to stack
       // but not necessary if we have no group
-      if(group !== aes[width.p]){
-        data = d3.nest().key(function(d) { return d[group];})
+      if(s.group !== s.aes[width.p]){
+        data = d3.nest().key(function(d) { return d[s.group];})
                   .entries(data);
-        groups = _.pluck(data, 'key');
+        s.groups = _.pluck(data, 'key');
         // stack layout requires all layers have same # of groups
         // and sort each layer by group;
-        data = ggd3.tools.fillEmptyStackGroups(data, aes[width.p]);
+        data = ggd3.tools.fillEmptyStackGroups(data, s.aes[width.p]);
         var stack = d3.layout.stack()
-                      .x(function(d) { return d[aes[width.p]]; })
+                      .x(function(d) { return d[s.aes[width.p]]; })
                       .y(function(d) {
                         return d[valueVar]; })
                       .offset(that.offset())
@@ -205,13 +180,13 @@ Bar.prototype.draw = function() {
                               function(d) {
                                 return d.values ? d.values: [];
                               }));
-        if(position === 'dodge') {
+        if(s.position === 'dodge') {
           // make ordinal scale for group
           groupOrd.rangeRoundBands([0, rb])
-                  .domain(groups);
+                  .domain(s.groups);
           rb = groupOrd.rangeBand();
         }
-        if(position !== "dodge"){
+        if(s.position !== "dodge"){
           groupOrd = function(d) {
             return 0;
           };
@@ -220,26 +195,26 @@ Bar.prototype.draw = function() {
     }
 
     var placeBar = function(d) {
-      var p = o.scale()(d[aes[width.p]]);
-      p += groupOrd(d[group]);
+      var p = o.scale()(d[s.aes[width.p]]);
+      p += groupOrd(d[s.group]);
       return p;
     };
 
     // I think this is unnecessary.
     var calcSizeS = (function() {
-      if(position === 'stack' && size.p === "y"){
+      if(s.position === 'stack' && size.p === "y"){
         return function(d) {
-          return dim.y - n.scale()(d.y);
+          return s.dim.y - n.scale()(d.y);
         };
       }
-      if(position === "stack"){
+      if(s.position === "stack"){
         return function(d) {
-          return n.scale()(d[valueVar]);
+          return n.scale()(d.y);
         };
       }
-      if(position === "dodge" && size.p === "y"){
+      if(s.position === "dodge" && size.p === "y"){
         return function(d) {
-          return dim.y - n.scale()(d.y); 
+          return s.dim.y - n.scale()(d.y); 
         };
       }
       return function(d) {
@@ -247,17 +222,17 @@ Bar.prototype.draw = function() {
       };
     })();
     var calcSizeP = (function () {
-      if(position === "stack" && size.p === "y"){
+      if(s.position === "stack" && size.p === "y"){
         return function(d) { 
           return n.scale()(d.y0 + d.y); 
           };
       }
-      if(position === "stack"){
+      if(s.position === "stack"){
         return function(d) {
           return n.scale()(d.y0);
         };
       }
-      if(position === "dodge" && size.p === "y") {
+      if(s.position === "dodge" && size.p === "y") {
         return function(d) {
           return n.scale()(d.y);
         };
@@ -265,23 +240,7 @@ Bar.prototype.draw = function() {
       return function(d) {
         return 0;
       };
-    } ) ();
-
-    // drawing axes goes in geom because they may be dependent on facet id
-    // if a facet has no data, therefore, no x or y, draw single
-    // facet axis
-    if(layerNum === 0){
-      xaxis = sel.select('.x.axis');
-      yaxis = sel.select('.y.axis');
-      xaxis.transition()
-        .attr("transform", 
-             "translate(" + x.positionAxis() + ")")
-        .call(x.axis);
-      yaxis.transition()
-        .attr("transform", 
-             "translate(" + y.positionAxis() + ")")
-        .call(y.axis);
-    }
+    } )();
 
 
     var bars = sel.select('.plot')
@@ -294,25 +253,36 @@ Bar.prototype.draw = function() {
         .attr(width.s, rb)
         .attr(size.p, calcSizeP)
         .attr(width.p , placeBar)
-        .style('fill-opacity', alpha)
-        .attr('fill', fill)
-        .style('stroke', color)
+        .style('fill-opacity', s.alpha)
+        .attr('fill', s.fill)
+        .style('stroke', s.color)
         .style('stroke-width', that.lineWidth())
         .attr('value', function(d) { 
-          return d[group] + "~" + d[aes[width.p]];
+          return d[group] + "~" + d[s.aes[width.p]];
         });
     }
 
     bars.transition().call(drawBar);
     
-    bars.enter().append('rect').call(drawBar);
+    bars.enter()
+      .append('rect')
+      .style('fill-opacity', s.alpha)
+      .attr('fill', s.fill)
+      .style('stroke', s.color)
+      .style('stroke-width', that.lineWidth())
+      .attr(width.s, rb)
+      .attr(width.p, placeBar)
+      .attr(size.s, 0)
+      .attr(size.p, function(d) {
+        return size.p === "y" ? dim.y: 0;
+      })
+      .transition()
+      .call(drawBar);
 
     bars.exit()
       .transition()
       .style('opacity', 0)
       .remove();
-
-
   }
   return draw;
 };

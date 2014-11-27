@@ -92,7 +92,7 @@ ggd3.tools.defaultScaleSettings = function(dtype, aesthetic) {
     if(dtype[0] === "number") {
       if(dtype[1] === "many"){
         return {type: 'linear',
-                  axis: {tickFormat: d3.format(",.0f")},
+                  axis: {},
                   scale: {}};
       } else {
         return {type: 'ordinal',
@@ -196,9 +196,8 @@ Plot.prototype.setDomains = function() {
       that.freeScales.push(s);
     }
   });
-
-  nest.rollup(function(data) {
-    return stat.compute(data);
+  nest.rollup(function(d) {
+    return stat.compute(d);
   });
   // each facet's data rolled up according to stat
   data = _.map(data, function(d) {

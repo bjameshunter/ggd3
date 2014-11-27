@@ -96,9 +96,9 @@ Layer.prototype.setStat = function() {
     }
   }
   // if a stat has not been set, it is x or y
-  // and should be set to count.
+  // and should be set to count if geom is not density.
   _.each(['x', 'y'], function(a) {
-    if(!stat[a]()){
+    if(!stat[a]() && this.geom().name() !== "density"){
       stat[a](stat.linearAgg());
       aes[a] = "n. observations";
       this.aes(aes);
@@ -135,10 +135,11 @@ Layer.prototype.draw = function(layerNum) {
           d = dlist.filter(function(d) {
             return d.selector === id;
           })[0];
-      if(that.position() === "jitter") {
-        _.each(d.data, function(r) { r._noise = _.random(-1,1,1); });        
+      if(_.isEmpty(d)) { d = {selector: id, data: []}; }
+      if(that.position() === "jitter" && 
+         !plot.hasJitter) {
+        _.each(d.data, function(r) { r._jitter = _.random(-1,1,1); });        
       }
-          if(_.isEmpty(d)) { d = {selector: id, data: []}; }
       that.geom().draw()(s, d, i, layerNum);
     });
   }
@@ -159,16 +160,20 @@ Layer.prototype.geomNest = function() {
   // to be performed before calculating layer level geoms or scales
   var aes = this.aes(),
       plot = this.plot(),
-      nest = d3.nest();
-  if(plot.xScale().single.scaleType() === "ordinal" && 
-     plot.yScale().single.scaleType() === "ordinal"){
-    throw "both x and y scales can't be ordinal for geom bar.";
-  }
+      nest = d3.nest(),
+      dtypes = plot.dtypes();
+  // if(plot.xScale().single.scaleType() === "ordinal" && 
+  //    plot.yScale().single.scaleType() === "ordinal"){
+  //   throw "both x and y scales can't be ordinal for geom bar.";
+  // }
   if(aes.group) {
     nest.key(function(d) { return d[aes.group]; });
   }
-  if(aes.fill) {
+  if(aes.fill && dtypes[aes.fill][1] !== 'many') {
     nest.key(function(d) { return d[aes.fill]; });
+  }
+  if(aes.color && dtypes[aes.color][1] !== 'many') {
+    nest.key(function(d) { return d[aes.color]; });
   }
   _.map(['x', 'y'], function(a) {
     if(plot[a + "Scale"]().single.scaleType() === "ordinal"){

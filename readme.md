@@ -33,8 +33,11 @@ Roadmap:
   - smooth with loess or lm methods
 - Possible adoption of bin-summarize-smooth methods for plots that draw a lot of DOM elements.
 
-#### Problems:
+#### Problems and questions:
 
 - Cannot update clipPath - selecting "clipPath" does not work
   - currently getting around this by adding class "clip" and selecting that.
 - Stack bar only works with default 'count' stat. Stacking according to mean or median doesn't make much sense, but should work.
+- Is using the super formula worth it? 
+  - does it cost more to draw and animate?
+  

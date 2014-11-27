@@ -2,11 +2,9 @@ function Text(spec) {
   if(!(this instanceof Geom)){
     return new Text(spec);
   }
-  Geom.apply(this);
+  Point.apply(this);
   var attributes = {
     name: "text",
-    stat: "identity",
-    position: "identity",
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -17,131 +15,43 @@ function Text(spec) {
     // }
   }
 }
-Text.prototype = new Geom();
-// Text.prototype.constructor = Text;
+Text.prototype = new Point();
 
-Text.prototype.domain = function(data, a) {
-  // duplicated at point
-  var layer = this.layer(),
-      plot = layer.plot(),
-      aes = layer.aes(),
-      extent = d3.extent(_.pluck(data, aes[a])),
-      range = extent[1] - extent[0];
-
-  // point always extends both ways
-  if(range === 0){
-    extent[0] -= 1;
-    extent[1] += 1;
-  }
-  extent[0] -= 0.1 * range;
-  extent[1] += 0.1 * range;
-  return extent;
-};
+Text.prototype.constructor = Text;
 
 Text.prototype.draw = function() {
 
-  var layer   = this.layer(),
-      plot    = layer.plot(),
-      stat    = layer.stat(),
-      facet   = plot.facet(),
-      aes     = layer.aes(),
-      fill    = d3.functor(this.fill() || plot.fill()),
-      size    = d3.functor(this.size() || plot.size()),
-      alpha   = d3.functor(this.alpha() || plot.alpha()),
-      color   = d3.functor(this.color() || plot.color()),
-      that    = this,
-      grouped   = false,
-      group,
-      groups;
-      if(aes.fill) {
-        grouped = true;
-        group = aes.fill;
-      } else if(aes.color){
-        grouped = true;
-        group = aes.color;
-      } else if(aes.group){
-        grouped = true;
-        group = aes.group;
-      }
-      if(group === aes.x || group === aes.y) {
-        // uninteresting grouping, get rid of it.
-        grouped = false;
-        group = null;
-        groups = null;
-      }
+  var s     = this.setup(),
+      that  = this;
 
   function draw(sel, data, i, layerNum) {
-    var x, y;
 
-    if(!_.contains(["free", "free_x"], facet.scales()) || 
-       _.isUndefined(plot.xScale()[data.selector])){
-      x = plot.xScale().single;
-      xfree = false;
-    } else {
-      x = plot.xScale()[data.selector];
-      xfree = true;
-    }
-    if(!_.contains(["free", "free_y"], facet.scales()) || 
-       _.isUndefined(plot.xScale()[data.selector])){
-      y = plot.yScale().single;
-      yfree = false;
-    } else {
-      y = plot.yScale()[data.selector];
-      yfree = true;
-    }
-    if(grouped) {
-      groups = _.unique(_.pluck(data.data, group));
-    }
+    var scales = that.scalesAxes(sel, s, data.selector, layerNum,
+                                 true, true);
+    // add canvas and svg functions.
 
-    if(layerNum === 0){
-      sel.select('.x.axis')
-        .attr("transform", "translate(" + x.positionAxis() + ")")
-        .transition().call(x.axis);
-      sel.select('.y.axis')
-        .attr("transform", "translate(" + y.positionAxis() + ")")
-        .transition().call(y.axis);
-    }
-    function position(a) {
-      var s = a === "x" ? x : y,
-          sub,
-          rb = 0;
-      if(s.scaleType() === "ordinal" && grouped){
-        sub = d3.scale.ordinal()
-                    .rangeRoundBands([0, s.scale().rangeBand()], 0.05, 0.05)
-                    .domain(groups);
-        rb = sub.rangeBand();
-      } else if(s.scaleType() === "ordinal") {
-        sub = function() { return s.scale().rangeBand() / 2; };
-        rb = s.scale().rangeBand()/2;
-      } else {
-        sub = function() { return 0;};
-      }
-      return function(d) {
-        return s.scale()(d[aes[a]]) + 
-          sub(d[group]) + 
-          (d._noise || 0) * rb;
+    var positionX = that.positionPoint(scales.x, s.group, s.groups),
+        positionY = that.positionPoint(scales.y, s.group, s.groups);
 
-      };
-    }
     ggd3.tools.removeElements(sel, layerNum, "text");
 
     function drawText(text) {
       text
         .attr('class', 'geom g' + layerNum + " geom-text")
-        .text(function(d) { return d[aes.label]; })
-        .attr('x', position('x'))
-        .attr('y', position('y'))
-        .style('font-size', size)
-        .attr('fill-opacity', alpha)
-        .style('stroke', color)
+        .text(function(d) { return d[s.aes.label]; })
+        .attr('x', positionX)
+        .attr('y', positionY)
+        .style('font-size', s.size)
+        .attr('fill-opacity', s.alpha)
+        .style('stroke', s.color)
         .style('stroke-width', 1)
         .attr('text-anchor', 'middle')
-        .attr('fill', fill);
+        .attr('fill', s.fill);
     }
 
     var text = sel.select('.plot')
                   .selectAll('text.geom.g' + layerNum)
-                  .data(stat.compute(data.data));
+                  .data(s.  stat.compute(data.data));
     text.transition().call(drawText);
     text.enter().append('text').call(drawText);
     text.exit()

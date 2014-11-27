@@ -97,6 +97,9 @@ path.geom-grid-horiz, path.geom-grid-vert {
 .geom-point {
   stroke: none;
 }
+.geom-density {
+  fill: none;
+}
 rect.geom {
   shape-Rendering: crispEdges;
   stroke: #222222;

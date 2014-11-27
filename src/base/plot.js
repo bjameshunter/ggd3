@@ -51,6 +51,9 @@ function Plot() {
   // newData will be true, after the plot is drawn the
   // first time, newData is set to false
   this.newData = true;
+  // flag to set true when random noise is 
+  // added to each data point for jittering
+  this.hasJitter = false;
   // when cycling through data, need to know if 
   // data are nested or not.
   this.nested = false;
@@ -202,6 +205,7 @@ Plot.prototype.data = function(data) {
   // dataset is passed through once here.
   // if passing 'dtypes', must be done before
   // let's just always nest and unNest
+  this.hasJitter = false;
   data = ggd3.tools.unNest(data);
   data = ggd3.tools.clean(data, this);
   this.timesCleaned += 1;
@@ -293,7 +297,11 @@ Plot.prototype.draw = function() {
         })
         .transition().style('opacity', 0).remove();
     });
-
+    // if any of the layers had a jitter, it has
+    // been added to each facet's dataset
+    if(_.any(chart.layers(), function(l) {
+      return l.position() === "jitter";
+    })){ that.hasJitter = true; }
   }
   return draw;
 };

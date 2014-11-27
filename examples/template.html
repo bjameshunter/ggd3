@@ -8,8 +8,8 @@
 <div>
   <select id="dataset" class='btn btn-primary'>
   <option value="mtcars.csv" id='cars' >cars</option>
-  <option value="iris.csv" id='iris' selected>iris</option>
-  <option value="diamonds.csv" id='diamonds' >diamonds</option>
+  <option value="iris.csv" id='iris' >iris</option>
+  <option value="diamonds.csv" id='diamonds' selected>diamonds</option>
   <option value="baseball.csv" id='baseball' >baseball</option>
   <option value="nelplo.csv" id='nelplo' >nelplo</option>
   <option value="wells.csv" id='wells' >wells</option>
@@ -48,8 +48,8 @@ $("#facet-scales").on('change', function() {
 });
 var facets = {'mtcars.csv': {y: "am", nrows: 2},
             "iris.csv" : null,
-            "diamonds.csv": {x: "clarity", nrows:3},
-            "baseball.csv": {x: "decade", y: "team"},
+            "diamonds.csv": {x: "cut", ncols: 5},
+            "baseball.csv": null,
             "nelplo.csv": {x: 'group', ncols: 3},
             "ustimeseries.csv": {x: 'group', nrows:3},
             "wells.csv": {x: 'switch', y:'assoc'}
@@ -62,19 +62,18 @@ var aes = {'mtcars.csv': {x: "cyl", fill: "gear"},
             alpha: "Sepal.Width",
             color: "Species"
           },
-            "diamonds.csv": { x: "cut",
-            y: "price",
-            fill: "color",
-            alpha:'carat',
-            color: 'color'
+            "diamonds.csv": { 
+              // x: "cut",
+            x: "price",
+            // fill: "cut",
+            // alpha:'carat',
+            color: 'cut'
           },
-            "baseball.csv": {x: "hr", y: "h", fill: "ab", size: "g",
-            label: 'id'
-          },
+            "baseball.csv": {x: "team", y: "h", fill: "decade"},
             "nelplo.csv": {x: 'date', y: 'value', fill: 'variable',
             label: "variable"},
             "ustimeseries.csv": {x: 'date', y: 'value', fill: 'variable'},
-            "wells.csv": {x: 'arsenic', y: 'dist', fill: "educ"}
+            "wells.csv": {x: 'educ', y: 'dist', fill: "arsenic"}
           };
 var dtypes = {'mtcars.csv': {"gear": ["string"], "cyl": ["string"]},
             "iris.csv" : {},
@@ -87,7 +86,7 @@ var dtypes = {'mtcars.csv': {"gear": ["string"], "cyl": ["string"]},
 var FacetType = {'mtcars.csv': "wrap",
             "iris.csv" : "wrap",
             "diamonds.csv": "wrap",
-            "baseball.csv": "grid",
+            "baseball.csv": "wrap",
             "nelplo.csv": "wrap",
             "ustimeseries.csv": "wrap",
             "wells.csv": "wrap",
@@ -95,7 +94,7 @@ var FacetType = {'mtcars.csv': "wrap",
 var geom = {'mtcars.csv': ["bar"],
             "iris.csv" : ["point"],
             "diamonds.csv": ggd3.geoms.bar().offset('expand'),
-            "baseball.csv": ["bar"],
+            "baseball.csv": ggd3.geoms.bar(),
             "nelplo.csv": ["point"],
             "ustimeseries.csv": ["point"],
             "wells.csv": ["point"],
@@ -108,14 +107,14 @@ var text = ggd3.geoms.text();
 var layers = {'mtcars.csv': ['bar'],
             "iris.csv" : [ggd3.layer().geom(text).position('jitter')],
             "diamonds.csv": [ggd3.layer()
-                                .stat({y:'median'})
-                                .position('stack')
-                                .geom(geom['diamonds.csv'])
+                                .geom('density')
                                     ] ,
-            "baseball.csv": ["point"],
+            "baseball.csv": [ggd3.layer().position('dodge').stat('max')
+                              .geom(geom["baseball.csv"])],
             "nelplo.csv": ["point"],
             "ustimeseries.csv": ["point"],
-            "wells.csv": ["point"],
+            "wells.csv": [ggd3.layer().geom('point')
+                              .position('jitter')],
           };
 var charts = {'mtcars.csv': ggd3.plot()
                     .width(300)
@@ -129,8 +128,8 @@ var charts = {'mtcars.csv': ggd3.plot()
                     .margins({top: 5, bottom:10, left:35, right:10})
                     .layers(layers["mtcars.csv"]),
             "iris.csv" : ggd3.plot()
-                    .width(300)
-                    .height(300)
+                    .width(600)
+                    .height(500)
                     .yScale({axis: {ticks: 4, position:'left',
                       orient: "left"}})
                     .sizeRange([5, 50])
@@ -141,8 +140,8 @@ var charts = {'mtcars.csv': ggd3.plot()
                     .layers(layers["iris.csv"]),
             "diamonds.csv": ggd3.plot()
                   .layers(layers["diamonds.csv"])
-                  .width(300)
-                  .height(200)
+                  .width(200)
+                  .height(400)
                   .yScale({axis: {ticks: 4, position:'right',
                           orient: "left"}})
                   .margins({top: 5, bottom:20, left:2, right:2})
@@ -151,7 +150,7 @@ var charts = {'mtcars.csv': ggd3.plot()
 ,
             "baseball.csv": ggd3.plot()
                   .layers(layers["baseball.csv"])
-                  .width(300)
+                  .width(1200)
                   .height(300)
                   .sizeRange([5, 50])
                   .yScale({axis: {ticks: 4, 
@@ -194,12 +193,10 @@ var charts = {'mtcars.csv': ggd3.plot()
                           orient: "left"}})
                   .layers(layers["wells.csv"])
                   .margins({top: 5, bottom:20, left:2, right:2})
-                  .xScale({type: 'log', 
-                          axis: {ticks: 4, 
-                            tickFormat: d3.format(",.1f"),
+                  .xScale({axis: {ticks: 4, 
+                            tickFormat: d3.format(",.0f"),
                             position: "top",
-                            orient: "bottom"},
-                          scale:{domain:[0.25, 20]}}),
+                            orient: "bottom"}}),
           };
 
 // this should work;
