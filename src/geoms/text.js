@@ -28,7 +28,7 @@ Text.prototype.draw = function() {
 
     var scales = that.scalesAxes(sel, s, data.selector, layerNum,
                                  true, true);
-    // add canvas and svg functions.
+
 
     var positionX = that.positionPoint(scales.x, s.group, s.groups),
         positionY = that.positionPoint(scales.y, s.group, s.groups);

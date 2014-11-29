@@ -258,7 +258,7 @@ Bar.prototype.draw = function() {
         .style('stroke', s.color)
         .style('stroke-width', that.lineWidth())
         .attr('value', function(d) { 
-          return d[group] + "~" + d[s.aes[width.p]];
+          return d[s.group] + "~" + d[s.aes[width.p]];
         });
     }
 
@@ -274,7 +274,7 @@ Bar.prototype.draw = function() {
       .attr(width.p, placeBar)
       .attr(size.s, 0)
       .attr(size.p, function(d) {
-        return size.p === "y" ? dim.y: 0;
+        return size.p === "y" ? s.dim.y: 0;
       })
       .transition()
       .call(drawBar);

@@ -23,11 +23,13 @@ function Scale(opts) {
     scaleType: null, // linear, log, ordinal, time, category, 
     // maybe radial, etc.
     scale: null,
+    rangeBands: [0.1, 0.1],
     opts: {},
   };
   // store passed object
   this.attributes = attributes;
-  var getSet = ["aesthetic", "plot", "orient", "position", "opts"];
+  var getSet = ["aesthetic", "plot", "orient", "position", "opts",
+                "rangeBands"];
   for(var attr in this.attributes){
     if(!this[attr] && _.contains(getSet, attr) ){
       this[attr] = createAccessor(attr);
@@ -93,7 +95,9 @@ Scale.prototype.scale = function(settings){
 Scale.prototype.range = function(range) {
   if(!arguments.length) { return this.attributes.range; }
   if(this.scaleType() === "ordinal"){
-    this.attributes.scale.rangeRoundBands(range, 0.1, 0.1);
+    this.attributes.scale.rangeRoundBands(range, 
+                                          this.rangeBands()[0],
+                                          this.rangeBands()[1]);
   } else {
     this.attributes.scale.range(range);
   }

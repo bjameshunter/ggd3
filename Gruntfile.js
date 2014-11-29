@@ -13,7 +13,6 @@ module.exports = function(grunt){
           "begin.js",
           "src/tools/*.js",
           "src/base/*.js",
-          "src/geoms/histogram.js",
           "src/geoms/*.js",
           "src/stats/*.js",
           "end.js"

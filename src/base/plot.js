@@ -12,7 +12,7 @@ function Plot() {
     data: null,
     dtypes: {},
     layers: [],
-    aes: null,
+    aes: {},
     legends: null, // strings corresponding to scales
     // that need legends or legend objects
     facet: null,
@@ -29,13 +29,17 @@ function Plot() {
     strokeScale: {single: ggd3.scale()},
     alpha: d3.functor(0.5),
     fill: d3.functor('steelblue'),
-    color: d3.functor(null),
+    color: d3.functor('steelblue'),
     size: d3.functor(30), 
     shape: d3.functor('circle'),
+    lineType: d3.functor('1,1'),
+    lineWidth: 2,
     xAdjust: false,
     yAdjust: false,
+    xGrid: true,
+    yGrid: true,
     alphaRange: [0.1, 1],
-    sizeRange: [10, 100],
+    sizeRange: [20, 200],
     fillRange: ["blue", "red"],
     colorRange: ["white", "black"],
     shapeRange: d3.superformulaTypes,
@@ -47,6 +51,7 @@ function Plot() {
   this.attributes = attributes;
   // doing more cleaning than necessary, counting it.
   this.timesCleaned = 0;
+  this.gridsAdded = false;
   // if the data method has been handed a new dataset, 
   // newData will be true, after the plot is drawn the
   // first time, newData is set to false
@@ -57,13 +62,22 @@ function Plot() {
   // when cycling through data, need to know if 
   // data are nested or not.
   this.nested = false;
+  this.hgrid = ggd3.layer()
+                .geom(ggd3.geoms.hline().grid(true)
+                      .lineType("2,2"))
+                .plot(this);
+  this.vgrid = ggd3.layer()
+                .geom(ggd3.geoms.vline().grid(true)
+                      .lineType("2,2"))
+                .plot(this); 
   // explicitly declare which attributes get a basic
   // getter/setter
   var getSet = ["opts", "theme", "margins", 
     "width", "height", "xAdjust", "yAdjust", 
     'colorRange', 'sizeRange',
-    'fillRange',
-    "alphaRange"];
+    'fillRange', "lineType",
+    "alphaRange", "lineWidth",
+    "xGrid", "yGrid"];
 
   for(var attr in attributes){
     if((!this[attr] && 
@@ -118,6 +132,7 @@ function scaleConfig(type) {
   return scaleGetter;
 }
 
+
 Plot.prototype.alpha = setGlobalScale('alpha');
 
 Plot.prototype.fill = setGlobalScale('fill');
@@ -154,31 +169,29 @@ Plot.prototype.layers = function(layers) {
     _.each(layers, function(l) {
       if(_.isString(l)){
         // passed string to get geom with default settings
-        layer = ggd3.layer()
-                      .aes(this.aes())
-                      .data(this.data())
-                      .plot(this)
-                      .geom(l);
-
-        this.attributes.layers.push(layer);
+        l = ggd3.layer()
+              .aes(_.clone(this.aes()))
+              .data(this.data())
+              .geom(l);
       } else if ( l instanceof ggd3.layer ){
         // user specified layer
         if(!l.data()) { 
-          l.data(this.data()).dtypes(this.dtypes()); 
+          l.data(this.data()); 
         } else {
+          console.log('instance of ggd3.layer');
+          console.log(l.data());
           l.ownData(true);
         }
-        if(!l.aes()) { l.aes(this.aes()); }
-        l.plot(this);
-        this.attributes.layers.push(l);
+        if(!l.aes()) { l.aes(_.clone(this.aes())); }
       } else if (l instanceof ggd3.geom){
         var g = l;
         l = ggd3.layer()
-                .aes(this.aes())
+                .aes(_.clone(this.aes()))
                 .data(this.data())
-                .plot(this)
                 .geom(g);
       }
+      l.plot(this).dtypes(this.dtypes());
+      this.attributes.layers.push(l);
     }, this);
   } else if (layers instanceof ggd3.layer) {
     if(!layers.data()) { 
@@ -186,7 +199,7 @@ Plot.prototype.layers = function(layers) {
     } else {
       layers.ownData(true);
     }
-    if(!layers.aes()) { layers.aes(this.aes()); }
+    if(!layers.aes()) { layers.aes(_.clone(this.aes())); }
     this.attributes.layers.push(layers.plot(this));
   } 
   return this;
@@ -222,9 +235,9 @@ Plot.prototype.updateLayers = function() {
   // for right now we are not planning on having more than
   // one layer
   _.each(this.layers(), function(l) {
-    if(!l.ownData()) { l.dtypes(this.dtypes())
-                        .data(this.data())
-                        .aes(this.aes()); }
+    l.dtypes(this.dtypes());
+    if(!l.ownData()) { l.data(this.data())
+                        .aes(_.clone(this.aes())); }
   }, this);
 };
 
@@ -245,8 +258,9 @@ Plot.prototype.facet = function(spec) {
 Plot.prototype.aes = function(aes) {
   if(!arguments.length) { return this.attributes.aes; }
   // all layers need aesthetics
+  aes = _.merge(this.attributes.aes, aes);
   _.each(this.layers(), function(layer) {
-    layer.aes(aes);
+    layer.aes(_.clone(aes));
   });
   this.attributes.aes = aes;
   return this;
@@ -280,6 +294,11 @@ Plot.prototype.draw = function() {
     // reset nSVGs after they're drawn.
     that.facet().nSVGs = 0;
 
+    if(!that._gridsAdded) {
+      if(that.yGrid()) { that.hgrid.draw(1)(sel);}
+      if(that.xGrid()) { that.vgrid.draw(1)(sel);}
+    }
+
     // get the number of geom classes that should
     // be present in the plot
     var classes = _.map(_.range(that.layers().length),
@@ -293,7 +312,6 @@ Plot.prototype.draw = function() {
         .filter(function() {
           var cl = d3.select(this).node().classList;
           return !_.contains(classes, cl[1]);
-
         })
         .transition().style('opacity', 0).remove();
     });
@@ -303,6 +321,7 @@ Plot.prototype.draw = function() {
       return l.position() === "jitter";
     })){ that.hasJitter = true; }
   }
+
   return draw;
 };
 

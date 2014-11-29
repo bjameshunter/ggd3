@@ -1,10 +1,11 @@
 // 
 function Vline(spec) {
-  Geom.apply(this);
+  if(!(this instanceof Geom)){
+    return new Vline(spec);
+  }
+  Hline.apply(this);
   var attributes = {
     name: "vline",
-    stat: "identity",
-    position: null,
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -16,6 +17,10 @@ function Vline(spec) {
   }
 }
 
+Vline.prototype = new Hline();
+
 Vline.prototype.constructor = Vline;
+
+
 
 ggd3.geoms.vline = Vline;

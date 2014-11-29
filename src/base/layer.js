@@ -9,7 +9,7 @@ function Layer(aes) {
     geom:     null,
     stat:     null, // identity, sum, mean, percentile, etc.
     position: null, // jitter, dodge, stack, etc.
-    aes:      null,
+    aes:      {},
     ownData:  false,
   };
   // grouping will occur on x and y axes if they are ordinal
@@ -43,7 +43,7 @@ Layer.prototype.updateGeom = function() {
 };
 Layer.prototype.aes = function(aes) {
   if(!arguments.length) { return this.attributes.aes; }
-  this.attributes.aes = aes;
+  this.attributes.aes = _.merge(this.attributes.aes, aes);
   this.updateGeom();
   return this;
 };
@@ -98,7 +98,8 @@ Layer.prototype.setStat = function() {
   // if a stat has not been set, it is x or y
   // and should be set to count if geom is not density.
   _.each(['x', 'y'], function(a) {
-    if(!stat[a]() && this.geom().name() !== "density"){
+    if(!stat[a]() && 
+       !_.contains(['density', 'bin'], this.geom().stat()) ){
       stat[a](stat.linearAgg());
       aes[a] = "n. observations";
       this.aes(aes);
@@ -120,11 +121,16 @@ Layer.prototype.draw = function(layerNum) {
       dtypes = this.dtypes(),
       stat = this.stat(),
       dtype,
-      scaleType;
+      scaleType,
+      dlist;
+  if(this.ownData()) {
+    dlist = this.dataList(this.nest(this.data()));
+  } else {
+    dlist = plot.dataList(plot.data());
+  }
   
   function draw(sel) {
-    var dlist = that.plot().dataList(that.plot().data()),
-        divs = [];
+    var divs = [];
     sel.selectAll('.plot-div')
       .each(function(d) {
         divs.push(d3.select(this).attr('id'));
@@ -161,20 +167,14 @@ Layer.prototype.geomNest = function() {
   var aes = this.aes(),
       plot = this.plot(),
       nest = d3.nest(),
-      dtypes = plot.dtypes();
-  // if(plot.xScale().single.scaleType() === "ordinal" && 
-  //    plot.yScale().single.scaleType() === "ordinal"){
-  //   throw "both x and y scales can't be ordinal for geom bar.";
-  // }
-  if(aes.group) {
-    nest.key(function(d) { return d[aes.group]; });
-  }
-  if(aes.fill && dtypes[aes.fill][1] !== 'many') {
-    nest.key(function(d) { return d[aes.fill]; });
-  }
-  if(aes.color && dtypes[aes.color][1] !== 'many') {
-    nest.key(function(d) { return d[aes.color]; });
-  }
+      dtypes = plot.dtypes(),
+      nestVars = _.unique(_.compact([aes.group, aes.fill, aes.color]));
+
+  _.each(nestVars, function(n) {
+    if(dtypes[n][1] !== "many") {
+      nest.key(function(d) { return d[n]; });
+    }
+  });
   _.map(['x', 'y'], function(a) {
     if(plot[a + "Scale"]().single.scaleType() === "ordinal"){
       nest.key(function(d) { return d[aes[a]]; });

@@ -18,7 +18,7 @@ Nest = function(data) {
   return data; 
 };
 
-function unNest(data) {
+function unNest(data, nestedArray) {
   // recurse and flatten nested dataset
   // this means no dataset can have a 'values' column
   if(!data || _.isEmpty(data)){ 
@@ -27,7 +27,10 @@ function unNest(data) {
   var branch = _.all(_.map(data, function(d){
     return d.hasOwnProperty('values');
   }));
-  if(!branch) { 
+  if(!branch) {
+    if(nestedArray === true){
+      return [data];
+    }
     return data; 
   }
   var vals = _.flatten(
@@ -39,11 +42,12 @@ function unNest(data) {
 ggd3.tools.unNest = unNest;
 
 // accepts single nested object
-function RecurseNest(data) {
+function recurseNest(data) {
   if(!data.values) { return data; }
   return _.map(data.values, 
-               function(d) {
-                return recurseNest(d);
-              });
+                 function(d) {
+                  return recurseNest(d);
+                });
 }
-ggd3.tools.recurseNest = RecurseNest;
+
+ggd3.tools.recurseNest = recurseNest;

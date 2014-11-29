@@ -40,4 +40,4 @@ Roadmap:
 - Stack bar only works with default 'count' stat. Stacking according to mean or median doesn't make much sense, but should work.
 - Is using the super formula worth it? 
   - does it cost more to draw and animate?
-  
+- Histogram stroke makes it look kinda bad. Output of histogram function not return a "dx" that I can feed to x scale to get width needed.

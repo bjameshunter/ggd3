@@ -1,6 +1,5 @@
 // Base geom from which all geoms inherit
 function Geom(aes) {
-  
   if(!(this instanceof Geom)){
     return new Geom(aes);
   }
@@ -18,7 +17,7 @@ function Geom(aes) {
     style: "", // optional class attributes for css 
   };
   this.attributes = attributes;
-} 
+}
 Geom.prototype.defaultPosition = function() {
   var n = this.name();
   return {
