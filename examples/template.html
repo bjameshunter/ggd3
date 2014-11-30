@@ -47,29 +47,23 @@ $("#facet-scales").on('change', function() {
   redraw();
 });
 var facets = {'mtcars.csv': {y: "am", nrows: 2},
-            "iris.csv" : {x: "Species", ncols:3},
-            "diamonds.csv": {y: 'color', nrows:3},
-            "baseball.csv": {y: 'team', x: 'decade'},
+            "iris.csv" : null, //{y: "Species", nrows:1},
+            "diamonds.csv": {y: 'cut', nrows:3},
+            "baseball.csv": {x: 'decade', nrows:3},
             "nelplo.csv": {x: 'group', ncols: 3},
             "ustimeseries.csv": {x: 'group', nrows:3},
             "wells.csv":null, 
           };
 var aes = {'mtcars.csv': {x: "cyl",y:"mpg", fill: "gear"},
-            "iris.csv" : {x: "Sepal.Length", y: "Sepal.Width",
-            fill: "Species", 
-            label: "Species",
-            size: "Sepal.Width",
-            alpha: "Sepal.Width",
-            color: "Species"
+            "iris.csv" : {x: "Sepal.Length", fill: "Species"
           },
             "diamonds.csv": { 
-              x: "clarity",
-              y: "carat",
-            fill: "cut",
-            alpha:'price',
-            color: 'cut'
+              x: "carat",
+            fill: "clarity",
+            // alpha:'price',
+            // color: 'cut'
           },
-            "baseball.csv": {x: "ab"},
+            "baseball.csv": {x: "team", y:"ab"},
             "nelplo.csv": {x: 'date', y: 'value', fill: 'variable',
             label: "variable", color:'variable'},
             "ustimeseries.csv": {x: 'date', y: 'value', fill: 'variable',
@@ -98,8 +92,10 @@ var geom = {'mtcars.csv': [ggd3.layer().position('stack').geom('bar')
                             ggd3.layer().position("jitter").geom('point') 
                             ],
             "iris.csv" : ["point"],
-            "diamonds.csv": ggd3.geoms.bar().offset('silhouette'),
-            "baseball.csv": ggd3.geoms.density(),
+            "diamonds.csv": [ggd3.geoms.density().smooth(10)
+                              .kernel("gaussianKernel"),
+                              ggd3.geoms.histogram()],
+            "baseball.csv": [],
             "nelplo.csv": ["point"],
             "ustimeseries.csv": ["point"],
             "wells.csv": ggd3.geoms.point(),
@@ -109,23 +105,12 @@ var geom = {'mtcars.csv': [ggd3.layer().position('stack').geom('bar')
 var square = ggd3.geoms.point()
                   .shape('square');
 var text = ggd3.geoms.text();
-// var irisLines = [
-//   {"Species": "setosa", "Sepal.Length": 4, "Sepal.Width": 3},
-//   {"Species": "setosa", "Sepal.Length": 8, "Sepal.Width": 4}
-// ]
-// var lineLayer = ggd3.layer()
-//                   .geom(ggd3.geoms.hline().color("black")
-//                             .lineType("2,1"))
-//                   .data(irisLines);
 var line = ggd3.geoms.line().interpolate('step')
 var layers = {'mtcars.csv': geom["mtcars.csv"],
-            "iris.csv" : [ggd3.layer().geom(text)],
-            "diamonds.csv": [ggd3.layer().position('stack')
-                                .stat({y: 'median'})
-                                .geom(geom['diamonds.csv'])
-                                    ] ,
-            "baseball.csv": ["histogram", ggd3.layer()
-                              .geom(geom["baseball.csv"])],
+            "iris.csv" : ['histogram'],
+            "diamonds.csv": ["histogram"] ,
+            "baseball.csv": [ggd3.layer().position('stack')
+                                .geom('bar').stat({y:"median"})],
             "nelplo.csv": [line],
             "ustimeseries.csv": [line],
             "wells.csv": [ggd3.layer().position('jitter')
@@ -143,8 +128,8 @@ var charts = {'mtcars.csv': ggd3.plot()
                     .margins({top: 5, bottom:10, left:35, right:10})
                     .layers(layers["mtcars.csv"]),
             "iris.csv" : ggd3.plot()
-                    .width(600)
-                    .height(500)
+                    .width(300)
+                    .height(300)
                     .yScale({axis: {ticks: 4, position:'left',
                       orient: "left"}})
                     .sizeRange([5, 50])
@@ -165,7 +150,7 @@ var charts = {'mtcars.csv': ggd3.plot()
 ,
             "baseball.csv": ggd3.plot()
                   .layers(layers["baseball.csv"])
-                  .width(200)
+                  .width(900)
                   .height(200)
                   .fill('orange')
                   .sizeRange([5, 50])

@@ -78,10 +78,10 @@ Line.prototype.innerDraw = function draw(sel, data, i, layerNum){
     ggd3.tools.removeElements(sel, layerNum, "geom-" + this.name());
 
   data = this.prepareData(data, s, scales);
-
-  var lines = sel.select('.plot')
-                .selectAll("." + that.selector(layerNum).replace(/ /g, '.'))
-                .data(data),
+  sel = this.grid() ? sel.select("." + this.direction() + 'grid'): sel.select('.plot');
+  var lines = sel
+              .selectAll("." + that.selector(layerNum).replace(/ /g, '.'))
+              .data(data),
   line = that.generator(s.aes, scales.x.scale(), scales.y.scale());
   lines.transition().call(_.bind(this.drawLines, this), line, s, layerNum);
   lines.enter().append('path')

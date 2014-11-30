@@ -8,11 +8,13 @@ module.exports = function(grunt){
   grunt.initConfig({
     pkg: grunt.file.readJSON("package.json"),
     concat: {
+
       dist: {
         src: [
           "begin.js",
           "src/tools/*.js",
-          "src/base/*.js",
+          "src/base/+(a)-*.js",
+          "src/base/!(a-|aa-|aaa-)*.js",
           "src/geoms/*.js",
           "src/stats/*.js",
           "end.js"

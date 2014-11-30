@@ -6,6 +6,7 @@ function Hline(spec) {
   Line.apply(this);
   var attributes = {
     name: "hline",
+    direction: "x",
   };
 
   this.attributes = _.merge(this.attributes, attributes);

@@ -34,7 +34,7 @@ function unNest(data, nestedArray) {
     return data; 
   }
   var vals = _.flatten(
-              _.map(data, function(d) { return d.values; })
+              _.map(data, function(d) { return d.values; }), true
              );
   return ggd3.tools.unNest(vals);
 }

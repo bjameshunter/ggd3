@@ -43,7 +43,7 @@ Geom.prototype.setup = function() {
     };
   s.plot      = s.layer.plot();
   s.stat      = s.layer.stat();
-  s.nest      = s.layer.geomNest();
+  s.nest      = this.nest();
   s.position  = s.layer.position();
   s.dim       = s.plot.plotDim();
   s.facet     = s.plot.facet();
@@ -74,6 +74,9 @@ Geom.prototype.setup = function() {
 
   return s;
 };
+Geom.prototype.rollup = function(data, s) {
+  return s.nest.entries(data);
+};
 
 Geom.prototype.domain = function(data, a) {
   var layer   = this.layer(),
@@ -83,10 +86,13 @@ Geom.prototype.domain = function(data, a) {
       range   = extent[1] - extent[0];
 
   // done if date
-  if(_.contains(["date", "time"], plot.dtypes()[aes[a]][0]) ){
-    return extent;
+  // and not histogram or density
+  if(!_.contains(['histogram', 'density'], this.name())){
+    if(_.contains(["date", "time"], plot.dtypes()[aes[a]][0]) ){
+      return extent;
+    }
   }
-  // point always extends both ways
+  // extent both ways
   if(range === 0){
     extent[0] -= 1;
     extent[1] += 1;
@@ -136,6 +142,30 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
     xfree: xfree,
     yfree: yfree,
   };
+};
+
+// different geoms may want to be nested
+// differently.
+Geom.prototype.nest = function() {
+
+  // to be performed before calculating layer level geoms or scales
+  var aes = this.layer().aes(),
+      plot = this.layer().plot(),
+      nest = d3.nest(),
+      dtypes = plot.dtypes(),
+      nestVars = _.unique(_.compact([aes.group, aes.fill, aes.color]));
+
+  _.each(nestVars, function(n) {
+    if(dtypes[n][1] !== "many") {
+      nest.key(function(d) { return d[n]; });
+    }
+  });
+  _.map(['x', 'y'], function(a) {
+    if(plot[a + "Scale"]().single.scaleType() === "ordinal"){
+      nest.key(function(d) { return d[aes[a]]; });
+    }
+  });
+  return nest;
 };
 
 ggd3.geom = Geom;

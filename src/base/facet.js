@@ -258,25 +258,29 @@ Facet.prototype.makeCell = function(selection, colNum, rowNum,
     .attr('class', 'plot')
     .attr('transform', "translate(" + margins.left + 
             "," + margins.top + ")")
-    .append('rect')
-    .attr('class', 'background')
-    .attr({x: 0, y:0, width: dim.x, height:dim.y});
+    .each(function() {
+      var sel = d3.select(this);
+      sel.append('rect')
+        .attr('class', 'background')
+        .attr({x: 0, y:0, 
+          width: dim.x, height:dim.y});
+    });
   plot.exit().remove();
 
-  var xaxis = selection.selectAll('g.x.axis')
-                .data([0]);
-  xaxis
-    .attr('class', 'x axis' + gridClassX);
-  xaxis.enter().append('g')
-    .attr('class', 'x axis' + gridClassX);
-  xaxis.exit().remove();
-  var yaxis = selection.selectAll('g.y.axis')
-                .data([0]);
-  yaxis
-    .attr('class', 'y axis' + gridClassY);
-  yaxis.enter().append('g')
-    .attr('class', 'y axis' + gridClassY);
-  yaxis.exit().remove();
+  function makeG(sel, cls, cls2) {
+    var g = sel.selectAll('g.' + cls.replace(/ /g, "."))
+      .data([0]);
+    g.enter().append('g')
+      .attr('class', cls + cls2);
+    g.exit().remove();
+    return g;
+  }
+  makeG(selection, "x axis", gridClassX);
+  makeG(selection, "y axis", gridClassY);
+  makeG(selection, "xgrid", "")
+    .attr("transform", "translate(" + margins.left + "," + margins.top + ")");
+  makeG(selection, "ygrid", "")
+    .attr("transform", "translate(" + margins.left + "," + margins.top + ")");
 };
 
 Facet.prototype.makeTitle = function(selection, colNum, rowNum) {

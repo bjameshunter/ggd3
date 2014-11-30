@@ -174,34 +174,31 @@ Plot.prototype.setDomains = function() {
   // granted, that doesn't make a lot of sense.
   // rather, better idea to keep track of what aesthetics
   // have a scale set for it, and pass over if so.
-  var aes = this.aes(),
-      that = this,
-      facet = this.facet(),
+  var that = this,
       layer = this.layers()[0],
-      nest = layer.geomNest(), 
-      stat = layer.stat(),
       geom = layer.geom(),
+      s = geom.setup(),
       domain,
       data = that.dataList(that.data()),
       scale;
 
-  that.globalScales = globalScales.filter(function(s) {
-    return _.contains(_.keys(aes), s);
+  that.globalScales = globalScales.filter(function(sc) {
+    return _.contains(_.keys(s.aes), sc);
   });
   that.freeScales = [];
-  _.each(['x', 'y'], function(s) {
-    if(!_.contains(['free', 'free_' + s], facet.scales()) ){
-      that.globalScales.push(s);
+  _.each(['x', 'y'], function(a) {
+    if(!_.contains(['free', 'free_' + a], s.facet.scales()) ){
+      that.globalScales.push(a);
     } else {
-      that.freeScales.push(s);
+      that.freeScales.push(a);
     }
   });
-  nest.rollup(function(d) {
-    return stat.compute(d);
+  s.nest.rollup(function(d) {
+    return s.stat.compute(d);
   });
   // each facet's data rolled up according to stat
   data = _.map(data, function(d) {
-      d.data = ggd3.tools.unNest(nest.entries(d.data) );
+      d.data = ggd3.tools.unNest(geom.rollup(d.data, s));
       return d;
   });
 
@@ -212,11 +209,11 @@ Plot.prototype.setDomains = function() {
       _.map(that.freeScales, function(k){
         scale = that[k+ "Scale"]()[d.selector];
         if(_.contains(linearScales, 
-           scale.scaleType()) ){
+          scale.scaleType()) ){
           scale.domain(geom.domain(d.data, k));
         } else {
           // gotta find a way to sort these.
-          scale.domain(_.unique(_.pluck(d.data, aes[k])));
+          scale.domain(_.unique(_.pluck(d.data, s.aes[k])));
         }
       });
     });
@@ -239,11 +236,9 @@ Plot.prototype.setDomains = function() {
                     _.flatten(
                       _.map(data, function(d) {
                         return d.data;
-                      })), aes[g]);
+                      }), true), s.aes[g]);
         scale.domain(domain);
-        if(_.contains(linearScales, scale.scaleType()) ){
-          scale.range(that[g + 'Range']());
-        }
+        scale.range(that[g + 'Range']());
       } else {
         // data must be delivered to geom's domain as faceted,
         // otherwise aggregates will be calculated on whole dataset
@@ -260,16 +255,19 @@ Plot.prototype.setDomains = function() {
               _.unique(
                 _.pluck(
                   _.flatten(
-                    _.map(data, 'data')), aes[g])));
+                    _.map(data, 'data'), true), s.aes[g])));
     }
-    for(var s in scale._userOpts.scale){
-      if(scale.scale().hasOwnProperty(s)){
-        scale.scale()[s](scale._userOpts.scale[s]);
+    for(var sc in scale._userOpts.scale){
+      if(scale.scale().hasOwnProperty(sc)){
+        scale.scale()[sc](scale._userOpts.scale[sc]);
       }
     }
     if(_.contains(globalScales, g)) {
       var aesScale = _.bind(function(d) {
-        return this.scale()(d[aes[g]]);
+        // if a geom doesn't use a particular
+        // aesthetic, it will trip up here, 
+        // choosing to pass null instead.
+        return this.scale()(d[s.aes[g]] || null);
       }, scale);
       that[g](aesScale);
     }

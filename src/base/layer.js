@@ -59,7 +59,7 @@ Layer.prototype.geom = function(geom) {
     this.stat(geom.stat());
   }
   if(!this.position()){
-    this.position(geom.defaultPosition());
+    this.position(geom.position());
   }
   return this;
 };
@@ -131,6 +131,7 @@ Layer.prototype.draw = function(layerNum) {
   
   function draw(sel) {
     var divs = [];
+
     sel.selectAll('.plot-div')
       .each(function(d) {
         divs.push(d3.select(this).attr('id'));
@@ -160,28 +161,6 @@ Layer.prototype.dataList = DataList;
 // same as on plot, for when Layer has it's own data
 // Nests according to facets
 Layer.prototype.nest = Nest;
-
-Layer.prototype.geomNest = function() {
-
-  // to be performed before calculating layer level geoms or scales
-  var aes = this.aes(),
-      plot = this.plot(),
-      nest = d3.nest(),
-      dtypes = plot.dtypes(),
-      nestVars = _.unique(_.compact([aes.group, aes.fill, aes.color]));
-
-  _.each(nestVars, function(n) {
-    if(dtypes[n][1] !== "many") {
-      nest.key(function(d) { return d[n]; });
-    }
-  });
-  _.map(['x', 'y'], function(a) {
-    if(plot[a + "Scale"]().single.scaleType() === "ordinal"){
-      nest.key(function(d) { return d[aes[a]]; });
-    }
-  });
-  return nest;
-};
 
 
 ggd3.layer = Layer;

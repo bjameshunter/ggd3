@@ -3,7 +3,7 @@ function Density(spec) {
   if(!(this instanceof Geom)){
     return new Density(spec);
   }
-  Histogram.apply(this, spec);
+  Geom.apply(this, spec);
   var attributes = {
     name: "density",
     stat: "density",
@@ -23,14 +23,14 @@ function Density(spec) {
   }
 }
 
-Density.prototype = new Histogram();
+Density.prototype = new Geom();
   
 Density.prototype.constructor = Density;
 
 Density.prototype.kde = function(kernel, x) {
   return function(sample) {
     return x.map(function(x) {
-      return [x, d3.mean(sample, function(v) { return kernel(x-v); })*10];
+      return [x, d3.mean(sample, function(v) { return kernel(x-v); })];
     });
   };
 };

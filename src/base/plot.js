@@ -294,9 +294,11 @@ Plot.prototype.draw = function() {
     // reset nSVGs after they're drawn.
     that.facet().nSVGs = 0;
 
-    if(!that._gridsAdded) {
-      if(that.yGrid()) { that.hgrid.draw(1)(sel);}
-      if(that.xGrid()) { that.vgrid.draw(1)(sel);}
+    if(that.yGrid() || that.xGrid()) {
+      if(that.yGrid()) { 
+        that.hgrid.draw(1)(sel, ".ygrid");}
+      if(that.xGrid()) { 
+        that.vgrid.draw(1)(sel, ".xgrid");}
     }
 
     // get the number of geom classes that should

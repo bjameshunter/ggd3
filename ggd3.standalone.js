@@ -156,45 +156,7 @@ ggd3.tools.linearDomain = function(data, variable, rule, zero) {
   }
   return extent;
 };
-ggd3.tools.fillEmptyStackGroups = function(data, v) {
-  // every object in data must have same length
-  // array in its 'value' slot
-  var keys = _.unique(_.flatten(_.map(data, function(d) {
-    return _.map(d.values, function(e) {
-      return e[v];
-    });
-  })));
-  // get an example object and set it's values to null;
-  var filler = _.clone(data[0].values[0]);
-  _.mapValues(filler, function(v,k) {
-    filler[k] = null;
-  });
-  _.each(data, function(d) {
-    var dkey, missing;
-    dkeys = _.map(d.values, function(e) { return e[v]; });
-    missing = _.compact(_.filter(keys, function(k) {
-      return !_.contains(dkeys, k);
-    }));
-    if(!_.isEmpty(missing)) {
-      _.each(missing, function(m) {
-        // must fill other values, too.
-        var e = _.clone(filler);
-        e[v] = m;
-        d.values.push(e);
-      });
-    }
-    d.values = _.sortBy(d.values, function(e) {
-      return e[v];
-    });
-  });
 
-  return data;
-};
-
-ggd3.tools.fillEmptyStackLayers = function(data, v){
-
-  return data;
-};
 ggd3.tools.removeElements = function(sel, layerNum, element) {
   var remove = sel.select('.plot')
                     .selectAll('.geom.g' + layerNum)
@@ -246,7 +208,7 @@ function unNest(data, nestedArray) {
     return data; 
   }
   var vals = _.flatten(
-              _.map(data, function(d) { return d.values; })
+              _.map(data, function(d) { return d.values; }), true
              );
   return ggd3.tools.unNest(vals);
 }
@@ -523,25 +485,29 @@ Facet.prototype.makeCell = function(selection, colNum, rowNum,
     .attr('class', 'plot')
     .attr('transform', "translate(" + margins.left + 
             "," + margins.top + ")")
-    .append('rect')
-    .attr('class', 'background')
-    .attr({x: 0, y:0, width: dim.x, height:dim.y});
+    .each(function() {
+      var sel = d3.select(this);
+      sel.append('rect')
+        .attr('class', 'background')
+        .attr({x: 0, y:0, 
+          width: dim.x, height:dim.y});
+    });
   plot.exit().remove();
 
-  var xaxis = selection.selectAll('g.x.axis')
-                .data([0]);
-  xaxis
-    .attr('class', 'x axis' + gridClassX);
-  xaxis.enter().append('g')
-    .attr('class', 'x axis' + gridClassX);
-  xaxis.exit().remove();
-  var yaxis = selection.selectAll('g.y.axis')
-                .data([0]);
-  yaxis
-    .attr('class', 'y axis' + gridClassY);
-  yaxis.enter().append('g')
-    .attr('class', 'y axis' + gridClassY);
-  yaxis.exit().remove();
+  function makeG(sel, cls, cls2) {
+    var g = sel.selectAll('g.' + cls.replace(/ /g, "."))
+      .data([0]);
+    g.enter().append('g')
+      .attr('class', cls + cls2);
+    g.exit().remove();
+    return g;
+  }
+  makeG(selection, "x axis", gridClassX);
+  makeG(selection, "y axis", gridClassY);
+  makeG(selection, "xgrid", "")
+    .attr("transform", "translate(" + margins.left + "," + margins.top + ")");
+  makeG(selection, "ygrid", "")
+    .attr("transform", "translate(" + margins.left + "," + margins.top + ")");
 };
 
 Facet.prototype.makeTitle = function(selection, colNum, rowNum) {
@@ -716,7 +682,7 @@ Layer.prototype.geom = function(geom) {
     this.stat(geom.stat());
   }
   if(!this.position()){
-    this.position(geom.defaultPosition());
+    this.position(geom.position());
   }
   return this;
 };
@@ -788,6 +754,7 @@ Layer.prototype.draw = function(layerNum) {
   
   function draw(sel) {
     var divs = [];
+
     sel.selectAll('.plot-div')
       .each(function(d) {
         divs.push(d3.select(this).attr('id'));
@@ -817,28 +784,6 @@ Layer.prototype.dataList = DataList;
 // same as on plot, for when Layer has it's own data
 // Nests according to facets
 Layer.prototype.nest = Nest;
-
-Layer.prototype.geomNest = function() {
-
-  // to be performed before calculating layer level geoms or scales
-  var aes = this.aes(),
-      plot = this.plot(),
-      nest = d3.nest(),
-      dtypes = plot.dtypes(),
-      nestVars = _.unique(_.compact([aes.group, aes.fill, aes.color]));
-
-  _.each(nestVars, function(n) {
-    if(dtypes[n][1] !== "many") {
-      nest.key(function(d) { return d[n]; });
-    }
-  });
-  _.map(['x', 'y'], function(a) {
-    if(plot[a + "Scale"]().single.scaleType() === "ordinal"){
-      nest.key(function(d) { return d[aes[a]]; });
-    }
-  });
-  return nest;
-};
 
 
 ggd3.layer = Layer;
@@ -1139,9 +1084,11 @@ Plot.prototype.draw = function() {
     // reset nSVGs after they're drawn.
     that.facet().nSVGs = 0;
 
-    if(!that._gridsAdded) {
-      if(that.yGrid()) { that.hgrid.draw(1)(sel);}
-      if(that.xGrid()) { that.vgrid.draw(1)(sel);}
+    if(that.yGrid() || that.xGrid()) {
+      if(that.yGrid()) { 
+        that.hgrid.draw(1)(sel, ".ygrid");}
+      if(that.xGrid()) { 
+        that.vgrid.draw(1)(sel, ".xgrid");}
     }
 
     // get the number of geom classes that should
@@ -1502,34 +1449,31 @@ Plot.prototype.setDomains = function() {
   // granted, that doesn't make a lot of sense.
   // rather, better idea to keep track of what aesthetics
   // have a scale set for it, and pass over if so.
-  var aes = this.aes(),
-      that = this,
-      facet = this.facet(),
+  var that = this,
       layer = this.layers()[0],
-      nest = layer.geomNest(), 
-      stat = layer.stat(),
       geom = layer.geom(),
+      s = geom.setup(),
       domain,
       data = that.dataList(that.data()),
       scale;
 
-  that.globalScales = globalScales.filter(function(s) {
-    return _.contains(_.keys(aes), s);
+  that.globalScales = globalScales.filter(function(sc) {
+    return _.contains(_.keys(s.aes), sc);
   });
   that.freeScales = [];
-  _.each(['x', 'y'], function(s) {
-    if(!_.contains(['free', 'free_' + s], facet.scales()) ){
-      that.globalScales.push(s);
+  _.each(['x', 'y'], function(a) {
+    if(!_.contains(['free', 'free_' + a], s.facet.scales()) ){
+      that.globalScales.push(a);
     } else {
-      that.freeScales.push(s);
+      that.freeScales.push(a);
     }
   });
-  nest.rollup(function(d) {
-    return stat.compute(d);
+  s.nest.rollup(function(d) {
+    return s.stat.compute(d);
   });
   // each facet's data rolled up according to stat
   data = _.map(data, function(d) {
-      d.data = ggd3.tools.unNest(nest.entries(d.data) );
+      d.data = ggd3.tools.unNest(geom.rollup(d.data, s));
       return d;
   });
 
@@ -1540,11 +1484,11 @@ Plot.prototype.setDomains = function() {
       _.map(that.freeScales, function(k){
         scale = that[k+ "Scale"]()[d.selector];
         if(_.contains(linearScales, 
-           scale.scaleType()) ){
+          scale.scaleType()) ){
           scale.domain(geom.domain(d.data, k));
         } else {
           // gotta find a way to sort these.
-          scale.domain(_.unique(_.pluck(d.data, aes[k])));
+          scale.domain(_.unique(_.pluck(d.data, s.aes[k])));
         }
       });
     });
@@ -1567,11 +1511,9 @@ Plot.prototype.setDomains = function() {
                     _.flatten(
                       _.map(data, function(d) {
                         return d.data;
-                      })), aes[g]);
+                      }), true), s.aes[g]);
         scale.domain(domain);
-        if(_.contains(linearScales, scale.scaleType()) ){
-          scale.range(that[g + 'Range']());
-        }
+        scale.range(that[g + 'Range']());
       } else {
         // data must be delivered to geom's domain as faceted,
         // otherwise aggregates will be calculated on whole dataset
@@ -1588,16 +1530,19 @@ Plot.prototype.setDomains = function() {
               _.unique(
                 _.pluck(
                   _.flatten(
-                    _.map(data, 'data')), aes[g])));
+                    _.map(data, 'data'), true), s.aes[g])));
     }
-    for(var s in scale._userOpts.scale){
-      if(scale.scale().hasOwnProperty(s)){
-        scale.scale()[s](scale._userOpts.scale[s]);
+    for(var sc in scale._userOpts.scale){
+      if(scale.scale().hasOwnProperty(sc)){
+        scale.scale()[sc](scale._userOpts.scale[sc]);
       }
     }
     if(_.contains(globalScales, g)) {
       var aesScale = _.bind(function(d) {
-        return this.scale()(d[aes[g]]);
+        // if a geom doesn't use a particular
+        // aesthetic, it will trip up here, 
+        // choosing to pass null instead.
+        return this.scale()(d[s.aes[g]] || null);
       }, scale);
       that[g](aesScale);
     }
@@ -1606,17 +1551,193 @@ Plot.prototype.setDomains = function() {
 
 Plot.prototype.setScales = SetScales;
 
-// 
-function Histogram(spec) {
-  if(!(this instanceof ggd3.geom)){
-    return new Histogram(spec);
+// Base geom from which all geoms inherit
+function Geom(aes) {
+  if(!(this instanceof Geom)){
+    return new Geom(aes);
   }
+  var attributes = {
+    layer: null,
+    stat: null,
+    fill: null,
+    alpha: null,
+    color: null,
+    size: null,
+    position: null,
+    lineWidth: null,
+    drawX: true,
+    drawY: true,
+    style: "", // optional class attributes for css 
+  };
+  this.attributes = attributes;
+}
+Geom.prototype.defaultPosition = function() {
+  var n = this.name();
+  return {
+    "point": "identity",
+    "text": "identity",
+    "bar": "stack",
+    "box": "dodge",
+    "hline": "identity",
+    "vline": "identity",
+    "abline": "identity",
+    "smooth": "loess", 
+    "area" : "identity",
+    "error": "identity",
+    "density": "kernel",
+    "path" : "identity",
+    "ribbon" : "identity",
+    }[n];
+};
+
+Geom.prototype.setup = function() {
+  var s = {
+      layer     : this.layer(),
+    };
+  s.plot      = s.layer.plot();
+  s.stat      = s.layer.stat();
+  s.nest      = this.nest();
+  s.position  = s.layer.position();
+  s.dim       = s.plot.plotDim();
+  s.facet     = s.plot.facet();
+  s.aes       = s.layer.aes();
+  s.fill      = d3.functor(this.fill() || s.plot.fill());
+  s.size      = d3.functor(this.size() || s.plot.size());
+  s.alpha     = d3.functor(this.alpha() || s.plot.alpha());
+  s.color     = d3.functor(this.color() || s.plot.color());
+
+  if(s.aes.fill) {
+    s.grouped = true;
+    s.group = s.aes.fill;
+  } else if(s.aes.color){
+    s.grouped = true;
+    s.group = aes.color;
+  } else if(aes.group){
+    s.grouped = true;
+    s.group = s.aes.group;
+  }
+  if(_.contains([s.facet.x(), s.facet.y(), 
+                s.aes.x, s.aes.y], 
+                s.group)) {
+    // uninteresting grouping, get rid of it.
+    grouped = false;
+    group = null;
+    groups = null;
+  }
+
+  return s;
+};
+Geom.prototype.rollup = function(data, s) {
+  return s.nest.entries(data);
+};
+
+Geom.prototype.domain = function(data, a) {
+  var layer   = this.layer(),
+      plot    = layer.plot(),
+      aes     = layer.aes(),
+      extent  = d3.extent(_.pluck(data, aes[a])),
+      range   = extent[1] - extent[0];
+
+  // done if date
+  // and not histogram or density
+  if(!_.contains(['histogram', 'density'], this.name())){
+    if(_.contains(["date", "time"], plot.dtypes()[aes[a]][0]) ){
+      return extent;
+    }
+  }
+  // extent both ways
+  if(range === 0){
+    extent[0] -= 1;
+    extent[1] += 1;
+  }
+  extent[0] -= 0.1 * range;
+  extent[1] += 0.1 * range;
+  return extent;
+};
+
+
+Geom.prototype.scalesAxes = function(sel, setup, selector, 
+                                     layerNum, drawX, drawY){
+
+  var x, y;
+    // choosing scales based on facet rule,
+  // factor out.
+  if(!_.contains(["free", "free_x"], setup.facet.scales()) || 
+     _.isUndefined(setup.plot.xScale()[selector])){
+    x = setup.plot.xScale().single;
+    xfree = false;
+  } else {
+    x = setup.plot.xScale()[selector];
+    xfree = true;
+  }
+  if(!_.contains(["free", "free_y"], setup.facet.scales()) || 
+     _.isUndefined(setup.plot.xScale()[selector])){
+    y = setup.plot.yScale().single;
+    yfree = false;
+  } else {
+    y = setup.plot.yScale()[selector];
+    yfree = true;
+  }
+
+  if(layerNum === 0 && drawX){
+    sel.select('.x.axis')
+      .attr("transform", "translate(" + x.positionAxis() + ")")
+      .transition().call(x.axis);
+  }
+  if(layerNum === 0 && drawY){
+    sel.select('.y.axis')
+      .attr("transform", "translate(" + y.positionAxis() + ")")
+      .transition().call(y.axis);
+  }
+  return {
+    x: x,
+    y: y,
+    xfree: xfree,
+    yfree: yfree,
+  };
+};
+
+// different geoms may want to be nested
+// differently.
+Geom.prototype.nest = function() {
+
+  // to be performed before calculating layer level geoms or scales
+  var aes = this.layer().aes(),
+      plot = this.layer().plot(),
+      nest = d3.nest(),
+      dtypes = plot.dtypes(),
+      nestVars = _.unique(_.compact([aes.group, aes.fill, aes.color]));
+
+  _.each(nestVars, function(n) {
+    if(dtypes[n][1] !== "many") {
+      nest.key(function(d) { return d[n]; });
+    }
+  });
+  _.map(['x', 'y'], function(a) {
+    if(plot[a + "Scale"]().single.scaleType() === "ordinal"){
+      nest.key(function(d) { return d[aes[a]]; });
+    }
+  });
+  return nest;
+};
+
+ggd3.geom = Geom;
+
+// 
+function Bar(spec) {
+  if(!(this instanceof Geom)){
+    return new Bar(spec);
+  }
+  
   Geom.apply(this);
   var attributes = {
-    name: "histogram",
-    stat: "bin",
-    bins: 30,
-    frequency: false,
+    name: "bar",
+    stat: "count",
+    position: "dodge",
+    lineWidth: 1,
+    offset: 'zero',
+    groupSum: 0,
+    stackSum: 0,
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -1628,127 +1749,323 @@ function Histogram(spec) {
   }
 }
 
-Histogram.prototype = new Geom();
-  
-Histogram.prototype.constructor = Histogram;
+Bar.prototype = new Geom();
 
-Histogram.prototype.domain = function(data, a) {
-  var layer   = this.layer(),
-      plot    = layer.plot(),
-      aes     = layer.aes(),
-      extent  = d3.extent(_.pluck(data, aes[a])),
-      range   = extent[1] - extent[0];
+Bar.prototype.constructor = Bar;
 
-  // histogram always extends both ways
-  if(range === 0){
-    extent[0] -= 1;
-    extent[1] += 1;
-  }
-  extent[0] -= 0.1 * range;
-  extent[1] += 0.1 * range;
-  return extent;
+Bar.prototype.fillEmptyStackGroups = function(data, v) {
+  // every object in data must have same length
+  // array in its 'value' slot
+  if(!data.length) { return data; }
+  var keys = _.unique(_.flatten(_.map(data, function(d) {
+    return _.map(d.values, function(e) {
+      return e[v];
+    });
+  })));
+  // get an example object and set it's values to null;
+  var filler = _.clone(data[0].values[0]);
+  _.mapValues(filler, function(v,k) {
+    filler[k] = null;
+  });
+  _.each(data, function(d) {
+    var dkey, missing;
+    dkeys = _.map(d.values, function(e) { return e[v]; });
+    missing = _.compact(_.filter(keys, function(k) {
+      return !_.contains(dkeys, k);
+    }));
+    if(!_.isEmpty(missing)) {
+      _.each(missing, function(m) {
+        // must fill other values, too.
+        var e = _.clone(filler);
+        e[v] = m;
+        d.values.push(e);
+      });
+    }
+    d.values = _.sortBy(d.values, function(e) {
+      return e[v];
+    });
+  });
+
+  return data;
+};
+
+Bar.prototype.domain = function(data, a) {
+
+  var s = this.setup(),
+      valueVar = s.aes[a] ? s.aes[a]: "n. observations",
+      group, stackby,
+      groupSum, stackSum,
+      grouped;
+
+  group = s.aes.fill || s.aes.color || s.aes.group;
+  stackby = a === "x" ? s.aes.y: s.aes.x;
+
+  grouped = _.groupBy(data, function(d) {
+    return d[stackby];
+  });
+
+  stackSum = _.mapValues(grouped, function(v, k) {
+    return _.reduce(_.pluck(v, valueVar), function(a,b) {
+      return a + b;
+    });
+  });
+  stackSum = d3.extent(_.map(stackSum, function(v, k) { return v; }));
+  groupSum = d3.extent(data, function(d) {
+    return d[valueVar];
+  });
+  this.stackSum(stackSum);
+  this.groupSum(groupSum);
+
+  stackSum[0] = 0;
+  groupSum[0] = 0;
+  stackSum[1] *= 1.1;
+  groupSum[1] *= 1.1;
+  return s.position === "stack" ? stackSum: groupSum;
 };
 
 
-Histogram.prototype.draw = function(){
-
+Bar.prototype.draw = function() {
+  // bar takes an array of data, 
+  // nests by a required ordinal axis, optional color and group
+  // variables then calculates the stat and draws
+  // horizontal or vertical bars.
+  // stacked, grouped, expanded or not.
+  // scales first need to be calculated according to output
+  // of the stat. 
   var s     = this.setup(),
       that  = this;
 
   function draw(sel, data, i, layerNum) {
-    // histograms are not to draw more than one per plot,
-    // so grouping by color/fill/group is not supported.
-    if(s.grouped) {
-      console.warn("Grouping within a plot for histogram doesn't really make sense. Not doing it.");
-    }
-    var scales = that.scalesAxes(sel, s, data.selector, layerNum,
-                                 that.drawX(), that.drawY());
-    data = s.stat.compute(data.data);
-           
-    var n, h, size, width;
-    if(s.aes.y === "binHeight") {
-      n = 'x';
-      h = 'y';
-      size = {p: 'y', s: 'height'};
-      width = {p: 'x', s: 'width'};
-    } else {
-      n = 'y';
-      h = 'x';
-      size = {p: 'x', s: 'width'};
-      width = {p: 'y', s: 'height'};
-    }
-    var barSize = (function() {
-      if(size.p === 'y'){
-        return function(d) {
-          return  scales.y.scale()(0) - scales.y.scale()(d.binHeight);
-        };
-      }
-      return function(d) {
-        return scales.x.scale()(d.binHeight) - scales.x.scale()(0);
-      };
-    })();
-    var barPosition = (function() {
-      if(size.p === 'y'){
-        return function(d) {
-          return scales.y.scale()(d.binHeight);
-        };
-      }
-      return function(d) {
-        return scales.x.scale()(0);
-      };
-    })();
-    var barWidthPlace = (function() {
-      if(size.p === 'y'){
-        return function(d) {
-          return ggd3.tools.round(scales[n].scale()(d.x), 2) + 1;
-        };
-      }
-      return function(d) {
-        return (ggd3.tools.round(scales[n].scale()(d.x), 2) + 1 - 
-                barWidth.rangeBand());
-      };
-    })();
 
-    // dx is not returning the output I expect.
-    // calculating bar width on my own
-    var barWidth = d3.scale.ordinal()
-                      .rangeRoundBands(scales[n].scale().range(), 0.3, 0.2)
-                      .domain(_.range(that.bins()));
-    ggd3.tools.removeElements(sel, layerNum, "rect");
-    function drawHistogram(rect){
-      rect.attr('class', 'geom g' + layerNum + ' geom-histogram')
-        .attr(size.s, barSize)
-        .attr(width.s, barWidth.rangeBand())
-        .attr(width.p, barWidthPlace)
-        .attr(size.p, barPosition)
-        .attr('fill', function(d) {
-          return s.fill(d[1]);
-        })
-        .attr('stroke-width', 1)
-        .attr('fill-opacity', function(d) {
-          return s.alpha(d[1]);
-        })
-        .attr('stroke', function(d) {
-          return s.color(d[1]);
-        });
+    // o2 is second scale used
+    // to derive width of histogram bars.
+    var o, // original value or ordinal scale
+        n, // numeric agg scale
+        rb, // final range band
+        o2, // used to calculate rangeband if histogram
+        valueVar, // holds aggregated name
+        categoryVar, // name of bar positions
+        // secondary ordinal scale to calc dodged rangebands
+        groupOrd  = d3.scale.ordinal(),
+        drawX     = true,
+        drawY     = true,
+        verticalBars = (s.plot.xScale().single.scaleType() === "ordinal" ||
+                        s.aes.y === "binHeight");
+
+    if(_.contains(['wiggle', 'silhouette'], that.offset()) ){
+      if(verticalBars){
+        // x is bars, don't draw Y axis
+        drawY = false;
+        sel.select('.y.axis')
+          .selectAll('*')
+          .transition()
+          .style('opacity', 0)
+          .remove();
+      } else {
+        // y is ordinal, don't draw X.
+        drawX = false;
+        sel.select('.x.axis')
+          .selectAll('*')
+          .transition()
+          .style('opacity', 0)
+          .remove();
+      }
     }
-    var hist = sel.select('.plot')
+    // gotta do something to reset domains if offset is expand
+    if(that.offset() === "expand"){
+      if(verticalBars){
+        _.mapValues(s.plot.yScale(), function(v, k) {
+          v.domain([0,1]);
+        });
+      } else {
+        _.mapValues(s.plot.xScale(), function(v, k) {
+          v.domain([0,1]);
+        });  
+      }
+    }
+
+    var scales = that.scalesAxes(sel, s, data.selector, layerNum,
+                                 drawX, drawY);
+    // scales are drawn by now. return if no data.
+    if(!data.data.length){ return false; }
+    data = data.data;
+
+
+    // prep scales for vertical or horizontal use.
+    // "o" is ordinal, "n" is numeric
+    // width refers to scale defining rangeband of bars
+    // size refers to scale defining its length along numeric axis
+    // s and p on those objects are for size and position, respectively.
+    // need to use this for histograms too, but it's going to be
+    // tricky
+    if(!verticalBars){
+      // horizontal bars
+      o = scales.y;
+      n = scales.x;
+      size = {s: "width", p:'x'};
+      width = {s:"height", p: 'y'};
+    } else {
+      // vertical bars
+      o = scales.x;
+      n = scales.y;
+      size = {s: "height", p: 'y'};
+      width = {s: "width", p: 'x'};
+    }
+
+    s.nest.rollup(function(data) {
+      return s.stat.compute(data);
+    });
+
+    ggd3.tools.removeElements(sel, layerNum, "rect");
+
+    // calculate stat
+    data = that.rollup(data, s);
+    s.groups = _.pluck(data, 'key');
+
+    data = ggd3.tools.unNest(data);
+    data = d3.nest().key(function(d) { return d[s.group];})
+              .entries(data);
+    data = _.filter(data, function(d) { 
+      return d.key !== "undefined" ;});
+    if(that.name() === "bar"){
+      rb = o.scale().rangeBand();
+      valueVar = s.aes[size.p] || "n. observations";
+      categoryVar = s.aes[width.p];
+    } else if(that.name() === "histogram"){
+      valueVar = "binHeight";
+      categoryVar = s.group;
+      o2 = d3.scale.ordinal()
+              .rangeRoundBands(o.range(), 0, 0)
+              .domain(that.bins());
+      rb = o2.rangeBand();
+      if(rb < 2) {
+        rb = 2;
+      }
+    }
+    if(s.grouped && !_.contains([s.aes.x, s.aes.y], s.group)){
+
+    }
+    data = that.fillEmptyStackGroups(data, categoryVar);
+    var stack = d3.layout.stack()
+                  .x(function(d) { return d[categoryVar]; })
+                  .y(function(d) {
+                    return d[valueVar]; })
+                  .offset(that.offset())
+                  .values(function(d) { 
+                    return d.values; });
+    data = _.map(stack(data),
+                            function(d) {
+                              return d.values ? d.values: [];
+                            });
+    data = _.flatten(data, 
+                     that.name() === "histogram" ? true:false);
+    if(s.position === 'dodge') {
+      // make ordinal scale for group
+      groupOrd.rangeBands([0, rb], 0, 0)
+              .domain(s.groups);
+      rb = groupOrd.rangeBand();
+    }
+    if(s.position !== "dodge"){
+      groupOrd = function(d) {
+        return 0;
+      };
+    }
+    
+    var placeBar = function(d) {
+      var p = o.scale()(d[s.aes[width.p]]);
+      p += groupOrd(d[s.group]) || 0;
+      return p || 0;
+    };
+
+    // I think this is unnecessary.
+    var calcSizeS = (function() {
+      if(s.position === 'stack' && size.p === "y"){
+        return function(d) {
+          return n.scale()(0) - n.scale()(d.y);
+        };
+      }
+      if(s.position === "stack"){
+        return function(d) {
+          return n.scale()(d.y) - n.scale()(0);
+        };
+      }
+      if(s.position === "dodge" && size.p === "y"){
+        return function(d) {
+          return n.scale()(0) - n.scale()(d.y); 
+        };
+      }
+      return function(d) {
+        return n.scale()(d[valueVar]); 
+      };
+    })();
+    var calcSizeP = (function () {
+      if(s.position === "stack" && size.p === "y"){
+        return function(d) { 
+          return n.scale()(d.y0 + d.y); 
+          };
+      }
+      if(s.position === "stack"){
+        return function(d) {
+          return n.scale()(d.y0);
+        };
+      }
+      if(s.position === "dodge" && size.p === "y") {
+        return function(d) {
+          return n.scale()(d.y);
+        };
+      }
+      return function(d) {
+        return 0;
+      };
+    } )();
+
+
+    var bars = sel.select('.plot')
                   .selectAll('rect.geom.g' + layerNum)
                   .data(data);
-    hist.transition().call(drawHistogram);
-    hist.enter().append('rect')
-      .call(drawHistogram);
-    hist.exit()
+    // add canvas and svg functions.
+    function drawBar(rect) {
+      rect.attr('class', 'geom g' + layerNum + ' geom-bar')
+        .attr(size.s, calcSizeS)
+        .attr(width.s, rb)
+        .attr(size.p, calcSizeP)
+        .attr(width.p , placeBar || 0)
+        .style('fill-opacity', s.alpha)
+        .attr('fill', s.fill)
+        .style('stroke', s.color)
+        .style('stroke-width', that.lineWidth())
+        .attr('value', function(d) { 
+          return d[s.group] + "~" + d[s.aes[width.p]];
+        });
+    }
+
+    bars.transition().call(drawBar);
+    
+    bars.enter()
+      .append('rect')
+      .style('fill-opacity', s.alpha)
+      .attr('fill', s.fill)
+      .style('stroke', s.color)
+      .style('stroke-width', that.lineWidth())
+      .attr(width.s, rb)
+      .attr(width.p, placeBar)
+      .attr(size.s, 0)
+      .attr(size.p, function(d) {
+        return n.scale()(0);
+      })
+      .transition()
+      .call(drawBar);
+
+    bars.exit()
       .transition()
       .style('opacity', 0)
       .remove();
-
-
   }
   return draw;
 };
 
-ggd3.geoms.histogram = Histogram;
+ggd3.geoms.bar = Bar;
+
 // 
 function Line(spec) {
   if(!(this instanceof ggd3.geom)){
@@ -1829,10 +2146,10 @@ Line.prototype.innerDraw = function draw(sel, data, i, layerNum){
     ggd3.tools.removeElements(sel, layerNum, "geom-" + this.name());
 
   data = this.prepareData(data, s, scales);
-
-  var lines = sel.select('.plot')
-                .selectAll("." + that.selector(layerNum).replace(/ /g, '.'))
-                .data(data),
+  sel = this.grid() ? sel.select("." + this.direction() + 'grid'): sel.select('.plot');
+  var lines = sel
+              .selectAll("." + that.selector(layerNum).replace(/ /g, '.'))
+              .data(data),
   line = that.generator(s.aes, scales.x.scale(), scales.y.scale());
   lines.transition().call(_.bind(this.drawLines, this), line, s, layerNum);
   lines.enter().append('path')
@@ -1853,163 +2170,19 @@ Line.prototype.draw = function() {
 
 
 ggd3.geoms.line = Line;
-// Base geom from which all geoms inherit
-function Geom(aes) {
-  if(!(this instanceof Geom)){
-    return new Geom(aes);
-  }
-  var attributes = {
-    layer: null,
-    stat: null,
-    fill: null,
-    alpha: null,
-    color: null,
-    size: null,
-    position: null,
-    lineWidth: null,
-    drawX: true,
-    drawY: true,
-    style: "", // optional class attributes for css 
-  };
-  this.attributes = attributes;
-}
-Geom.prototype.defaultPosition = function() {
-  var n = this.name();
-  return {
-    "point": "identity",
-    "text": "identity",
-    "bar": "stack",
-    "box": "dodge",
-    "hline": "identity",
-    "vline": "identity",
-    "abline": "identity",
-    "smooth": "loess", 
-    "area" : "identity",
-    "error": "identity",
-    "density": "kernel",
-    "path" : "identity",
-    "ribbon" : "identity",
-    }[n];
-};
-
-Geom.prototype.setup = function() {
-  var s = {
-      layer     : this.layer(),
-    };
-  s.plot      = s.layer.plot();
-  s.stat      = s.layer.stat();
-  s.nest      = s.layer.geomNest();
-  s.position  = s.layer.position();
-  s.dim       = s.plot.plotDim();
-  s.facet     = s.plot.facet();
-  s.aes       = s.layer.aes();
-  s.fill      = d3.functor(this.fill() || s.plot.fill());
-  s.size      = d3.functor(this.size() || s.plot.size());
-  s.alpha     = d3.functor(this.alpha() || s.plot.alpha());
-  s.color     = d3.functor(this.color() || s.plot.color());
-
-  if(s.aes.fill) {
-    s.grouped = true;
-    s.group = s.aes.fill;
-  } else if(s.aes.color){
-    s.grouped = true;
-    s.group = aes.color;
-  } else if(aes.group){
-    s.grouped = true;
-    s.group = s.aes.group;
-  }
-  if(_.contains([s.facet.x(), s.facet.y(), 
-                s.aes.x, s.aes.y], 
-                s.group)) {
-    // uninteresting grouping, get rid of it.
-    grouped = false;
-    group = null;
-    groups = null;
-  }
-
-  return s;
-};
-
-Geom.prototype.domain = function(data, a) {
-  var layer   = this.layer(),
-      plot    = layer.plot(),
-      aes     = layer.aes(),
-      extent  = d3.extent(_.pluck(data, aes[a])),
-      range   = extent[1] - extent[0];
-
-  // done if date
-  if(_.contains(["date", "time"], plot.dtypes()[aes[a]][0]) ){
-    return extent;
-  }
-  // point always extends both ways
-  if(range === 0){
-    extent[0] -= 1;
-    extent[1] += 1;
-  }
-  extent[0] -= 0.1 * range;
-  extent[1] += 0.1 * range;
-  return extent;
-};
-
-
-Geom.prototype.scalesAxes = function(sel, setup, selector, 
-                                     layerNum, drawX, drawY){
-
-  var x, y;
-    // choosing scales based on facet rule,
-  // factor out.
-  if(!_.contains(["free", "free_x"], setup.facet.scales()) || 
-     _.isUndefined(setup.plot.xScale()[selector])){
-    x = setup.plot.xScale().single;
-    xfree = false;
-  } else {
-    x = setup.plot.xScale()[selector];
-    xfree = true;
-  }
-  if(!_.contains(["free", "free_y"], setup.facet.scales()) || 
-     _.isUndefined(setup.plot.xScale()[selector])){
-    y = setup.plot.yScale().single;
-    yfree = false;
-  } else {
-    y = setup.plot.yScale()[selector];
-    yfree = true;
-  }
-
-  if(layerNum === 0 && drawX){
-    sel.select('.x.axis')
-      .attr("transform", "translate(" + x.positionAxis() + ")")
-      .transition().call(x.axis);
-  }
-  if(layerNum === 0 && drawY){
-    sel.select('.y.axis')
-      .attr("transform", "translate(" + y.positionAxis() + ")")
-      .transition().call(y.axis);
-  }
-  return {
-    x: x,
-    y: y,
-    xfree: xfree,
-    yfree: yfree,
-  };
-};
-
-ggd3.geom = Geom;
-
-
 // 
-function Bar(spec) {
+function Histogram(spec) {
   if(!(this instanceof Geom)){
-    return new Bar(spec);
+    return new Histogram(spec);
   }
-  Geom.apply(this);
+  Bar.apply(this);
   var attributes = {
-    name: "bar",
-    stat: "count",
-    position: "dodge",
-    lineWidth: 1,
-    offset: 'zero',
-    groupSum: 0,
-    stackSum: 0,
+    name: "histogram",
+    stat: "bin",
+    position: "stack",
+    bins: 30,
+    defaultBins: 30,
+    frequency: true,
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -2021,271 +2194,116 @@ function Bar(spec) {
   }
 }
 
-Bar.prototype = new Geom();
+Histogram.prototype = new Bar();
+  
+Histogram.prototype.constructor = Histogram;
 
-Bar.prototype.constructor = Bar;
+Histogram.prototype.domain = function(data, v) {
+  var s = this.setup(),
+      group, stackby,
+      groupSum, stackSum,
+      grouped;
 
-Bar.prototype.domain = function(data, a) {
-  // data passed here have been computed and 
-  // separated by facet if not fixed.
-  // all that is required is the stacked or dodged
-  // values
-  var layer = this.layer(),
-      plot = layer.plot(),
-      aes = layer.aes(),
-      position = layer.position() || this.position(),
-      valueVar = aes[a] ? aes[a]: "n. observations",
-      group, ord,
-      groupSum, stackSum;
-
-  // I need the ordinal axis variable
-  // and group axis variable to do this.
-  group = aes.fill || aes.color || aes.group;
-  ord = a === "x" ? aes.y: aes.x;
-  stackSum = _.mapValues(_.groupBy(data, function(d) {
-    return d[ord];
-  }), function(v, k) {
-    return _.reduce(_.pluck(v, valueVar), function(a,b) {
-      return a + b;
+  if(s.aes[v] === "binHeight") {
+    grouped = _.groupBy(data, function(d) {
+      return d.x;
     });
-  });
-  stackSum = d3.extent(_.map(stackSum, function(v, k) { return v; }));
-  groupSum = d3.extent(data, function(d) {
-    return d[valueVar];
-  });
-  this.stackSum(stackSum);
-  this.groupSum(groupSum);
-
-  stackSum[0] = 0;
-  groupSum[0] = 0;
-  stackSum[1] *= 1.1;
-  groupSum[1] *= 1.1;
-  return position === "stack" ? stackSum: groupSum;
-};
-
-Bar.prototype.draw = function() {
-  // bar takes an array of data, 
-  // nests by a required ordinal axis, optional color and group
-  // variables then calculates the stat and draws
-  // horizontal or vertical bars.
-  // stacked, grouped, expanded or not.
-  // scales first need to be calculated according to output
-  // of the stat. 
-  var s     = this.setup(),
-      that  = this;
-
-  function draw(sel, data, i, layerNum) {
-
-    var o, n, rb, 
-        valueVar,
-        groupOrd  = d3.scale.ordinal(),
-        drawX     = true,
-        drawY     = true;
-
-    if(_.contains(['wiggle', 'silhouette'], that.offset()) ){
-      if(s.plot.xScale().single.scaleType() === "ordinal"){
-        // x is ordinal, don't draw Y axis
-        drawY = false;
-        sel.select('.y.axis')
-          .selectAll('*')
-          .transition()
-          .style('opacity', 0)
-          .remove();
-      } else {
-        // y is ordinal, don't draw X.
-        drawX = false;
-        sel.select('.x.axis')
-          .selectAll('*')
-          .transition()
-          .style('opacity', 0)
-          .remove();
-      }
-    }
-    // gotta do something to reset domains if offset is expand
-    if(that.offset() === "expand"){
-      if(s.plot.xScale().single.scaleType() === "ordinal"){
-        _.mapValues(s.plot.yScale(), function(v, k) {
-          v.domain([0,1]);
-        });
-      } else {
-        _.mapValues(s.plot.xScale(), function(v, k) {
-          v.domain([0,1]);
-        });  
-      }
-    }
-
-
-    var scales = that.scalesAxes(sel, s, data.selector, layerNum,
-                                 drawX, drawY);
-    data = data.data;
-
-
-    // prep scales for vertical or horizontal use.
-    // "o" is ordinal, "n" is numeric
-    // width refers to scale defining rangeband of bars
-    // size refers to scale defining its length along numeric axis
-    // s and p on those objects are for size and position, respectively.
-    if(scales.y.scaleType() === 'ordinal'){
-      o = scales.y;
-      n = scales.x;
-      size = {s: "width", p:'x'};
-      width = {s:"height", p: 'y'};
-    } else {
-      o = scales.x;
-      n = scales.y;
-      size = {s: "height", p: 'y'};
-      width = {s: "width", p: 'x'};
-    }
-
-
-    s.nest.rollup(function(data) {
-      return s.stat.compute(data);
+    stackSum = _.mapValues(grouped, function(v, k) {
+      return _.reduce(_.pluck(v, "y"), function(a,b) {
+        return a + b;
+      });
     });
-    rb = o.scale().rangeBand();
-    valueVar = s.aes[size.p] || "n. observations";
-
-    // some warnings about nesting with bars
-    if(s.aes.fill && s.aes.group){
-      console.warn("Doesn't make a lot of sense with bars to set" +
-                   " aes.fill and aes.group. That's too many groupings." +
-                   " Maybe write a custom geom and specify fewer aesthetics.");
-    }
-
-    ggd3.tools.removeElements(sel, layerNum, "rect");
-
-    if(data.length){
-      // calculate stat
-      data = s.nest.entries(data);
-      // get back to array so we can nest for stack
-      data = ggd3.tools.unNest(data);
-      // nest so we can pass to stack
-      // but not necessary if we have no group
-      if(s.group !== s.aes[width.p]){
-        data = d3.nest().key(function(d) { return d[s.group];})
-                  .entries(data);
-        s.groups = _.pluck(data, 'key');
-        // stack layout requires all layers have same # of groups
-        // and sort each layer by group;
-        data = ggd3.tools.fillEmptyStackGroups(data, s.aes[width.p]);
-        var stack = d3.layout.stack()
-                      .x(function(d) { return d[s.aes[width.p]]; })
-                      .y(function(d) {
-                        return d[valueVar]; })
-                      .offset(that.offset())
-                      .values(function(d) { 
-                        return d.values; });
-        data = _.flatten(_.map(stack(data),
-                              function(d) {
-                                return d.values ? d.values: [];
-                              }));
-        if(s.position === 'dodge') {
-          // make ordinal scale for group
-          groupOrd.rangeRoundBands([0, rb])
-                  .domain(s.groups);
-          rb = groupOrd.rangeBand();
-        }
-        if(s.position !== "dodge"){
-          groupOrd = function(d) {
-            return 0;
-          };
-        }
-      }
-    }
-
-    var placeBar = function(d) {
-      var p = o.scale()(d[s.aes[width.p]]);
-      p += groupOrd(d[s.group]);
-      return p;
-    };
-
-    // I think this is unnecessary.
-    var calcSizeS = (function() {
-      if(s.position === 'stack' && size.p === "y"){
-        return function(d) {
-          return s.dim.y - n.scale()(d.y);
-        };
-      }
-      if(s.position === "stack"){
-        return function(d) {
-          return n.scale()(d.y);
-        };
-      }
-      if(s.position === "dodge" && size.p === "y"){
-        return function(d) {
-          return s.dim.y - n.scale()(d.y); 
-        };
-      }
-      return function(d) {
-        return n.scale()(d[valueVar]); 
-      };
-    })();
-    var calcSizeP = (function () {
-      if(s.position === "stack" && size.p === "y"){
-        return function(d) { 
-          return n.scale()(d.y0 + d.y); 
-          };
-      }
-      if(s.position === "stack"){
-        return function(d) {
-          return n.scale()(d.y0);
-        };
-      }
-      if(s.position === "dodge" && size.p === "y") {
-        return function(d) {
-          return n.scale()(d.y);
-        };
-      }
-      return function(d) {
-        return 0;
-      };
-    } )();
-
-
-    var bars = sel.select('.plot')
-                  .selectAll('rect.geom.g' + layerNum)
-                  .data(data);
-    // add canvas and svg functions.
-    function drawBar(rect) {
-      rect.attr('class', 'geom g' + layerNum + ' geom-bar')
-        .attr(size.s, calcSizeS)
-        .attr(width.s, rb)
-        .attr(size.p, calcSizeP)
-        .attr(width.p , placeBar)
-        .style('fill-opacity', s.alpha)
-        .attr('fill', s.fill)
-        .style('stroke', s.color)
-        .style('stroke-width', that.lineWidth())
-        .attr('value', function(d) { 
-          return d[s.group] + "~" + d[s.aes[width.p]];
-        });
-    }
-
-    bars.transition().call(drawBar);
-    
-    bars.enter()
-      .append('rect')
-      .style('fill-opacity', s.alpha)
-      .attr('fill', s.fill)
-      .style('stroke', s.color)
-      .style('stroke-width', that.lineWidth())
-      .attr(width.s, rb)
-      .attr(width.p, placeBar)
-      .attr(size.s, 0)
-      .attr(size.p, function(d) {
-        return size.p === "y" ? s.dim.y: 0;
-      })
-      .transition()
-      .call(drawBar);
-
-    bars.exit()
-      .transition()
-      .style('opacity', 0)
-      .remove();
+    stackSum = d3.extent(_.map(stackSum, function(v, k) { return v; }));
+    groupSum = d3.extent(data, function(d) {
+      return d.y;
+    });
+    extent = s.position === "stack" ? stackSum: groupSum;
+    range = extent[1] - extent[0];
+    extent[0] -= 0.05*range;
+  } else {
+    extent = d3.extent(_.pluck(data, 'x'));
+    range = extent[1] - extent[0];
+    extent[0] -= 0.1*range;
   }
-  return draw;
+  // extent both ways to draw an empty chart, I guess
+  if(range === 0){
+    extent[0] -= 1;
+    extent[1] += 1;
+  }
+  extent[1] += 0.1*range;
+  return extent;
 };
 
-ggd3.geoms.bar = Bar;
+Histogram.prototype.rollup = function(data, s) {
+  // first get bins according to ungrouped data;
+  if(!s.grouped) { 
+    return s.nest.entries(data); 
+  }
+  var unNested = s.stat.compute(data),
+      bins = _.map(unNested, "x");
+  // this is the problem
+  // there should be a 'fixed bins' flag
+  this.bins(bins);
+  return s.nest.entries(data);
+};
+
+Histogram.prototype.fillEmptyStackGroups = function(data, v) {
+  console.log(data);
+  var keys = _.unique(_.map(data, function(d) { return d.key; })),
+      vals = _.unique(_.flatten(_.map(data, function(d) {
+        return _.map(d.values, 'x');
+      }))),
+      empty = {},
+      n = d3.nest()
+            .key(function(d) { return d[v]; });
+  empty.y = 0;
+  empty.binHeight = 0;
+  empty.dx = data[0].dx;
+  _.each(data, function(d) {
+    var dkey, missing;
+    dkeys = _.map(d.values, 'x');
+    missing = _.compact(_.filter(vals, function(k) {
+      return !_.contains(dkeys, k);
+    }));
+    if(!_.isEmpty(missing)) {
+      _.each(missing, function(m) {
+        // must fill other values, too.
+        var e = _.clone(empty);
+        e.x = m;
+        d.values.push(e);
+      });
+    }
+    d.values = _.sortBy(d.values, function(e) {
+      return e.x;
+    });
+  });
+  return data;
+};
+// different geoms may want to be nested
+// differently.
+Histogram.prototype.nest = function() {
+
+  // to be performed before calculating layer level geoms or scales
+  var aes = this.layer().aes(),
+      plot = this.layer().plot(),
+      nest = d3.nest(),
+      dtypes = plot.dtypes(),
+      nestVars = _.unique(_.compact([aes.group, aes.fill, aes.color]));
+
+  _.each(nestVars, function(n) {
+    if(dtypes[n][1] !== "many") {
+      nest.key(function(d) { return d[n]; });
+    }
+  });
+  _.map(['x', 'y'], function(a) {
+    if(plot[a + "Scale"]().single.scaleType() === "ordinal"){
+      nest.key(function(d) { return d[aes[a]]; });
+    }
+  });
+  return nest;
+};
+
+ggd3.geoms.histogram = Histogram;
 
 // 
 function Box(spec) {
@@ -2316,7 +2334,7 @@ function Density(spec) {
   if(!(this instanceof Geom)){
     return new Density(spec);
   }
-  Histogram.apply(this, spec);
+  Geom.apply(this, spec);
   var attributes = {
     name: "density",
     stat: "density",
@@ -2336,14 +2354,14 @@ function Density(spec) {
   }
 }
 
-Density.prototype = new Histogram();
+Density.prototype = new Geom();
   
 Density.prototype.constructor = Density;
 
 Density.prototype.kde = function(kernel, x) {
   return function(sample) {
     return x.map(function(x) {
-      return [x, d3.mean(sample, function(v) { return kernel(x-v); })*10];
+      return [x, d3.mean(sample, function(v) { return kernel(x-v); })];
     });
   };
 };
@@ -2427,149 +2445,6 @@ Density.prototype.draw = function(){
 };
 
 ggd3.geoms.density = Density;
-// Base geom from which all geoms inherit
-function Geom(aes) {
-  
-  if(!(this instanceof Geom)){
-    return new Geom(aes);
-  }
-  var attributes = {
-    layer: null,
-    stat: null,
-    fill: null,
-    alpha: null,
-    color: null,
-    size: null,
-    position: null,
-    lineWidth: null,
-    drawX: true,
-    drawY: true,
-    style: "", // optional class attributes for css 
-  };
-  this.attributes = attributes;
-} 
-Geom.prototype.defaultPosition = function() {
-  var n = this.name();
-  return {
-    "point": "identity",
-    "text": "identity",
-    "bar": "stack",
-    "box": "dodge",
-    "hline": "identity",
-    "vline": "identity",
-    "abline": "identity",
-    "smooth": "loess", 
-    "area" : "identity",
-    "error": "identity",
-    "density": "kernel",
-    "path" : "identity",
-    "ribbon" : "identity",
-    }[n];
-};
-
-Geom.prototype.setup = function() {
-  var s = {
-      layer     : this.layer(),
-    };
-  s.plot      = s.layer.plot();
-  s.stat      = s.layer.stat();
-  s.nest      = s.layer.geomNest();
-  s.position  = s.layer.position();
-  s.dim       = s.plot.plotDim();
-  s.facet     = s.plot.facet();
-  s.aes       = s.layer.aes();
-  s.fill      = d3.functor(this.fill() || s.plot.fill());
-  s.size      = d3.functor(this.size() || s.plot.size());
-  s.alpha     = d3.functor(this.alpha() || s.plot.alpha());
-  s.color     = d3.functor(this.color() || s.plot.color());
-
-  if(s.aes.fill) {
-    s.grouped = true;
-    s.group = s.aes.fill;
-  } else if(s.aes.color){
-    s.grouped = true;
-    s.group = aes.color;
-  } else if(aes.group){
-    s.grouped = true;
-    s.group = s.aes.group;
-  }
-  if(_.contains([s.facet.x(), s.facet.y(), 
-                s.aes.x, s.aes.y], 
-                s.group)) {
-    // uninteresting grouping, get rid of it.
-    grouped = false;
-    group = null;
-    groups = null;
-  }
-
-  return s;
-};
-
-Geom.prototype.domain = function(data, a) {
-  var layer   = this.layer(),
-      plot    = layer.plot(),
-      aes     = layer.aes(),
-      extent  = d3.extent(_.pluck(data, aes[a])),
-      range   = extent[1] - extent[0];
-
-  // done if date
-  if(_.contains(["date", "time"], plot.dtypes()[aes[a]][0]) ){
-    return extent;
-  }
-  // point always extends both ways
-  if(range === 0){
-    extent[0] -= 1;
-    extent[1] += 1;
-  }
-  extent[0] -= 0.1 * range;
-  extent[1] += 0.1 * range;
-  return extent;
-};
-
-
-Geom.prototype.scalesAxes = function(sel, setup, selector, 
-                                     layerNum, drawX, drawY){
-
-  var x, y;
-    // choosing scales based on facet rule,
-  // factor out.
-  if(!_.contains(["free", "free_x"], setup.facet.scales()) || 
-     _.isUndefined(setup.plot.xScale()[selector])){
-    x = setup.plot.xScale().single;
-    xfree = false;
-  } else {
-    x = setup.plot.xScale()[selector];
-    xfree = true;
-  }
-  if(!_.contains(["free", "free_y"], setup.facet.scales()) || 
-     _.isUndefined(setup.plot.xScale()[selector])){
-    y = setup.plot.yScale().single;
-    yfree = false;
-  } else {
-    y = setup.plot.yScale()[selector];
-    yfree = true;
-  }
-
-  if(layerNum === 0 && drawX){
-    sel.select('.x.axis')
-      .attr("transform", "translate(" + x.positionAxis() + ")")
-      .transition().call(x.axis);
-  }
-  if(layerNum === 0 && drawY){
-    sel.select('.y.axis')
-      .attr("transform", "translate(" + y.positionAxis() + ")")
-      .transition().call(y.axis);
-  }
-  return {
-    x: x,
-    y: y,
-    xfree: xfree,
-    yfree: yfree,
-  };
-};
-
-ggd3.geom = Geom;
-
 
 function Hline(spec) {
   if(!(this instanceof Geom)){
@@ -2578,6 +2453,7 @@ function Hline(spec) {
   Line.apply(this);
   var attributes = {
     name: "hline",
+    direction: "x",
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -3000,6 +2876,7 @@ function Vline(spec) {
   Hline.apply(this);
   var attributes = {
     name: "vline",
+    direction: "y",
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -3177,6 +3054,7 @@ Stat.prototype.calcBin = function(data) {
   var aes = this.layer().aes(),
       g = this.layer().geom(),
       h, n;
+  
   if(aes.y && aes.x) {
     // we've been through before and density exists on aes
     h = aes.y === "binHeight" ? 'y': 'x';
@@ -3193,6 +3071,7 @@ Stat.prototype.calcBin = function(data) {
                 });
   data = hist(data);
   data.map(function(d) {
+    if(_.isEmpty(d)) { return d; }
     d[aes[n]] = d.x;
     d.binHeight = d.y;
     // all other aesthetics in histograms will only map to

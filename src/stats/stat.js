@@ -157,6 +157,7 @@ Stat.prototype.calcBin = function(data) {
   var aes = this.layer().aes(),
       g = this.layer().geom(),
       h, n;
+  
   if(aes.y && aes.x) {
     // we've been through before and density exists on aes
     h = aes.y === "binHeight" ? 'y': 'x';
@@ -173,6 +174,7 @@ Stat.prototype.calcBin = function(data) {
                 });
   data = hist(data);
   data.map(function(d) {
+    if(_.isEmpty(d)) { return d; }
     d[aes[n]] = d.x;
     d.binHeight = d.y;
     // all other aesthetics in histograms will only map to

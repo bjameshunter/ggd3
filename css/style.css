@@ -3,8 +3,7 @@
   fill:none;
   shape-Rendering: crispEdges;
   stroke: #222222;
-  stroke-dasharray: "2,2";
-  stroke-opacity: 0.4 ;
+  stroke-opacity: 0.9 ;
 }
 svg {
   font: 10px sans-serif;
