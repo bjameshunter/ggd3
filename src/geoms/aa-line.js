@@ -56,10 +56,10 @@ Line.prototype.drawLines = function (path, line, s, layerNum) {
     .attr('d', line)
     .attr('stroke-dasharray', this.lineType());
   if(!this.grid()){
-    path  
+    path
+      .attr('stroke-opacity', function(d) { return s.alpha(d[1]) ;})
       .attr('stroke', function(d) { return s.color(d[1]);})
-      .attr('stroke-width', this.lineWidth() || s.plot.lineWidth())
-      .attr('fill', 'none');
+      .attr('stroke-width', this.lineWidth() || s.plot.lineWidth());
   }
 };
 
@@ -80,7 +80,7 @@ Line.prototype.draw = function draw(sel, data, i, layerNum){
       scales = this.scalesAxes(sel, s, data.selector, layerNum,
                                  this.drawX(), this.drawY());
 
-  ggd3.tools.removeElements(sel, layerNum, this.geom());
+  ggd3.tools.removeElements(sel, layerNum, "geom-" + this.name());
   data = this.prepareData(data, s, scales);
   sel = this.grid() ? sel.select("." + this.direction() + 'grid'): sel.select('.plot');
   var lines = sel

@@ -28,6 +28,11 @@ function Layer(aes) {
   }
   return this;
 }
+Layer.prototype.plot = function(plot) {
+  if(!arguments.length) { return this.attributes.plot; }
+  this.attributes.plot = plot;
+  return this;
+};
 Layer.prototype.position = function(position){
   if(!arguments.length) { return this.attributes.position; }
   if(this.geom()){
@@ -107,9 +112,16 @@ Layer.prototype.setStat = function() {
   }, this);
 
 };
-Layer.prototype.data = function(data) {
+Layer.prototype.data = function(data, fromPlot) {
   if(!arguments.length) { return this.attributes.data; }
-  this.attributes.data = data;
+  if(fromPlot){
+    this.attributes.data = data;
+  } else {
+    data = ggd3.tools.unNest(data);
+    data = ggd3.tools.clean(data, this);
+    this.attributes.dtypes = _.merge(this.attributes.dtypes, data.dtypes);
+    this.attributes.data = data.data;
+  }
   return this;
 };
 

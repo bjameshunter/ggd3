@@ -652,6 +652,11 @@ function Layer(aes) {
   }
   return this;
 }
+Layer.prototype.plot = function(plot) {
+  if(!arguments.length) { return this.attributes.plot; }
+  this.attributes.plot = plot;
+  return this;
+};
 Layer.prototype.position = function(position){
   if(!arguments.length) { return this.attributes.position; }
   if(this.geom()){
@@ -731,9 +736,16 @@ Layer.prototype.setStat = function() {
   }, this);
 
 };
-Layer.prototype.data = function(data) {
+Layer.prototype.data = function(data, fromPlot) {
   if(!arguments.length) { return this.attributes.data; }
-  this.attributes.data = data;
+  if(fromPlot){
+    this.attributes.data = data;
+  } else {
+    data = ggd3.tools.unNest(data);
+    data = ggd3.tools.clean(data, this);
+    this.attributes.dtypes = _.merge(this.attributes.dtypes, data.dtypes);
+    this.attributes.data = data.data;
+  }
   return this;
 };
 
@@ -961,13 +973,13 @@ Plot.prototype.layers = function(layers) {
         // passed string to get geom with default settings
         l = ggd3.layer()
               .aes(_.clone(this.aes()))
-              .data(this.data())
+              .data(this.data(), true)
               .geom(l);
       } else if ( l instanceof ggd3.layer ){
         // user specified layer
         aes = _.clone(l.aes());
         if(!l.data()) { 
-          l.data(this.data()); 
+          l.data(this.data(), true); 
         } else {
           l.ownData(true);
         }
@@ -976,7 +988,7 @@ Plot.prototype.layers = function(layers) {
         var g = l;
         l = ggd3.layer()
                 .aes(_.clone(this.aes()))
-                .data(this.data())
+                .data(this.data(), true)
                 .geom(g);
       }
       l.plot(this).dtypes(this.dtypes());
@@ -984,7 +996,7 @@ Plot.prototype.layers = function(layers) {
     }, this);
   } else if (layers instanceof ggd3.layer) {
     if(!layers.data()) { 
-      layers.data(this.data()); 
+      layers.data(this.data(), true); 
     } else {
       layers.ownData(true);
     }
@@ -1028,7 +1040,7 @@ Plot.prototype.updateLayers = function() {
   // one layer
   _.each(this.layers(), function(l) {
     l.dtypes(this.dtypes());
-    if(!l.ownData()) { l.data(this.data()); }
+    if(!l.ownData()) { l.data(this.data(), true); }
     l.aes(_.merge(_.clone(this.aes()), l.aes()));
   }, this);
 };
@@ -1099,21 +1111,20 @@ Plot.prototype.draw = function(sel) {
                     return "g" + (n);
                   });
 
-  _.each(that.layers(), function(l, i) {
-    l.draw(sel, i);
-    sel.selectAll('.geom')
-      .filter(function() {
-        var cl = d3.select(this).node().classList;
-        return !_.contains(classes, cl[1]);
-      })
-      .transition().style('opacity', 0).remove();
+  _.each(that.layers(), function(l, layerNum) {
+    l.draw(sel, layerNum);
   });
+  sel.selectAll('.geom')
+    .filter(function() {
+      var cl = d3.select(this).attr('class').split(' ');
+      return !_.contains(classes, cl[1]);
+    })
+    .transition().style('opacity', 0).remove();
   // if any of the layers had a jitter, it has
   // been added to each facet's dataset
   if(_.any(chart.layers(), function(l) {
     return l.position() === "jitter";
   }) ) { 
-
     that.hasJitter = true; 
   }
 };
@@ -2148,10 +2159,10 @@ Line.prototype.drawLines = function (path, line, s, layerNum) {
     .attr('d', line)
     .attr('stroke-dasharray', this.lineType());
   if(!this.grid()){
-    path  
+    path
+      .attr('stroke-opacity', function(d) { return s.alpha(d[1]) ;})
       .attr('stroke', function(d) { return s.color(d[1]);})
-      .attr('stroke-width', this.lineWidth() || s.plot.lineWidth())
-      .attr('fill', 'none');
+      .attr('stroke-width', this.lineWidth() || s.plot.lineWidth());
   }
 };
 
@@ -2172,7 +2183,7 @@ Line.prototype.draw = function draw(sel, data, i, layerNum){
       scales = this.scalesAxes(sel, s, data.selector, layerNum,
                                  this.drawX(), this.drawY());
 
-  ggd3.tools.removeElements(sel, layerNum, this.geom());
+  ggd3.tools.removeElements(sel, layerNum, "geom-" + this.name());
   data = this.prepareData(data, s, scales);
   sel = this.grid() ? sel.select("." + this.direction() + 'grid'): sel.select('.plot');
   var lines = sel
@@ -2331,15 +2342,15 @@ ggd3.geoms.histogram = Histogram;
 
 function Abline(spec) {
   if(!(this instanceof Geom)){
-    return new Hline(spec);
+    return new Abline(spec);
   }
   Line.apply(this);
   var attributes = {
-    name: "hline",
-    direction: "x",
+    name: "abline",
+    // color: d3.functor("black")
   };
 
-  this.attributes = _.merge(this.attributes, attributes);
+  this.attributes = _.merge(_.clone(this.attributes), attributes);
 
   for(var attr in this.attributes){
     if((!this[attr] && this.attributes.hasOwnProperty(attr))){
@@ -2353,20 +2364,13 @@ Abline.prototype = new Line();
 Abline.prototype.constructor = Abline;
 
 Abline.prototype.domain = function(data, a) {
-  console.log(data);
+  // it is not getting called because slope and intercept
+  // have no need to set a scales domain.
+  // maybe...
   return data;
 };
 
-
-Abline.prototype.generator = function(s) {
-
-  return d3.svg.line()
-          .x(function(d) { return x(d[s.aes.x]); })
-          .y(function(d) { return y(d[s.aes.y]); })
-          .interpolate(this.interpolate());
-};
-
-Abline.prototype.prepareData = function(data, s, scales) {
+Abline.prototype.prepareData = function(d, s, scales) {
   if(!_.contains(_.keys(s.aes), "yint")){
     throw "geom abline requires aesthetic 'yint' and an optional slope.";
   }
@@ -2376,12 +2380,37 @@ Abline.prototype.prepareData = function(data, s, scales) {
   if(!s.aes.slope){
     s.aes.slope = 0;
   }
-  console.log(data);
-  console.log(s);
-
-
+  var xdomain = scales.x.scale().domain(),
+      data;
+  if(_.isNumber(s.aes.yint)){
+    s.aes.yint = [s.aes.yint];
+  }
+  if(_.isArray(s.aes.yint)){
+    // yints and slopes are drawn on every facet.
+    data = _.map(s.aes.yint, function(y) {
+      return _.map(xdomain, function(x, i) {
+        var o = {};
+        o[s.aes.x] = x;
+        o[s.aes.y] = y + s.aes.slope * x;
+        return o;
+      });
+    });
+  }
+  if(_.isString(s.aes.yint)){
+    data = [];
+    _.each(d.data, function(row) {
+      data.push(_.map(xdomain, function(x) {
+        var o = {};
+        o[s.aes.x] = x;
+        o[s.aes.y] = row[s.aes.yint] + row[s.aes.slope] * x;
+        o = _.merge(_.clone(row), o);
+        return o;
+      }));
+    }); 
+  }
   return data;
 };
+
 
 ggd3.geoms.abline = Abline;
 // 
@@ -2422,7 +2451,8 @@ function Density(spec) {
     smooth: 6,
     nPoints: 100,
     fill: false, // fill with same color?
-    alpha: 0.4
+    alpha: 0.4,
+    lineType: null,
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -2471,6 +2501,7 @@ Density.prototype.draw = function(sel, data, i, layerNum){
             return line(d.values);
         })
         .attr('stroke-width', that.lineWidth())
+        .attr('stroke-dasharray', that.lineType())
         .attr('stroke', function(d) {
           return s.color(d.values[1]); 
         });

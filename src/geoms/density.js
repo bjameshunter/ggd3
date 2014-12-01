@@ -12,7 +12,8 @@ function Density(spec) {
     smooth: 6,
     nPoints: 100,
     fill: false, // fill with same color?
-    alpha: 0.4
+    alpha: 0.4,
+    lineType: null,
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -61,6 +62,7 @@ Density.prototype.draw = function(sel, data, i, layerNum){
             return line(d.values);
         })
         .attr('stroke-width', that.lineWidth())
+        .attr('stroke-dasharray', that.lineType())
         .attr('stroke', function(d) {
           return s.color(d.values[1]); 
         });

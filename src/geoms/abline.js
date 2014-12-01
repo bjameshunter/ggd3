@@ -1,15 +1,15 @@
 
 function Abline(spec) {
   if(!(this instanceof Geom)){
-    return new Hline(spec);
+    return new Abline(spec);
   }
   Line.apply(this);
   var attributes = {
-    name: "hline",
-    direction: "x",
+    name: "abline",
+    // color: d3.functor("black")
   };
 
-  this.attributes = _.merge(this.attributes, attributes);
+  this.attributes = _.merge(_.clone(this.attributes), attributes);
 
   for(var attr in this.attributes){
     if((!this[attr] && this.attributes.hasOwnProperty(attr))){
@@ -23,20 +23,13 @@ Abline.prototype = new Line();
 Abline.prototype.constructor = Abline;
 
 Abline.prototype.domain = function(data, a) {
-  console.log(data);
+  // it is not getting called because slope and intercept
+  // have no need to set a scales domain.
+  // maybe...
   return data;
 };
 
-
-Abline.prototype.generator = function(s) {
-
-  return d3.svg.line()
-          .x(function(d) { return x(d[s.aes.x]); })
-          .y(function(d) { return y(d[s.aes.y]); })
-          .interpolate(this.interpolate());
-};
-
-Abline.prototype.prepareData = function(data, s, scales) {
+Abline.prototype.prepareData = function(d, s, scales) {
   if(!_.contains(_.keys(s.aes), "yint")){
     throw "geom abline requires aesthetic 'yint' and an optional slope.";
   }
@@ -46,11 +39,36 @@ Abline.prototype.prepareData = function(data, s, scales) {
   if(!s.aes.slope){
     s.aes.slope = 0;
   }
-  console.log(data);
-  console.log(s);
-
-
+  var xdomain = scales.x.scale().domain(),
+      data;
+  if(_.isNumber(s.aes.yint)){
+    s.aes.yint = [s.aes.yint];
+  }
+  if(_.isArray(s.aes.yint)){
+    // yints and slopes are drawn on every facet.
+    data = _.map(s.aes.yint, function(y) {
+      return _.map(xdomain, function(x, i) {
+        var o = {};
+        o[s.aes.x] = x;
+        o[s.aes.y] = y + s.aes.slope * x;
+        return o;
+      });
+    });
+  }
+  if(_.isString(s.aes.yint)){
+    data = [];
+    _.each(d.data, function(row) {
+      data.push(_.map(xdomain, function(x) {
+        var o = {};
+        o[s.aes.x] = x;
+        o[s.aes.y] = row[s.aes.yint] + row[s.aes.slope] * x;
+        o = _.merge(_.clone(row), o);
+        return o;
+      }));
+    }); 
+  }
   return data;
 };
+
 
 ggd3.geoms.abline = Abline;

@@ -69,7 +69,8 @@ var aes = {'mtcars.csv': {x: "cyl",y:"mpg", fill: "gear"},
             label: "variable", color:'variable'},
             "ustimeseries.csv": {x: 'date', y: 'value', fill: 'variable',
             color:'variable'},
-            "wells.csv": {x: "arsenic", y: 'dist', fill:'switch', alpha:'dist'}
+            "wells.csv": {x: "arsenic", y: 'dist', fill:'switch', alpha:'dist',
+            color:"switch"}
           };
 var dtypes = {'mtcars.csv': {"gear": ["string"], "cyl": ["string"]},
             "iris.csv" : {},
@@ -114,10 +115,14 @@ var layers = {'mtcars.csv': ['bar'],
             "nelplo.csv": [line],
             "ustimeseries.csv": [line],
             "wells.csv": [ggd3.layer()
-                            .geom('point'),
+                            .geom(ggd3.geoms.point().color(null)),
                           ggd3.layer()
-                            .geom('abline')
-                            .aes({yint: [100, 200], slope: 3})],
+                            .data([{int: 100, slope: 20, assoc: 0, switch: 1}, 
+                                  {int: 120, slope:-10, assoc: 1, switch: 1},
+                                  {int: 150, slope: 0, assoc: 1, switch: 0}])
+                            .geom(ggd3.geoms.abline().lineType("5,3")
+                                    .color('darkseagreen').alpha(1))
+                            .aes({yint: "int", slope: "slope"})],
           };
 var charts = {'mtcars.csv': ggd3.plot()
                     .width(300)

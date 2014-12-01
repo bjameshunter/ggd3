@@ -172,13 +172,13 @@ Plot.prototype.layers = function(layers) {
         // passed string to get geom with default settings
         l = ggd3.layer()
               .aes(_.clone(this.aes()))
-              .data(this.data())
+              .data(this.data(), true)
               .geom(l);
       } else if ( l instanceof ggd3.layer ){
         // user specified layer
         aes = _.clone(l.aes());
         if(!l.data()) { 
-          l.data(this.data()); 
+          l.data(this.data(), true); 
         } else {
           l.ownData(true);
         }
@@ -187,7 +187,7 @@ Plot.prototype.layers = function(layers) {
         var g = l;
         l = ggd3.layer()
                 .aes(_.clone(this.aes()))
-                .data(this.data())
+                .data(this.data(), true)
                 .geom(g);
       }
       l.plot(this).dtypes(this.dtypes());
@@ -195,7 +195,7 @@ Plot.prototype.layers = function(layers) {
     }, this);
   } else if (layers instanceof ggd3.layer) {
     if(!layers.data()) { 
-      layers.data(this.data()); 
+      layers.data(this.data(), true); 
     } else {
       layers.ownData(true);
     }
@@ -239,7 +239,7 @@ Plot.prototype.updateLayers = function() {
   // one layer
   _.each(this.layers(), function(l) {
     l.dtypes(this.dtypes());
-    if(!l.ownData()) { l.data(this.data()); }
+    if(!l.ownData()) { l.data(this.data(), true); }
     l.aes(_.merge(_.clone(this.aes()), l.aes()));
   }, this);
 };
@@ -310,21 +310,20 @@ Plot.prototype.draw = function(sel) {
                     return "g" + (n);
                   });
 
-  _.each(that.layers(), function(l, i) {
-    l.draw(sel, i);
-    sel.selectAll('.geom')
-      .filter(function() {
-        var cl = d3.select(this).node().classList;
-        return !_.contains(classes, cl[1]);
-      })
-      .transition().style('opacity', 0).remove();
+  _.each(that.layers(), function(l, layerNum) {
+    l.draw(sel, layerNum);
   });
+  sel.selectAll('.geom')
+    .filter(function() {
+      var cl = d3.select(this).attr('class').split(' ');
+      return !_.contains(classes, cl[1]);
+    })
+    .transition().style('opacity', 0).remove();
   // if any of the layers had a jitter, it has
   // been added to each facet's dataset
   if(_.any(chart.layers(), function(l) {
     return l.position() === "jitter";
   }) ) { 
-
     that.hasJitter = true; 
   }
 };
