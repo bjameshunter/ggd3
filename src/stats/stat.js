@@ -166,8 +166,9 @@ Stat.prototype.calcBin = function(data) {
     aes[h] = "binHeight";
   }
   n = h === "y" ? "x": "y";
+
   var hist = d3.layout.histogram()
-                .bins(g.bins())
+                .bins(g.breaks())
                 .frequency(g.frequency())
                 .value(function(d) {
                   return d[aes[n]];

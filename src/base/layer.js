@@ -44,6 +44,7 @@ Layer.prototype.updateGeom = function() {
 Layer.prototype.aes = function(aes) {
   if(!arguments.length) { return this.attributes.aes; }
   this.attributes.aes = _.merge(this.attributes.aes, aes);
+  console.log(this.attributes.aes);
   this.updateGeom();
   return this;
 };
@@ -113,7 +114,8 @@ Layer.prototype.data = function(data) {
   return this;
 };
 
-Layer.prototype.draw = function(layerNum) {
+Layer.prototype.draw = function(sel, layerNum) {
+
   var that = this,
       facet = this.plot().facet(),
       plot = this.plot(),
@@ -129,28 +131,26 @@ Layer.prototype.draw = function(layerNum) {
     dlist = plot.dataList(plot.data());
   }
   
-  function draw(sel) {
-    var divs = [];
+  var divs = [];
 
-    sel.selectAll('.plot-div')
-      .each(function(d) {
-        divs.push(d3.select(this).attr('id'));
-      });
-    _.each(divs, function(id, i){
-      // cycle through all divs, drawing data if it exists.
-      var s = sel.select("#" + id),
-          d = dlist.filter(function(d) {
-            return d.selector === id;
-          })[0];
-      if(_.isEmpty(d)) { d = {selector: id, data: []}; }
-      if(that.position() === "jitter" && 
-         !plot.hasJitter) {
-        _.each(d.data, function(r) { r._jitter = _.random(-1,1,1); });        
-      }
-      that.geom().draw()(s, d, i, layerNum);
+  sel.selectAll('.plot-div')
+    .each(function(d) {
+      divs.push(d3.select(this).attr('id'));
     });
-  }
-  return draw;
+  _.each(divs, function(id, i){
+    // cycle through all divs, drawing data if it exists.
+    var s = sel.select("#" + id),
+        d = dlist.filter(function(d) {
+          return d.selector === id;
+        })[0];
+    if(_.isEmpty(d)) { d = {selector: id, data: []}; }
+    if(that.position() === "jitter" && 
+       !plot.hasJitter) {
+      console.log('setting jitter');
+      _.each(d.data, function(r) { r._jitter = _.random(-1,1,1); });        
+    }
+    that.geom().draw(s, d, i, layerNum);
+  });
 };
 
 // same as on plot, for when Layer has it's own data

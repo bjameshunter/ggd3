@@ -8,7 +8,7 @@ function Point(spec) {
   Geom.apply(this);
   var attributes = {
     name: "point",
-    shape: "circle",
+    geom: "circle",
     stat: "identity",
     position: "identity",
     subRangeBand: 0.3,
@@ -43,7 +43,6 @@ Point.prototype.positionPoint = function(s, group, groups) {
     rb = sub.rangeBand()/2;
     shift = d3.sum(s.rangeBands(), function(r) {
       return r*s.scale().rangeBand();});
-    console.log(shift);
   } else if(s.scaleType() === "ordinal") {
     sub = function() { 
       return s.scale().rangeBand() / 2; 
@@ -59,53 +58,55 @@ Point.prototype.positionPoint = function(s, group, groups) {
   };
 };
 
-Point.prototype.draw = function() {
+Point.prototype.position = function(d, x, y, size) {
+  return {
+    cx: x(d),
+    cy: y(d),
+    r: size(d)
+  };
+};
+
+Point.prototype.draw = function(sel, data, i, layerNum) {
 
   var s     = this.setup(),
-      that  = this,
-      geom  = d3.superformula()
-                .type(function(d) {
-                  return d[aes.shape] || that.shape();
-                })
-                .size(s.size)
-                .segments(10);
-  function draw(sel, data, i, layerNum) {
+      scales = this.scalesAxes(sel, s, data.selector, layerNum,
+                               true, true);
+  s.groups = _.unique(_.pluck(data.data, s.group));
+  data = this.unNest(this.compute(data.data, s  ));
+  // get rid of wrong elements if they exist.
 
-    var scales = that.scalesAxes(sel, s, data.selector, layerNum,
-                                 true, true);
-    s.groups = _.unique(_.pluck(data.data, s.group));
-    // get rid of wrong elements if they exist.
-    ggd3.tools.removeElements(sel, layerNum, "path");
-    var points = sel.select('.plot')
-                  .selectAll('path.geom.g' + layerNum)
-                  .data(s.stat.compute(data.data));
-    
-    // poing should have both canvas and svg functions.
-    var positionX = that.positionPoint(scales.x, s.group, s.groups),
-        positionY = that.positionPoint(scales.y, s.group, s.groups);
+  ggd3.tools.removeElements(sel, layerNum, this.geom());
+  var points = sel.select('.plot')
+                .selectAll(this.geom() + '.geom.g' + layerNum)
+                .data(data);
+  
+  // poing should have both canvas and svg functions.
+  var x = this.positionPoint(scales.x, s.group, s.groups),
+      y = this.positionPoint(scales.y, s.group, s.groups);
 
-    function drawPoint(point) {
+  points.transition().call(this.drawGeom, x, y, s, layerNum);
+  points.enter().append(this.geom())
+    .call(this.drawGeom, x, y, s, layerNum);
+  points.exit()
+    .transition()
+    .style('opacity', 0)
+    .remove();
+};
 
-      point
-        .attr('class', 'geom g' + layerNum + " geom-point")
-        .attr('d', geom)
-        .attr('transform', function(d) { 
-          return "translate(" + positionX(d) + "," +
-           positionY(d) + ")"; } )
-        .attr('fill', s.fill)
-        .style('stroke', s.color)
-        .style('stroke-width', 1)
-        .style('fill-opacity', s.alpha);
-    }
-
-    points.transition().call(drawPoint);
-    points.enter().append('path').call(drawPoint);
-    points.exit()
-      .transition()
-      .style('opacity', 0)
-      .remove();
-  }
-  return draw;
+Point.prototype.drawGeom = function (point, x, y, s, i) {
+  point
+    .attr('class', 'geom g' + i + " geom-point")
+    .attr({
+      cx: x,
+      cy: y,
+      r: s.size,
+      fill: s.fill
+    })
+    .style({
+      stroke: s.color,
+      "stroke-width": 1,
+      "fill-opacity": s.alpha
+    });
 };
 
 ggd3.geoms.point = Point;

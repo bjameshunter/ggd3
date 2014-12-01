@@ -9,7 +9,7 @@ function Histogram(spec) {
     stat: "bin",
     position: "stack",
     bins: 30,
-    defaultBins: 30,
+    breaks: null,
     frequency: true,
   };
 
@@ -62,16 +62,17 @@ Histogram.prototype.domain = function(data, v) {
   return extent;
 };
 
-Histogram.prototype.rollup = function(data, s) {
+Histogram.prototype.compute = function(data, s) {
   // first get bins according to ungrouped data;
   if(!s.grouped) { 
     return s.nest.entries(data); 
   }
+  this.breaks(this.bins());
   var unNested = s.stat.compute(data),
-      bins = _.map(unNested, "x");
+      breaks = _.map(unNested, "x");
   // this is the problem
   // there should be a 'fixed bins' flag
-  this.bins(bins);
+  this.breaks(breaks);
   return s.nest.entries(data);
 };
 
@@ -107,11 +108,14 @@ Histogram.prototype.fillEmptyStackGroups = function(data, v) {
   });
   return data;
 };
-// different geoms may want to be nested
-// differently.
+// geoms may want to be nested differently.
 Histogram.prototype.nest = function() {
-
-  // to be performed before calculating layer level geoms or scales
+  // if stacking histograms, bins must be calculated
+  // first on entire facet, then individually on
+  // each layer. If facet.scales() === "fixed"
+  // bins should be the same across facets. If not
+  // the pre calculated bins need to be stored and 
+  // referenced when calculating layers.
   var aes = this.layer().aes(),
       plot = this.layer().plot(),
       nest = d3.nest(),

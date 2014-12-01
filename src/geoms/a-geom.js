@@ -53,6 +53,10 @@ Geom.prototype.setup = function() {
   s.alpha     = d3.functor(this.alpha() || s.plot.alpha());
   s.color     = d3.functor(this.color() || s.plot.color());
 
+  s.nest.rollup(function(d) {
+    return s.stat.compute(d);
+  });
+
   if(s.aes.fill) {
     s.grouped = true;
     s.group = s.aes.fill;
@@ -74,7 +78,7 @@ Geom.prototype.setup = function() {
 
   return s;
 };
-Geom.prototype.rollup = function(data, s) {
+Geom.prototype.compute = function(data, s) {
   return s.nest.entries(data);
 };
 
@@ -144,8 +148,6 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
   };
 };
 
-// different geoms may want to be nested
-// differently.
 Geom.prototype.nest = function() {
 
   // to be performed before calculating layer level geoms or scales
@@ -169,3 +171,25 @@ Geom.prototype.nest = function() {
 };
 
 ggd3.geom = Geom;
+
+
+Geom.prototype.unNest = function(data, nestedArray) {
+  // recurse and flatten nested dataset
+  // this means no dataset can have a 'values' column
+  if(!data || _.isEmpty(data)){ 
+    return data;
+  }
+  var branch = _.all(_.map(data, function(d){
+    return d.hasOwnProperty('values');
+  }));
+  if(!branch) {
+    if(nestedArray === true){
+      return [data];
+    }
+    return data; 
+  }
+  var vals = _.flatten(
+              _.map(data, function(d) { return d.values; }), 
+              true);
+  return ggd3.tools.unNest(vals);
+};

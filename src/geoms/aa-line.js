@@ -7,6 +7,7 @@ function Line(spec) {
   var attributes = {
     name: "line",
     stat: "identity",
+    geom: "path",
     grid: false,
     interpolate: 'basis',
     lineType: null,
@@ -48,10 +49,12 @@ Line.prototype.selector = function(layerNum) {
 
 Line.prototype.drawLines = function (path, line, s, layerNum) {
   var that = this;
+  if(!this.lineType()){
+    this.lineType(s.plot.lineType());
+  }
   path.attr("class", this.selector(layerNum))
     .attr('d', line)
-    .attr('stroke-dasharray', function(d) { 
-      return that.lineType() ? that.lineType()(d): s.plot.lineType()(d); });
+    .attr('stroke-dasharray', this.lineType());
   if(!this.grid()){
     path  
       .attr('stroke', function(d) { return s.color(d[1]);})
@@ -68,37 +71,28 @@ Line.prototype.prepareData = function(data, s) {
   data = _.map(data, function(d) { return ggd3.tools.recurseNest(d);});
   return data;
 };
-// why? 
-Line.prototype.innerDraw = function draw(sel, data, i, layerNum){
+
+Line.prototype.draw = function draw(sel, data, i, layerNum){
 
   var s     = this.setup(),
-      that  = this,
-      scales = that.scalesAxes(sel, s, data.selector, layerNum,
+      scales = this.scalesAxes(sel, s, data.selector, layerNum,
                                  this.drawX(), this.drawY());
-    ggd3.tools.removeElements(sel, layerNum, "geom-" + this.name());
 
+  ggd3.tools.removeElements(sel, layerNum, this.geom());
   data = this.prepareData(data, s, scales);
   sel = this.grid() ? sel.select("." + this.direction() + 'grid'): sel.select('.plot');
   var lines = sel
-              .selectAll("." + that.selector(layerNum).replace(/ /g, '.'))
+              .selectAll("." + this.selector(layerNum).replace(/ /g, '.'))
               .data(data),
-  line = that.generator(s.aes, scales.x.scale(), scales.y.scale());
+  line = this.generator(s.aes, scales.x.scale(), scales.y.scale());
   lines.transition().call(_.bind(this.drawLines, this), line, s, layerNum);
-  lines.enter().append('path')
+  lines.enter().append(this.geom())
     .call(_.bind(this.drawLines, this), line, s, layerNum);
   lines.exit()
     .transition()
     .style('opacity', 0)
     .remove();
 };
-
-Line.prototype.draw = function() {
-  // thought there'd be a purpose for this wrapper. Looks like not.
-
-
-  return _.bind(this.innerDraw, this);
-};
-
 
 
 ggd3.geoms.line = Line;

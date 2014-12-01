@@ -193,12 +193,9 @@ Plot.prototype.setDomains = function() {
       that.freeScales.push(a);
     }
   });
-  s.nest.rollup(function(d) {
-    return s.stat.compute(d);
-  });
   // each facet's data rolled up according to stat
   data = _.map(data, function(d) {
-      d.data = ggd3.tools.unNest(geom.rollup(d.data, s));
+      d.data = ggd3.tools.unNest(geom.compute(d.data, s));
       return d;
   });
 

@@ -8,11 +8,12 @@ function Bar(spec) {
   var attributes = {
     name: "bar",
     stat: "count",
+    geom: "rect",
     position: "dodge",
     lineWidth: 1,
     offset: 'zero',
-    groupSum: 0,
-    stackSum: 0,
+    groupRange: 0,
+    stackRange: 0,
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -31,6 +32,8 @@ Bar.prototype.constructor = Bar;
 Bar.prototype.fillEmptyStackGroups = function(data, v) {
   // every object in data must have same length
   // array in its 'value' slot
+  // this should be usable for histograms as well
+  // but currently is not.
   if(!data.length) { return data; }
   var keys = _.unique(_.flatten(_.map(data, function(d) {
     return _.map(d.values, function(e) {
@@ -65,13 +68,11 @@ Bar.prototype.fillEmptyStackGroups = function(data, v) {
 };
 
 Bar.prototype.domain = function(data, a) {
-
   var s = this.setup(),
       valueVar = s.aes[a] ? s.aes[a]: "n. observations",
       group, stackby,
-      groupSum, stackSum,
+      groupRange, stackRange,
       grouped;
-
   group = s.aes.fill || s.aes.color || s.aes.group;
   stackby = a === "x" ? s.aes.y: s.aes.x;
 
@@ -79,264 +80,265 @@ Bar.prototype.domain = function(data, a) {
     return d[stackby];
   });
 
-  stackSum = _.mapValues(grouped, function(v, k) {
+  stackRange = _.mapValues(grouped, function(v, k) {
     return _.reduce(_.pluck(v, valueVar), function(a,b) {
       return a + b;
     });
   });
-  stackSum = d3.extent(_.map(stackSum, function(v, k) { return v; }));
-  groupSum = d3.extent(data, function(d) {
+  stackRange = d3.extent(_.map(stackRange, 
+                         function(v, k) { return v; }));
+  groupRange = d3.extent(data, function(d) {
     return d[valueVar];
   });
-  this.stackSum(stackSum);
-  this.groupSum(groupSum);
 
-  stackSum[0] = 0;
-  groupSum[0] = 0;
-  stackSum[1] *= 1.1;
-  groupSum[1] *= 1.1;
-  return s.position === "stack" ? stackSum: groupSum;
+  stackRange[0] = 0 - 0.1 * (stackRange[1] - stackRange[0]);
+  groupRange[0] = 0 - 0.1 * (groupRange[1] - groupRange[0]);
+  stackRange[1] *= 1.1;
+  groupRange[1] *= 1.1;
+  this.stackRange(stackRange);
+  this.groupRange(groupRange);
+  return s.position === "stack" ? stackRange: groupRange;
 };
 
+Bar.prototype.vertical = function(s){
+  return (s.plot.xScale().single.scaleType() === "ordinal" ||
+                      s.aes.y === "binHeight");
+};
 
-Bar.prototype.draw = function() {
-  // bar takes an array of data, 
-  // nests by a required ordinal axis, optional color and group
-  // variables then calculates the stat and draws
-  // horizontal or vertical bars.
-  // stacked, grouped, expanded or not.
-  // scales first need to be calculated according to output
-  // of the stat. 
+Bar.prototype.draw = function(sel, data, i, layerNum) {
+
   var s     = this.setup(),
       that  = this;
 
-  function draw(sel, data, i, layerNum) {
+  var o, // original value or ordinal scale
+      n, // numeric agg scale
+      rb, // final range band
+      o2, // used to calculate rangeband if histogram
+      valueVar, // holds aggregated name
+      categoryVar, // name of bar positions
+      // secondary ordinal scale to calc dodged rangebands
+      groupOrd  = d3.scale.ordinal(),
+      drawX     = true,
+      drawY     = true,
+      vertical = this.vertical(s);
 
-    // o2 is second scale used
-    // to derive width of histogram bars.
-    var o, // original value or ordinal scale
-        n, // numeric agg scale
-        rb, // final range band
-        o2, // used to calculate rangeband if histogram
-        valueVar, // holds aggregated name
-        categoryVar, // name of bar positions
-        // secondary ordinal scale to calc dodged rangebands
-        groupOrd  = d3.scale.ordinal(),
-        drawX     = true,
-        drawY     = true,
-        verticalBars = (s.plot.xScale().single.scaleType() === "ordinal" ||
-                        s.aes.y === "binHeight");
-
-    if(_.contains(['wiggle', 'silhouette'], that.offset()) ){
-      if(verticalBars){
-        // x is bars, don't draw Y axis
-        drawY = false;
-        sel.select('.y.axis')
-          .selectAll('*')
-          .transition()
-          .style('opacity', 0)
-          .remove();
-      } else {
-        // y is ordinal, don't draw X.
-        drawX = false;
-        sel.select('.x.axis')
-          .selectAll('*')
-          .transition()
-          .style('opacity', 0)
-          .remove();
-      }
-    }
-    // gotta do something to reset domains if offset is expand
-    if(that.offset() === "expand"){
-      if(verticalBars){
-        _.mapValues(s.plot.yScale(), function(v, k) {
-          v.domain([0,1]);
-        });
-      } else {
-        _.mapValues(s.plot.xScale(), function(v, k) {
-          v.domain([0,1]);
-        });  
-      }
-    }
-
-    var scales = that.scalesAxes(sel, s, data.selector, layerNum,
-                                 drawX, drawY);
-    // scales are drawn by now. return if no data.
-    if(!data.data.length){ return false; }
-    data = data.data;
-
-
-    // prep scales for vertical or horizontal use.
-    // "o" is ordinal, "n" is numeric
-    // width refers to scale defining rangeband of bars
-    // size refers to scale defining its length along numeric axis
-    // s and p on those objects are for size and position, respectively.
-    // need to use this for histograms too, but it's going to be
-    // tricky
-    if(!verticalBars){
-      // horizontal bars
-      o = scales.y;
-      n = scales.x;
-      size = {s: "width", p:'x'};
-      width = {s:"height", p: 'y'};
+  if(_.contains(['wiggle', 'silhouette'], that.offset()) ){
+    if(vertical){
+      // x is bars, don't draw Y axis
+      drawY = false;
+      sel.select('.y.axis')
+        .selectAll('*')
+        .transition()
+        .style('opacity', 0)
+        .remove();
     } else {
-      // vertical bars
-      o = scales.x;
-      n = scales.y;
-      size = {s: "height", p: 'y'};
-      width = {s: "width", p: 'x'};
+      // y is ordinal, don't draw X.
+      drawX = false;
+      sel.select('.x.axis')
+        .selectAll('*')
+        .transition()
+        .style('opacity', 0)
+        .remove();
     }
+  }
+  // gotta do something to reset domains if offset is expand
+  if(that.offset() === "expand"){
+    if(vertical){
+      _.mapValues(s.plot.yScale(), function(v, k) {
+        v.domain([-0.05,1.05]);
+      });
+    } else {
+      _.mapValues(s.plot.xScale(), function(v, k) {
+        v.domain([-0.05,1.05]);
+      });  
+    }
+  }
 
-    s.nest.rollup(function(data) {
-      return s.stat.compute(data);
-    });
+  var scales = that.scalesAxes(sel, s, data.selector, 
+                               layerNum,
+                               drawX, drawY);
+  // scales are drawn by now. return if no data.
+  if(!data.data.length){ return false; }
 
-    ggd3.tools.removeElements(sel, layerNum, "rect");
+  data = data.data;
 
-    // calculate stat
-    data = that.rollup(data, s);
-    s.groups = _.pluck(data, 'key');
 
-    data = ggd3.tools.unNest(data);
+  // prep scales for vertical or horizontal use.
+  // "o" is ordinal, "n" is numeric
+  // width refers to scale defining rangeband of bars
+  // size refers to scale defining its length along numeric axis
+  // s and p on those objects are for size and position, respectively.
+  // need to use this for histograms too, but it's going to be
+  // tricky
+  if(vertical){
+    // vertical bars
+    o = scales.x.scale();
+    n = scales.y.scale();
+    size = {s: "height", p: 'y'};
+    width = {s: "width", p: 'x'};
+  } else {
+    // horizontal bars
+    o = scales.y.scale();
+    n = scales.x.scale();
+    size = {s: "width", p:'x'};
+    width = {s:"height", p: 'y'};
+  }
+
+  ggd3.tools.removeElements(sel, layerNum, "rect");
+
+  // calculate stat
+  // but why isn't this already done since 
+  // we've trained domains?
+  data = this.compute(data, s);
+  s.groups = _.pluck(data, 'key');
+
+  data = this.unNest(data);
+  // data must be nested to go into stack algorithm
+  if(s.group){
     data = d3.nest().key(function(d) { return d[s.group];})
               .entries(data);
-    data = _.filter(data, function(d) { 
-      return d.key !== "undefined" ;});
-    if(that.name() === "bar"){
-      rb = o.scale().rangeBand();
-      valueVar = s.aes[size.p] || "n. observations";
-      categoryVar = s.aes[width.p];
-    } else if(that.name() === "histogram"){
-      valueVar = "binHeight";
-      categoryVar = s.group;
-      o2 = d3.scale.ordinal()
-              .rangeRoundBands(o.range(), 0, 0)
-              .domain(that.bins());
-      rb = o2.rangeBand();
-      if(rb < 2) {
-        rb = 2;
-      }
-    }
-    if(s.grouped && !_.contains([s.aes.x, s.aes.y], s.group)){
-
-    }
-    data = that.fillEmptyStackGroups(data, categoryVar);
-    var stack = d3.layout.stack()
-                  .x(function(d) { return d[categoryVar]; })
-                  .y(function(d) {
-                    return d[valueVar]; })
-                  .offset(that.offset())
-                  .values(function(d) { 
-                    return d.values; });
-    data = _.map(stack(data),
-                            function(d) {
-                              return d.values ? d.values: [];
-                            });
-    data = _.flatten(data, 
-                     that.name() === "histogram" ? true:false);
-    if(s.position === 'dodge') {
-      // make ordinal scale for group
-      groupOrd.rangeBands([0, rb], 0, 0)
-              .domain(s.groups);
-      rb = groupOrd.rangeBand();
-    }
-    if(s.position !== "dodge"){
-      groupOrd = function(d) {
-        return 0;
-      };
-    }
-    
-    var placeBar = function(d) {
-      var p = o.scale()(d[s.aes[width.p]]);
-      p += groupOrd(d[s.group]) || 0;
-      return p || 0;
-    };
-
-    // I think this is unnecessary.
-    var calcSizeS = (function() {
-      if(s.position === 'stack' && size.p === "y"){
-        return function(d) {
-          return n.scale()(0) - n.scale()(d.y);
-        };
-      }
-      if(s.position === "stack"){
-        return function(d) {
-          return n.scale()(d.y) - n.scale()(0);
-        };
-      }
-      if(s.position === "dodge" && size.p === "y"){
-        return function(d) {
-          return n.scale()(0) - n.scale()(d.y); 
-        };
-      }
-      return function(d) {
-        return n.scale()(d[valueVar]); 
-      };
-    })();
-    var calcSizeP = (function () {
-      if(s.position === "stack" && size.p === "y"){
-        return function(d) { 
-          return n.scale()(d.y0 + d.y); 
-          };
-      }
-      if(s.position === "stack"){
-        return function(d) {
-          return n.scale()(d.y0);
-        };
-      }
-      if(s.position === "dodge" && size.p === "y") {
-        return function(d) {
-          return n.scale()(d.y);
-        };
-      }
-      return function(d) {
-        return 0;
-      };
-    } )();
-
-
-    var bars = sel.select('.plot')
-                  .selectAll('rect.geom.g' + layerNum)
-                  .data(data);
-    // add canvas and svg functions.
-    function drawBar(rect) {
-      rect.attr('class', 'geom g' + layerNum + ' geom-bar')
-        .attr(size.s, calcSizeS)
-        .attr(width.s, rb)
-        .attr(size.p, calcSizeP)
-        .attr(width.p , placeBar || 0)
-        .style('fill-opacity', s.alpha)
-        .attr('fill', s.fill)
-        .style('stroke', s.color)
-        .style('stroke-width', that.lineWidth())
-        .attr('value', function(d) { 
-          return d[s.group] + "~" + d[s.aes[width.p]];
-        });
-    }
-
-    bars.transition().call(drawBar);
-    
-    bars.enter()
-      .append('rect')
-      .style('fill-opacity', s.alpha)
-      .attr('fill', s.fill)
-      .style('stroke', s.color)
-      .style('stroke-width', that.lineWidth())
-      .attr(width.s, rb)
-      .attr(width.p, placeBar)
-      .attr(size.s, 0)
-      .attr(size.p, function(d) {
-        return n.scale()(0);
-      })
-      .transition()
-      .call(drawBar);
-
-    bars.exit()
-      .transition()
-      .style('opacity', 0)
-      .remove();
+  } else {
+    data = [{key: 'single',values:data}];
   }
-  return draw;
+
+  // with histograms, if a bin is empty, it's key comes
+  // back 'undefined'. This causes bars to be drawn
+  // from the top (or right). They should be removed
+  data = _.filter(data, function(d) { 
+    return d.key !== "undefined" ;});
+  if(this.name() === "bar"){
+    rb = o.rangeBand();
+    valueVar = s.aes[size.p] || "n. observations";
+    categoryVar = s.aes[width.p];
+  } else if(that.name() === "histogram"){
+    valueVar = "binHeight";
+    categoryVar = s.group;
+    rb = o(o.domain()[0] + data[0].values[0].dx);
+  }
+  if(s.grouped && 
+     !_.contains([s.aes.x, s.aes.y, s.facet.y(), s.facet.x()], s.group)){
+    console.log('grouping is already shown by facets' +
+                ' unnecessary color scales probably generated');
+  }
+  data = that.fillEmptyStackGroups(data, categoryVar);
+  var stack = d3.layout.stack()
+                .x(function(d) { return d[categoryVar]; })
+                .y(function(d) {
+                  return d[valueVar]; })
+                .offset(that.offset())
+                .values(function(d) { 
+                  return d.values; });
+  data = _.map(stack(data),
+                          function(d) {
+                            return d.values ? d.values: [];
+                          });
+  data = _.flatten(data, 
+                   that.name() === "histogram" ? true:false);
+  if(s.position === 'dodge') {
+    // make ordinal scale for group
+    groupOrd.rangeBands([0, rb], 0, 0)
+            .domain(s.groups);
+    rb = groupOrd.rangeBand();
+  }
+  if(s.position !== "dodge"){
+    groupOrd = function(d) {
+      return 0;
+    };
+  }
+  
+  var placeBar = function(d) {
+    var p = o(d[s.aes[width.p]]);
+    p += groupOrd(d[s.group]) || 0;
+    return p || 0;
+  };
+
+  // I think this is unnecessary.
+  var calcSizeS = (function() {
+    if(s.position === 'stack' && size.p === "y"){
+      return function(d) {
+        return n(0) - n(d.y);
+      };
+    }
+    if(s.position === "stack"){
+      return function(d) {
+        return n(d.y) - n(0);
+      };
+    }
+    if(s.position === "dodge" && size.p === "y"){
+      return function(d) {
+        return n(0) - n(d.y); 
+      };
+    }
+    return function(d) {
+      return n(d[valueVar]); 
+    };
+  })();
+  var calcSizeP = (function () {
+    if(s.position === "stack" && size.p === "y"){
+      return function(d) { 
+        return n(d.y0 + d.y); 
+        };
+    }
+    if(s.position === "stack"){
+      return function(d) {
+        return n(d.y0);
+      };
+    }
+    if(s.position === "dodge" && size.p === "y") {
+      return function(d) {
+        return n(d.y);
+      };
+    }
+    return function(d) {
+      return 0;
+    };
+  } )();
+
+
+  var bars = sel.select('.plot')
+                .selectAll('rect.geom.g' + layerNum)
+                .data(data);
+  // add canvas and svg functions.
+  function draw(rect) {
+    rect.attr('class', 'geom g' + layerNum + ' geom-bar')
+      .attr(size.s, calcSizeS)
+      .attr(width.s, rb)
+      .attr(size.p, calcSizeP)
+      .attr(width.p , placeBar || 0)
+      .attr('value', function(d) { 
+        return d[s.group] + "~" + d[s.aes[width.p]];
+      })
+      .style({
+        fill: s.fill,
+        stroke: s.color,
+        'fill-opacity': s.alpha,
+        'stroke-width': that.lineWidth()
+      });
+  }
+
+  bars.transition().call(draw);
+  
+  bars.enter()
+    .append(this.geom())
+    .attr(width.s, rb)
+    .attr(width.p, placeBar)
+    .attr(size.s, 0)
+    .attr(size.p, function(d) {
+      return n(0);
+    })
+    .style({
+      fill: s.fill,
+      stroke: s.color,
+      'fill-opacity': s.alpha,
+      'stroke-width': that.lineWidth()
+    })
+    .transition()
+    .call(draw);
+
+  bars.exit()
+    .transition()
+    .style('opacity', 0)
+    .remove();
 };
 
 ggd3.geoms.bar = Bar;

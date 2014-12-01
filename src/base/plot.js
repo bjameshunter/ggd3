@@ -29,8 +29,8 @@ function Plot() {
     strokeScale: {single: ggd3.scale()},
     alpha: d3.functor(0.5),
     fill: d3.functor('steelblue'),
-    color: d3.functor('steelblue'),
-    size: d3.functor(30), 
+    color: d3.functor(null),
+    size: d3.functor(8), 
     shape: d3.functor('circle'),
     lineType: d3.functor('1,1'),
     lineWidth: 2,
@@ -39,7 +39,7 @@ function Plot() {
     xGrid: true,
     yGrid: true,
     alphaRange: [0.1, 1],
-    sizeRange: [20, 200],
+    sizeRange: [3, 20],
     fillRange: ["blue", "red"],
     colorRange: ["white", "black"],
     shapeRange: d3.superformulaTypes,
@@ -178,8 +178,6 @@ Plot.prototype.layers = function(layers) {
         if(!l.data()) { 
           l.data(this.data()); 
         } else {
-          console.log('instance of ggd3.layer');
-          console.log(l.data());
           l.ownData(true);
         }
         if(!l.aes()) { l.aes(_.clone(this.aes())); }
@@ -236,8 +234,8 @@ Plot.prototype.updateLayers = function() {
   // one layer
   _.each(this.layers(), function(l) {
     l.dtypes(this.dtypes());
-    if(!l.ownData()) { l.data(this.data())
-                        .aes(_.clone(this.aes())); }
+    if(!l.ownData()) { l.data(this.data()); }
+    if(_.isEmpty(l.aes())) { l.aes(this.aes()); }
   }, this);
 };
 
@@ -260,7 +258,9 @@ Plot.prototype.aes = function(aes) {
   // all layers need aesthetics
   aes = _.merge(this.attributes.aes, aes);
   _.each(this.layers(), function(layer) {
-    layer.aes(_.clone(aes));
+    if(_.isEmpty(layer.aes())){
+      layer.aes(_.clone(aes));
+    }
   });
   this.attributes.aes = aes;
   return this;
@@ -276,7 +276,7 @@ Plot.prototype.plotDim = function() {
    y: this.height() - margins.top - margins.bottom};
 };
 
-Plot.prototype.draw = function() {
+Plot.prototype.draw = function(sel) {
   var that = this,
       updateFacet = that.facet().updateFacet();
   
@@ -289,42 +289,41 @@ Plot.prototype.draw = function() {
   });
   // set fixed/free domains
   this.setDomains();
-  function draw(sel) {
-    updateFacet(sel);
-    // reset nSVGs after they're drawn.
-    that.facet().nSVGs = 0;
+  updateFacet(sel);
+  // reset nSVGs after they're drawn.
+  that.facet().nSVGs = 0;
 
-    if(that.yGrid() || that.xGrid()) {
-      if(that.yGrid()) { 
-        that.hgrid.draw(1)(sel, ".ygrid");}
-      if(that.xGrid()) { 
-        that.vgrid.draw(1)(sel, ".xgrid");}
-    }
-
-    // get the number of geom classes that should
-    // be present in the plot
-    var classes = _.map(_.range(that.layers().length),
-                    function(n) {
-                      return "g" + (n);
-                    });
-
-    _.each(that.layers(), function(l, i) {
-      l.draw(i)(sel);
-      sel.selectAll('.geom')
-        .filter(function() {
-          var cl = d3.select(this).node().classList;
-          return !_.contains(classes, cl[1]);
-        })
-        .transition().style('opacity', 0).remove();
-    });
-    // if any of the layers had a jitter, it has
-    // been added to each facet's dataset
-    if(_.any(chart.layers(), function(l) {
-      return l.position() === "jitter";
-    })){ that.hasJitter = true; }
+  if(that.yGrid() || that.xGrid()) {
+    if(that.yGrid()) { 
+      that.hgrid.draw(sel, 1, ".ygrid");}
+    if(that.xGrid()) { 
+      that.vgrid.draw(sel, 1, ".xgrid");}
   }
 
-  return draw;
+  // get the number of geom classes that should
+  // be present in the plot
+  var classes = _.map(_.range(that.layers().length),
+                  function(n) {
+                    return "g" + (n);
+                  });
+
+  _.each(that.layers(), function(l, i) {
+    l.draw(sel, i);
+    sel.selectAll('.geom')
+      .filter(function() {
+        var cl = d3.select(this).node().classList;
+        return !_.contains(classes, cl[1]);
+      })
+      .transition().style('opacity', 0).remove();
+  });
+  // if any of the layers had a jitter, it has
+  // been added to each facet's dataset
+  if(_.any(chart.layers(), function(l) {
+    return l.position() === "jitter";
+  }) ) { 
+
+    that.hasJitter = true; 
+  }
 };
 
 Plot.prototype.nest = Nest;

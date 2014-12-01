@@ -4,7 +4,7 @@ ggd3.tools.removeElements = function(sel, layerNum, element) {
                     .filter(function() {
                       return d3.select(this)[0][0].nodeName !== element;
                     });
-  remove.transition().duration(1000)
+  remove.transition()
     .style('opacity', 0)
     .remove();
 };
