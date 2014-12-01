@@ -44,6 +44,7 @@ Geom.prototype.setup = function() {
   s.plot      = s.layer.plot();
   s.stat      = s.layer.stat();
   s.nest      = this.nest();
+  s.dtypes    = s.layer.dtypes();
   s.position  = s.layer.position();
   s.dim       = s.plot.plotDim();
   s.facet     = s.plot.facet();
@@ -86,15 +87,20 @@ Geom.prototype.domain = function(data, a) {
   var layer   = this.layer(),
       plot    = layer.plot(),
       aes     = layer.aes(),
-      extent  = d3.extent(_.pluck(data, aes[a])),
-      range   = extent[1] - extent[0];
+      extent,
+      range;
 
+  if(_.contains(linearScales, plot[a + "Scale"]().single.scaleType())) {
+    extent  = d3.extent(_.pluck(data, aes[a]));
+    range   = extent[1] - extent[0];
+  } else {
+    var domain = _.sortBy(_.unique(_.pluck(data, aes[a])));
+    return domain;
+  }
   // done if date
   // and not histogram or density
-  if(!_.contains(['histogram', 'density'], this.name())){
-    if(_.contains(["date", "time"], plot.dtypes()[aes[a]][0]) ){
-      return extent;
-    }
+  if(_.contains(["date", "time"], plot.dtypes()[aes[a]][0]) ){
+    return extent;
   }
   // extent both ways
   if(range === 0){
@@ -173,23 +179,5 @@ Geom.prototype.nest = function() {
 ggd3.geom = Geom;
 
 
-Geom.prototype.unNest = function(data, nestedArray) {
-  // recurse and flatten nested dataset
-  // this means no dataset can have a 'values' column
-  if(!data || _.isEmpty(data)){ 
-    return data;
-  }
-  var branch = _.all(_.map(data, function(d){
-    return d.hasOwnProperty('values');
-  }));
-  if(!branch) {
-    if(nestedArray === true){
-      return [data];
-    }
-    return data; 
-  }
-  var vals = _.flatten(
-              _.map(data, function(d) { return d.values; }), 
-              true);
-  return ggd3.tools.unNest(vals);
-};
+Geom.prototype.unNest = unNest;
+Geom.prototype.recurseNest = recurseNest;

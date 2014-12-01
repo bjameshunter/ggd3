@@ -117,7 +117,7 @@ Layer.prototype.data = function(data, fromPlot) {
   if(fromPlot){
     this.attributes.data = data;
   } else {
-    data = ggd3.tools.unNest(data);
+    data = this.unNest(data);
     data = ggd3.tools.clean(data, this);
     this.attributes.dtypes = _.merge(this.attributes.dtypes, data.dtypes);
     this.attributes.data = data.data;
@@ -171,6 +171,7 @@ Layer.prototype.dataList = DataList;
 // same as on plot, for when Layer has it's own data
 // Nests according to facets
 Layer.prototype.nest = Nest;
-
+Layer.prototype.unNest = unNest;
+Layer.prototype.recurseNest = recurseNest;
 
 ggd3.layer = Layer;

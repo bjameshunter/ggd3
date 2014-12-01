@@ -47,27 +47,35 @@ function Stat(setting) {
     }
   }
 }
+var specialStats = [
+  "density",
+  "bin",
+  "boxplot"
+];
+
+Stat.prototype.agg = function(data, aes) {
+  var out = {};
+  for(var a in aes){
+    out[aes[a]] = this[a]()(_.pluck(data, aes[a]));
+  }
+  return out;
+};
 
 Stat.prototype.compute = function(data) {
-  var out = {},
-      aes = this.layer().aes(),
+  var aes = this.layer().aes(),
       id = _.any(_.map(_.keys(aes), function(k){
               if(!this[k]()){ return null; }
               return this[k]()([]) === "identity";
             }, this));
-  if(this.linearAgg() === "density"){
-    return this.calcDensity(data);
+  if(_.contains(specialStats, this.linearAgg()) ){
+    return this["compute_" + this.linearAgg()](data);
   }
-  if(this.linearAgg() === "bin"){
-    return this.calcBin(data);
-  }
+
   // most situations will need these two
   if(id){
     return data;
   }
-  for(var a in aes){
-    out[aes[a]] = this[a]()(_.pluck(data, aes[a]));
-  }
+  out = this.agg(data, aes);
   return out;
 };
 
@@ -142,20 +150,39 @@ Stat.prototype.first = function(arr) {
 Stat.prototype.mode = function(arr) {
   return "nuthing yet for mode.";
 };
+// how to deal with less convential computations?
 // ugly hack? Most of this is ugly.
 Stat.prototype.identity = function(arr) {
   return "identity";
 };
-
 Stat.prototype.density = function(arr) {
-  // console.log(this);
-  // var l = this.layer(),
-  //     g = layer.geom(),
-  //     k = g[g.kernel()](g.smooth());
   return 'density';
 };
+Stat.prototype.boxplot = function(arr) {
+  return 'boxplot';
+};
+Stat.prototype.compute_boxplot = function(data) {
+  var aes = this.layer().aes(),
+      g = this.layer().geom(),
+      factor = this.layer().dtypes()[aes.x][1] === "few" ? 'x': 'y',
+      number = factor === 'x' ? 'y': 'x',
+      arr = _.sortBy(_.pluck(data, aes[number])),
+      iqr = this.iqr(arr),
+      upper = d3.quantile(arr, (1-g.tail()) || g.upper()),
+      lower = d3.quantile(arr, g.tail() || g.lower()),
+      out = _.merge({
+        quantiles: iqr,
+        upper: upper,
+        lower: lower,
+      }, this.agg(data, aes));
+      out.data = data.filter(function(d) {
+        return (d[aes[number]] < lower || 
+                d[aes[number]] > upper);
+      });
+  return out;
+};
 
-Stat.prototype.calcBin = function(data) {
+Stat.prototype.compute_bin = function(data) {
 
   var aes = this.layer().aes(),
       g = this.layer().geom(),
@@ -193,7 +220,7 @@ Stat.prototype.calcBin = function(data) {
   return data;
 };
 
-Stat.prototype.calcDensity = function(data) {
+Stat.prototype.compute_density = function(data) {
 
   var out = {},
       start = {},

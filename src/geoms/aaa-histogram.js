@@ -77,7 +77,7 @@ Histogram.prototype.compute = function(data, s) {
 };
 
 Histogram.prototype.fillEmptyStackGroups = function(data, v) {
-  console.log(data);
+
   var keys = _.unique(_.map(data, function(d) { return d.key; })),
       vals = _.unique(_.flatten(_.map(data, function(d) {
         return _.map(d.values, 'x');

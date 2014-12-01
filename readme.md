@@ -32,12 +32,17 @@ Roadmap:
   - geom error that mounts on geom point, bar, box, line, etc.
   - smooth with loess or lm methods
 - Possible adoption of bin-summarize-smooth methods for plots that draw a lot of DOM elements.
+- Sampling methods for large datasets
 
 #### Problems and questions:
 
 - Cannot update clipPath - selecting "clipPath" does not work
   - currently getting around this by adding class "clip" and selecting that.
-- Stack bar only works with default 'count' stat. Stacking according to mean or median doesn't make much sense, but should work.
+or median doesn't make much sense, but should work.
 - Is using the super formula worth it? 
   - does it cost more to draw and animate?
-- Histogram stroke makes it look kinda bad. Output of histogram function not return a "dx" that I can feed to x scale to get width needed.
+- Find smarter way to decide, during computation step, which axis is the number and which the factor. Currently my dtypes function returns a two tuple
+  - the first is one of "number", "string", or "date"
+  - the second is one of "few" or "many", 20 being the cutoff
+  - if it's a date, a third element can be the format to be passed to axes.
+  - doing it like this prohibits drawing 100 boxplots on a single facet

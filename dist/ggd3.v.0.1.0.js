@@ -128,7 +128,7 @@ ggd3.tools.dateFormatter = function(v, format) {
   }
 };
 
-ggd3.tools.linearDomain = function(data, variable, rule, zero) {
+ggd3.tools.numericDomain = function(data, variable, rule, zero) {
   var extent = d3.extent(_.pluck(data, variable)),
       range = extent[1] - extent[0];
   if(rule === "left" || rule === "both"){
@@ -144,6 +144,9 @@ ggd3.tools.linearDomain = function(data, variable, rule, zero) {
     }
   }
   return extent;
+};
+ggd3.tools.categoryDomain = function(data, variable) {
+  return _.sortBy(_.unique(_.pluck(data, variable)));
 };
 
 ggd3.tools.removeElements = function(sel, layerNum, element) {
@@ -199,10 +202,9 @@ function unNest(data, nestedArray) {
   var vals = _.flatten(
               _.map(data, function(d) { return d.values; }), true
              );
-  return ggd3.tools.unNest(vals);
+  return this.unNest(vals);
 }
 
-ggd3.tools.unNest = unNest;
 
 // accepts single nested object
 function recurseNest(data) {
@@ -213,7 +215,7 @@ function recurseNest(data) {
                 });
 }
 
-ggd3.tools.recurseNest = recurseNest;
+
 function Facet(spec) {
   var attributes = {
     x: null,
@@ -730,7 +732,7 @@ Layer.prototype.data = function(data, fromPlot) {
   if(fromPlot){
     this.attributes.data = data;
   } else {
-    data = ggd3.tools.unNest(data);
+    data = this.unNest(data);
     data = ggd3.tools.clean(data, this);
     this.attributes.dtypes = _.merge(this.attributes.dtypes, data.dtypes);
     this.attributes.data = data.data;
@@ -784,7 +786,8 @@ Layer.prototype.dataList = DataList;
 // same as on plot, for when Layer has it's own data
 // Nests according to facets
 Layer.prototype.nest = Nest;
-
+Layer.prototype.unNest = unNest;
+Layer.prototype.recurseNest = recurseNest;
 
 ggd3.layer = Layer;
 
@@ -1012,7 +1015,7 @@ Plot.prototype.data = function(data) {
   // if passing 'dtypes', must be done before
   // let's just always nest and unNest
   this.hasJitter = false;
-  data = ggd3.tools.unNest(data);
+  data = this.unNest(data);
   data = ggd3.tools.clean(data, this);
   this.timesCleaned += 1;
   // after data is declared, nest it according to facets.
@@ -1121,6 +1124,9 @@ Plot.prototype.draw = function(sel) {
 Plot.prototype.nest = Nest;
 // returns array of faceted objects {selector: s, data: data} 
 Plot.prototype.dataList = DataList;
+
+Plot.prototype.unNest = unNest;
+Plot.prototype.recurseNest = recurseNest;
 
 // update method for actions requiring redrawing plot
 Plot.prototype.update = function() {
@@ -1455,10 +1461,10 @@ Plot.prototype.setDomains = function() {
       geom = layer.geom(),
       s = geom.setup(),
       domain,
-      data = that.dataList(that.data()),
+      data = this.dataList(this.data()),
       scale;
 
-  that.globalScales = globalScales.filter(function(sc) {
+  this.globalScales = globalScales.filter(function(sc) {
     return _.contains(_.keys(s.aes), sc);
   });
   that.freeScales = [];
@@ -1471,9 +1477,9 @@ Plot.prototype.setDomains = function() {
   });
   // each facet's data rolled up according to stat
   data = _.map(data, function(d) {
-      d.data = ggd3.tools.unNest(geom.compute(d.data, s));
+      d.data = this.unNest(geom.compute(d.data, s));
       return d;
-  });
+  }, this);
 
   // free scales
   if(!_.isEmpty(that.freeScales)){
@@ -1481,13 +1487,7 @@ Plot.prototype.setDomains = function() {
       // data is now nested by facet and by geomNest
       _.map(that.freeScales, function(k){
         scale = that[k+ "Scale"]()[d.selector];
-        if(_.contains(linearScales, 
-          scale.scaleType()) ){
-          scale.domain(geom.domain(d.data, k));
-        } else {
-          // gotta find a way to sort these.
-          scale.domain(_.unique(_.pluck(d.data, s.aes[k])));
-        }
+        scale.domain(geom.domain(d.data, k));
       });
     });
   } else {
@@ -1501,11 +1501,11 @@ Plot.prototype.setDomains = function() {
   // calculate global scales
   _.map(that.globalScales, function(g){
     scale = that[g + "Scale"]().single;
-    if(_.contains(linearScales, scale.scaleType())) {
-      if(_.contains(globalScales, g)){
-        // scale is fill, color, alpha, etc.
-        // with no padding on either side of domain.
-        domain = ggd3.tools.linearDomain(
+    if(_.contains(globalScales, g)){
+      // scale is fill, color, alpha, etc.
+      // with no padding on either side of domain.
+      if(_.contains(linearScales, scale.scaleType())){
+        domain = ggd3.tools.numericDomain(
                     _.flatten(
                       _.map(data, function(d) {
                         return d.data;
@@ -1513,22 +1513,27 @@ Plot.prototype.setDomains = function() {
         scale.domain(domain);
         scale.range(that[g + 'Range']());
       } else {
-        // data must be delivered to geom's domain as faceted,
-        // otherwise aggregates will be calculated on whole dataset
-        // rather than facet. Here we're looking for max facet domains.
-        domain = _.map(data, function(d) {
-          return geom.domain(d.data, g);
-        });
-        domain = [_.min(_.map(domain, first)) ,
-        _.max(_.map(domain, second))];
+        domain = _.sortBy(_.unique(ggd3.tools.categoryDomain(
+                    _.flatten(
+                      _.map(data, function(d) {
+                        return d.data;
+                      }), true), s.aes[g])));
         scale.domain(domain);
       }
     } else {
-      scale.domain(
-              _.unique(
-                _.pluck(
-                  _.flatten(
-                    _.map(data, 'data'), true), s.aes[g])));
+      // data must be delivered to geom's domain as faceted,
+      // otherwise aggregates will be calculated on whole dataset
+      // rather than facet. Here we're looking for max facet domains.
+      domain = _.map(data, function(d) {
+        return geom.domain(d.data, g);
+      });
+      if(_.contains(linearScales, scale.scaleType())){
+        domain = [_.min(_.map(domain, first)) ,
+        _.max(_.map(domain, second))];
+      } else {
+        domain = _.sortBy(_.unique(_.flatten(domain)));
+      }
+        scale.domain(domain);
     }
     for(var sc in scale._userOpts.scale){
       if(scale.scale().hasOwnProperty(sc)){
@@ -1595,6 +1600,7 @@ Geom.prototype.setup = function() {
   s.plot      = s.layer.plot();
   s.stat      = s.layer.stat();
   s.nest      = this.nest();
+  s.dtypes    = s.layer.dtypes();
   s.position  = s.layer.position();
   s.dim       = s.plot.plotDim();
   s.facet     = s.plot.facet();
@@ -1637,15 +1643,20 @@ Geom.prototype.domain = function(data, a) {
   var layer   = this.layer(),
       plot    = layer.plot(),
       aes     = layer.aes(),
-      extent  = d3.extent(_.pluck(data, aes[a])),
-      range   = extent[1] - extent[0];
+      extent,
+      range;
 
+  if(_.contains(linearScales, plot[a + "Scale"]().single.scaleType())) {
+    extent  = d3.extent(_.pluck(data, aes[a]));
+    range   = extent[1] - extent[0];
+  } else {
+    var domain = _.sortBy(_.unique(_.pluck(data, aes[a])));
+    return domain;
+  }
   // done if date
   // and not histogram or density
-  if(!_.contains(['histogram', 'density'], this.name())){
-    if(_.contains(["date", "time"], plot.dtypes()[aes[a]][0]) ){
-      return extent;
-    }
+  if(_.contains(["date", "time"], plot.dtypes()[aes[a]][0]) ){
+    return extent;
   }
   // extent both ways
   if(range === 0){
@@ -1724,26 +1735,8 @@ Geom.prototype.nest = function() {
 ggd3.geom = Geom;
 
 
-Geom.prototype.unNest = function(data, nestedArray) {
-  // recurse and flatten nested dataset
-  // this means no dataset can have a 'values' column
-  if(!data || _.isEmpty(data)){ 
-    return data;
-  }
-  var branch = _.all(_.map(data, function(d){
-    return d.hasOwnProperty('values');
-  }));
-  if(!branch) {
-    if(nestedArray === true){
-      return [data];
-    }
-    return data; 
-  }
-  var vals = _.flatten(
-              _.map(data, function(d) { return d.values; }), 
-              true);
-  return ggd3.tools.unNest(vals);
-};
+Geom.prototype.unNest = unNest;
+Geom.prototype.recurseNest = recurseNest;
 
 // 
 function Bar(spec) {
@@ -1820,6 +1813,10 @@ Bar.prototype.domain = function(data, a) {
       group, stackby,
       groupRange, stackRange,
       grouped;
+  if(!_.contains(linearScales, s.plot[a + "Scale"]().single.scaleType())) {
+    var domain = _.sortBy(_.unique(_.pluck(data, s.aes[a])));
+    return domain;
+  }
   group = s.aes.fill || s.aes.color || s.aes.group;
   stackby = a === "x" ? s.aes.y: s.aes.x;
 
@@ -1905,6 +1902,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
                                layerNum,
                                drawX, drawY);
   // scales are drawn by now. return if no data.
+  ggd3.tools.removeElements(sel, layerNum, "rect");
   if(!data.data.length){ return false; }
 
   data = data.data;
@@ -1931,7 +1929,6 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     width = {s:"height", p: 'y'};
   }
 
-  ggd3.tools.removeElements(sel, layerNum, "rect");
 
   // calculate stat
   // but why isn't this already done since 
@@ -2151,7 +2148,8 @@ Line.prototype.drawLines = function (path, line, s, layerNum) {
     path
       .attr('stroke-opacity', function(d) { return s.alpha(d[1]) ;})
       .attr('stroke', function(d) { return s.color(d[1]);})
-      .attr('stroke-width', this.lineWidth() || s.plot.lineWidth());
+      .attr('stroke-width', this.lineWidth() || s.plot.lineWidth())
+      .attr('fill', 'none'); // must explicitly declare no grid.
   }
 };
 
@@ -2160,7 +2158,7 @@ Line.prototype.prepareData = function(data, s) {
           .rollup(function(d) { return s.stat.compute(d);})
           .entries(data.data) ;
 
-  data = _.map(data, function(d) { return ggd3.tools.recurseNest(d);});
+  data = _.map(data, function(d) { return this.recurseNest(d);}, this);
   return data;
 };
 
@@ -2269,7 +2267,7 @@ Histogram.prototype.compute = function(data, s) {
 };
 
 Histogram.prototype.fillEmptyStackGroups = function(data, v) {
-  console.log(data);
+
   var keys = _.unique(_.map(data, function(d) { return d.key; })),
       vals = _.unique(_.flatten(_.map(data, function(d) {
         return _.map(d.values, 'x');
@@ -2403,15 +2401,18 @@ Abline.prototype.prepareData = function(d, s, scales) {
 
 ggd3.geoms.abline = Abline;
 // 
-function Box(spec) {
+function Boxplot(spec) {
   if(!(this instanceof Geom)){
-    return new Box(spec);
+    return new Boxplot(spec);
   }
   Geom.apply(this);
   var attributes = {
-    name: "box",
-    stat: "identity",
-    position: null,
+    name: "boxplot",
+    stat: "boxplot",
+    position: "jitter",
+    upper: 0.95,
+    lower: 0.05,
+    tail: null,
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -2423,9 +2424,139 @@ function Box(spec) {
   }
 }
 
-Box.prototype.constructor = Box;
+Boxplot.prototype = new Geom();
 
-ggd3.geoms.box = Box;
+
+Boxplot.prototype.constructor = Boxplot;
+
+Boxplot.prototype.determineOrdinal = function(s) {
+  // this is dumb, this logic needs to happen when scales are created;
+  if(s.plot.xScale().single.scaleType() === "ordinal"){
+    return 'x';
+  } else {
+    return 'y';
+  }
+};
+
+Boxplot.prototype.domain = function(data, a) {
+
+  var s = this.setup(),
+      factor = this.determineOrdinal(s),
+      number = factor === 'x' ? 'y': 'x',
+      domain,
+      extent;
+  if(a === factor) {
+    domain = _.sortBy(_.map(data, function(d) {
+      return _.unique(_.pluck(d.data, s.aes[a]));
+    }));
+  } else {
+    domain = d3.extent(_.flatten(_.map(data, function(d) {
+      return _.pluck(d.data, s.aes[a]);
+    })));
+    extent = domain[1] - domain[0];
+    domain[0] -= extent*0.1;
+    domain[1] += extent*0.1;
+  }
+  return domain;
+};
+Boxplot.prototype.positionOutlier = function() {
+
+};
+
+Boxplot.prototype.positionBar = function() {
+
+};
+
+Boxplot.prototype.draw = function(sel, data, i, layerNum) {
+  var s = this.setup(),
+      that = this,
+      o, n, o2,
+      size, width,
+      scales = that.scalesAxes(sel, s, data.selector, layerNum,
+                               this.drawX(), this.drawY()),
+      vertical = scales.x.scaleType() === "ordinal",
+      factor = vertical ? "x": "y",
+      number = vertical ? "y": "x";
+
+  ggd3.tools.removeElements(sel, layerNum, "geom-" + this.name());
+
+  data = this.unNest(this.compute(data.data, s));
+
+  if(vertical){
+    // vertical boxes
+    o = scales.x.scale();
+    n = scales.y.scale();
+    size = {s: "height", p: 'y', c: "cy"};
+    width = {s: "width", p: 'x', c: "cx"};
+  } else {
+    // horizontal boxes
+    o = scales.y.scale();
+    n = scales.x.scale();
+    size = {s: "width", p:'x', c: "cx"};
+    width = {s:"height", p: 'y', c: "cy"};
+  }
+  if(s.grouped) {
+    s.groups = _.flatten(_.map(data, function(d) {
+      return _.pluck(d.data, s.group);
+    }));
+    o2 = d3.scale.ordinal()
+            .range([0, o.rangeBand()])
+            .domain(s.groups);
+  } else {
+    o2 = function() {
+      return 0;
+    };
+  }
+
+
+
+  function draw(box) {
+
+    var d = box.datum(),
+    rect = box.select('rect'),
+    lines = box.selectAll('path'),
+    points = box.selectAll('circle')
+              .data(d.data);
+    points.attr(size.c, function(d) {
+        return n(d[s.aes[number]]);
+      })
+      .attr(width.c, function(d) {
+        return o(d[s.aes[factor]]) + o2(d[s.group]);
+      })
+      .attr('r', s.size);
+    points.enter().append('circle')
+      .attr('class', 'outlier')
+      .attr(size.c, function(d) {
+        return n(d[s.aes[number]]);
+      })
+      .attr(width.c, function(d) {
+        return o(d[s.aes[factor]]) + o2(d[s.group]);
+      })
+      .attr('r', s.size);
+
+  }
+  var boxes = sel.select('.plot')
+                .selectAll('.geom g' + layerNum)
+                .data(data);
+
+  boxes.each(function(d) {
+    d3.select(this).call(draw);
+  });
+  boxes.enter().append('g').each(function(d) {
+    var b = d3.select(this);
+    b.attr('class', 'geom g' + layerNum + ' geom-' + that.name());
+    b.append('rect').attr('class', 'quantile-box');
+    b.append('path').attr('class', 'upper');
+    b.append('path').attr('class', 'lower');
+    b.append('path').attr('class', 'median');
+    b.call(draw);
+  });
+  boxes.exit().transition()
+    .style("opacity", 0)
+    .remove();
+};
+
+ggd3.geoms.boxplot = Boxplot;
 // 
 function Density(spec) {
   if(!(this instanceof Geom)){
@@ -3041,27 +3172,35 @@ function Stat(setting) {
     }
   }
 }
+var specialStats = [
+  "density",
+  "bin",
+  "boxplot"
+];
+
+Stat.prototype.agg = function(data, aes) {
+  var out = {};
+  for(var a in aes){
+    out[aes[a]] = this[a]()(_.pluck(data, aes[a]));
+  }
+  return out;
+};
 
 Stat.prototype.compute = function(data) {
-  var out = {},
-      aes = this.layer().aes(),
+  var aes = this.layer().aes(),
       id = _.any(_.map(_.keys(aes), function(k){
               if(!this[k]()){ return null; }
               return this[k]()([]) === "identity";
             }, this));
-  if(this.linearAgg() === "density"){
-    return this.calcDensity(data);
+  if(_.contains(specialStats, this.linearAgg()) ){
+    return this["compute_" + this.linearAgg()](data);
   }
-  if(this.linearAgg() === "bin"){
-    return this.calcBin(data);
-  }
+
   // most situations will need these two
   if(id){
     return data;
   }
-  for(var a in aes){
-    out[aes[a]] = this[a]()(_.pluck(data, aes[a]));
-  }
+  out = this.agg(data, aes);
   return out;
 };
 
@@ -3136,20 +3275,39 @@ Stat.prototype.first = function(arr) {
 Stat.prototype.mode = function(arr) {
   return "nuthing yet for mode.";
 };
+// how to deal with less convential computations?
 // ugly hack? Most of this is ugly.
 Stat.prototype.identity = function(arr) {
   return "identity";
 };
-
 Stat.prototype.density = function(arr) {
-  // console.log(this);
-  // var l = this.layer(),
-  //     g = layer.geom(),
-  //     k = g[g.kernel()](g.smooth());
   return 'density';
 };
+Stat.prototype.boxplot = function(arr) {
+  return 'boxplot';
+};
+Stat.prototype.compute_boxplot = function(data) {
+  var aes = this.layer().aes(),
+      g = this.layer().geom(),
+      factor = this.layer().dtypes()[aes.x][1] === "few" ? 'x': 'y',
+      number = factor === 'x' ? 'y': 'x',
+      arr = _.sortBy(_.pluck(data, aes[number])),
+      iqr = this.iqr(arr),
+      upper = d3.quantile(arr, (1-g.tail()) || g.upper()),
+      lower = d3.quantile(arr, g.tail() || g.lower()),
+      out = _.merge({
+        quantiles: iqr,
+        upper: upper,
+        lower: lower,
+      }, this.agg(data, aes));
+      out.data = data.filter(function(d) {
+        return (d[aes[number]] < lower || 
+                d[aes[number]] > upper);
+      });
+  return out;
+};
 
-Stat.prototype.calcBin = function(data) {
+Stat.prototype.compute_bin = function(data) {
 
   var aes = this.layer().aes(),
       g = this.layer().geom(),
@@ -3187,7 +3345,7 @@ Stat.prototype.calcBin = function(data) {
   return data;
 };
 
-Stat.prototype.calcDensity = function(data) {
+Stat.prototype.compute_density = function(data) {
 
   var out = {},
       start = {},

@@ -179,10 +179,10 @@ Plot.prototype.setDomains = function() {
       geom = layer.geom(),
       s = geom.setup(),
       domain,
-      data = that.dataList(that.data()),
+      data = this.dataList(this.data()),
       scale;
 
-  that.globalScales = globalScales.filter(function(sc) {
+  this.globalScales = globalScales.filter(function(sc) {
     return _.contains(_.keys(s.aes), sc);
   });
   that.freeScales = [];
@@ -195,9 +195,9 @@ Plot.prototype.setDomains = function() {
   });
   // each facet's data rolled up according to stat
   data = _.map(data, function(d) {
-      d.data = ggd3.tools.unNest(geom.compute(d.data, s));
+      d.data = this.unNest(geom.compute(d.data, s));
       return d;
-  });
+  }, this);
 
   // free scales
   if(!_.isEmpty(that.freeScales)){
@@ -205,13 +205,7 @@ Plot.prototype.setDomains = function() {
       // data is now nested by facet and by geomNest
       _.map(that.freeScales, function(k){
         scale = that[k+ "Scale"]()[d.selector];
-        if(_.contains(linearScales, 
-          scale.scaleType()) ){
-          scale.domain(geom.domain(d.data, k));
-        } else {
-          // gotta find a way to sort these.
-          scale.domain(_.unique(_.pluck(d.data, s.aes[k])));
-        }
+        scale.domain(geom.domain(d.data, k));
       });
     });
   } else {
@@ -225,11 +219,11 @@ Plot.prototype.setDomains = function() {
   // calculate global scales
   _.map(that.globalScales, function(g){
     scale = that[g + "Scale"]().single;
-    if(_.contains(linearScales, scale.scaleType())) {
-      if(_.contains(globalScales, g)){
-        // scale is fill, color, alpha, etc.
-        // with no padding on either side of domain.
-        domain = ggd3.tools.linearDomain(
+    if(_.contains(globalScales, g)){
+      // scale is fill, color, alpha, etc.
+      // with no padding on either side of domain.
+      if(_.contains(linearScales, scale.scaleType())){
+        domain = ggd3.tools.numericDomain(
                     _.flatten(
                       _.map(data, function(d) {
                         return d.data;
@@ -237,22 +231,27 @@ Plot.prototype.setDomains = function() {
         scale.domain(domain);
         scale.range(that[g + 'Range']());
       } else {
-        // data must be delivered to geom's domain as faceted,
-        // otherwise aggregates will be calculated on whole dataset
-        // rather than facet. Here we're looking for max facet domains.
-        domain = _.map(data, function(d) {
-          return geom.domain(d.data, g);
-        });
-        domain = [_.min(_.map(domain, first)) ,
-        _.max(_.map(domain, second))];
+        domain = _.sortBy(_.unique(ggd3.tools.categoryDomain(
+                    _.flatten(
+                      _.map(data, function(d) {
+                        return d.data;
+                      }), true), s.aes[g])));
         scale.domain(domain);
       }
     } else {
-      scale.domain(
-              _.unique(
-                _.pluck(
-                  _.flatten(
-                    _.map(data, 'data'), true), s.aes[g])));
+      // data must be delivered to geom's domain as faceted,
+      // otherwise aggregates will be calculated on whole dataset
+      // rather than facet. Here we're looking for max facet domains.
+      domain = _.map(data, function(d) {
+        return geom.domain(d.data, g);
+      });
+      if(_.contains(linearScales, scale.scaleType())){
+        domain = [_.min(_.map(domain, first)) ,
+        _.max(_.map(domain, second))];
+      } else {
+        domain = _.sortBy(_.unique(_.flatten(domain)));
+      }
+        scale.domain(domain);
     }
     for(var sc in scale._userOpts.scale){
       if(scale.scale().hasOwnProperty(sc)){

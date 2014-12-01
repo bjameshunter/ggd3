@@ -1,4 +1,4 @@
-ggd3.tools.linearDomain = function(data, variable, rule, zero) {
+ggd3.tools.numericDomain = function(data, variable, rule, zero) {
   var extent = d3.extent(_.pluck(data, variable)),
       range = extent[1] - extent[0];
   if(rule === "left" || rule === "both"){
@@ -14,4 +14,7 @@ ggd3.tools.linearDomain = function(data, variable, rule, zero) {
     }
   }
   return extent;
+};
+ggd3.tools.categoryDomain = function(data, variable) {
+  return _.sortBy(_.unique(_.pluck(data, variable)));
 };

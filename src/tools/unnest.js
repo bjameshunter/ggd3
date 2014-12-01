@@ -36,10 +36,9 @@ function unNest(data, nestedArray) {
   var vals = _.flatten(
               _.map(data, function(d) { return d.values; }), true
              );
-  return ggd3.tools.unNest(vals);
+  return this.unNest(vals);
 }
 
-ggd3.tools.unNest = unNest;
 
 // accepts single nested object
 function recurseNest(data) {
@@ -50,4 +49,3 @@ function recurseNest(data) {
                 });
 }
 
-ggd3.tools.recurseNest = recurseNest;

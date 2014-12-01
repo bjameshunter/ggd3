@@ -73,6 +73,10 @@ Bar.prototype.domain = function(data, a) {
       group, stackby,
       groupRange, stackRange,
       grouped;
+  if(!_.contains(linearScales, s.plot[a + "Scale"]().single.scaleType())) {
+    var domain = _.sortBy(_.unique(_.pluck(data, s.aes[a])));
+    return domain;
+  }
   group = s.aes.fill || s.aes.color || s.aes.group;
   stackby = a === "x" ? s.aes.y: s.aes.x;
 
@@ -158,6 +162,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
                                layerNum,
                                drawX, drawY);
   // scales are drawn by now. return if no data.
+  ggd3.tools.removeElements(sel, layerNum, "rect");
   if(!data.data.length){ return false; }
 
   data = data.data;
@@ -184,7 +189,6 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     width = {s:"height", p: 'y'};
   }
 
-  ggd3.tools.removeElements(sel, layerNum, "rect");
 
   // calculate stat
   // but why isn't this already done since 

@@ -222,7 +222,7 @@ Plot.prototype.data = function(data) {
   // if passing 'dtypes', must be done before
   // let's just always nest and unNest
   this.hasJitter = false;
-  data = ggd3.tools.unNest(data);
+  data = this.unNest(data);
   data = ggd3.tools.clean(data, this);
   this.timesCleaned += 1;
   // after data is declared, nest it according to facets.
@@ -331,6 +331,9 @@ Plot.prototype.draw = function(sel) {
 Plot.prototype.nest = Nest;
 // returns array of faceted objects {selector: s, data: data} 
 Plot.prototype.dataList = DataList;
+
+Plot.prototype.unNest = unNest;
+Plot.prototype.recurseNest = recurseNest;
 
 // update method for actions requiring redrawing plot
 Plot.prototype.update = function() {
