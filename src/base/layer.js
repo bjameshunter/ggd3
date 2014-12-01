@@ -44,7 +44,6 @@ Layer.prototype.updateGeom = function() {
 Layer.prototype.aes = function(aes) {
   if(!arguments.length) { return this.attributes.aes; }
   this.attributes.aes = _.merge(this.attributes.aes, aes);
-  console.log(this.attributes.aes);
   this.updateGeom();
   return this;
 };
@@ -97,7 +96,7 @@ Layer.prototype.setStat = function() {
     }
   }
   // if a stat has not been set, it is x or y
-  // and should be set to count if geom is not density.
+  // and should be set to count if geom is not density/hist.
   _.each(['x', 'y'], function(a) {
     if(!stat[a]() && 
        !_.contains(['density', 'bin'], this.geom().stat()) ){
@@ -146,7 +145,6 @@ Layer.prototype.draw = function(sel, layerNum) {
     if(_.isEmpty(d)) { d = {selector: id, data: []}; }
     if(that.position() === "jitter" && 
        !plot.hasJitter) {
-      console.log('setting jitter');
       _.each(d.data, function(r) { r._jitter = _.random(-1,1,1); });        
     }
     that.geom().draw(s, d, i, layerNum);

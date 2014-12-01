@@ -22,6 +22,7 @@ function Stat(setting) {
     size: null,
     shape: null,
     label: null,
+    yint: null, // default is median of group, like the rest
   }; 
   if(_.isPlainObject(setting)) {
     for(var a in setting){
@@ -96,6 +97,8 @@ Stat.prototype.color = aggSetter('color');
 Stat.prototype.alpha = aggSetter('alpha');
 Stat.prototype.size = aggSetter('size');
 Stat.prototype.size = aggSetter('size');
+Stat.prototype.yint = aggSetter('yint');
+Stat.prototype.slope = d3.functor(null);
 Stat.prototype.label = function() {
   return function(arr) {
     return arr[0];
@@ -168,7 +171,7 @@ Stat.prototype.calcBin = function(data) {
   n = h === "y" ? "x": "y";
 
   var hist = d3.layout.histogram()
-                .bins(g.breaks())
+                .bins(g.breaks() || g.bins())
                 .frequency(g.frequency())
                 .value(function(d) {
                   return d[aes[n]];

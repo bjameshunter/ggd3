@@ -668,7 +668,6 @@ Layer.prototype.updateGeom = function() {
 Layer.prototype.aes = function(aes) {
   if(!arguments.length) { return this.attributes.aes; }
   this.attributes.aes = _.merge(this.attributes.aes, aes);
-  console.log(this.attributes.aes);
   this.updateGeom();
   return this;
 };
@@ -721,7 +720,7 @@ Layer.prototype.setStat = function() {
     }
   }
   // if a stat has not been set, it is x or y
-  // and should be set to count if geom is not density.
+  // and should be set to count if geom is not density/hist.
   _.each(['x', 'y'], function(a) {
     if(!stat[a]() && 
        !_.contains(['density', 'bin'], this.geom().stat()) ){
@@ -770,7 +769,6 @@ Layer.prototype.draw = function(sel, layerNum) {
     if(_.isEmpty(d)) { d = {selector: id, data: []}; }
     if(that.position() === "jitter" && 
        !plot.hasJitter) {
-      console.log('setting jitter');
       _.each(d.data, function(r) { r._jitter = _.random(-1,1,1); });        
     }
     that.geom().draw(s, d, i, layerNum);
@@ -821,7 +819,7 @@ function Plot() {
     alpha: d3.functor(0.5),
     fill: d3.functor('steelblue'),
     color: d3.functor(null),
-    size: d3.functor(8), 
+    size: d3.functor(3), 
     shape: d3.functor('circle'),
     lineType: d3.functor('1,1'),
     lineWidth: 2,
@@ -950,6 +948,7 @@ Plot.prototype.alphaScale = scaleConfig('alpha');
 
 Plot.prototype.layers = function(layers) {
   if(!arguments.length) { return this.attributes.layers; }
+  var aes;
   if(_.isArray(layers)) {
     // allow reseting of layers by passing empty array
     if(layers.length === 0){
@@ -966,12 +965,13 @@ Plot.prototype.layers = function(layers) {
               .geom(l);
       } else if ( l instanceof ggd3.layer ){
         // user specified layer
+        aes = _.clone(l.aes());
         if(!l.data()) { 
           l.data(this.data()); 
         } else {
           l.ownData(true);
         }
-        if(!l.aes()) { l.aes(_.clone(this.aes())); }
+        l.aes(_.merge(_.clone(this.aes()), aes));
       } else if (l instanceof ggd3.geom){
         var g = l;
         l = ggd3.layer()
@@ -984,12 +984,15 @@ Plot.prototype.layers = function(layers) {
     }, this);
   } else if (layers instanceof ggd3.layer) {
     if(!layers.data()) { 
-      layers.data(this.data()).dtypes(this.dtypes()); 
+      layers.data(this.data()); 
     } else {
       layers.ownData(true);
     }
-    if(!layers.aes()) { layers.aes(_.clone(this.aes())); }
-    this.attributes.layers.push(layers.plot(this));
+    aes = layers.aes();
+    layers.aes(_.merge(_.clone(this.aes()), aes))
+      .dtypes(this.dtypes())
+      .plot(this);
+    this.attributes.layers.push(layers);
   } 
   return this;
 };
@@ -1026,7 +1029,7 @@ Plot.prototype.updateLayers = function() {
   _.each(this.layers(), function(l) {
     l.dtypes(this.dtypes());
     if(!l.ownData()) { l.data(this.data()); }
-    if(_.isEmpty(l.aes())) { l.aes(this.aes()); }
+    l.aes(_.merge(_.clone(this.aes()), l.aes()));
   }, this);
 };
 
@@ -1047,13 +1050,11 @@ Plot.prototype.facet = function(spec) {
 Plot.prototype.aes = function(aes) {
   if(!arguments.length) { return this.attributes.aes; }
   // all layers need aesthetics
-  aes = _.merge(this.attributes.aes, aes);
+  aes = _.merge(this.attributes.aes, _.clone(aes));
   _.each(this.layers(), function(layer) {
-    if(_.isEmpty(layer.aes())){
-      layer.aes(_.clone(aes));
-    }
+    layer.aes(_.merge(_.clone(aes), _.clone(layer.aes()) ));
   });
-  this.attributes.aes = aes;
+  this.attributes.aes = _.clone(aes);
   return this;
 };
 
@@ -2164,7 +2165,9 @@ Line.prototype.prepareData = function(data, s) {
 };
 
 Line.prototype.draw = function draw(sel, data, i, layerNum){
-
+// data should be passed in in order
+// missing data should be allowed somehow
+// the 
   var s     = this.setup(),
       scales = this.scalesAxes(sel, s, data.selector, layerNum,
                                  this.drawX(), this.drawY());
@@ -2326,6 +2329,61 @@ Histogram.prototype.nest = function() {
 
 ggd3.geoms.histogram = Histogram;
 
+function Abline(spec) {
+  if(!(this instanceof Geom)){
+    return new Hline(spec);
+  }
+  Line.apply(this);
+  var attributes = {
+    name: "hline",
+    direction: "x",
+  };
+
+  this.attributes = _.merge(this.attributes, attributes);
+
+  for(var attr in this.attributes){
+    if((!this[attr] && this.attributes.hasOwnProperty(attr))){
+      this[attr] = createAccessor(attr);
+    }
+  }
+}
+
+Abline.prototype = new Line();
+
+Abline.prototype.constructor = Abline;
+
+Abline.prototype.domain = function(data, a) {
+  console.log(data);
+  return data;
+};
+
+
+Abline.prototype.generator = function(s) {
+
+  return d3.svg.line()
+          .x(function(d) { return x(d[s.aes.x]); })
+          .y(function(d) { return y(d[s.aes.y]); })
+          .interpolate(this.interpolate());
+};
+
+Abline.prototype.prepareData = function(data, s, scales) {
+  if(!_.contains(_.keys(s.aes), "yint")){
+    throw "geom abline requires aesthetic 'yint' and an optional slope.";
+  }
+  if(!_.contains(linearScales, scales.x.scaleType() )){
+    throw "use geom hline or vline to draw lines on an ordinal x axis y yaxis";
+  }
+  if(!s.aes.slope){
+    s.aes.slope = 0;
+  }
+  console.log(data);
+  console.log(s);
+
+
+  return data;
+};
+
+ggd3.geoms.abline = Abline;
 // 
 function Box(spec) {
   if(!(this instanceof Geom)){
@@ -2487,13 +2545,13 @@ Hline.prototype = new Line();
 
 Hline.prototype.constructor = Hline;
 
-Hline.prototype.generator = function(aes, x, y) {
+Hline.prototype.generator = function(aes) {
   // get list of intercepts and translate them
   // in the data to the actual coordinates
-  var s = this.setup();
+  var s = this.setup(),
   x = d3.scale.linear()
         .range([0, s.dim.x])
-        .domain([0, s.dim.x]);
+        .domain([0, s.dim.x]),
   y = d3.scale.linear()
           .range([0, s.dim.y])
           .domain([0, s.dim.y]);
@@ -2938,6 +2996,7 @@ function Stat(setting) {
     size: null,
     shape: null,
     label: null,
+    yint: null, // default is median of group, like the rest
   }; 
   if(_.isPlainObject(setting)) {
     for(var a in setting){
@@ -3012,6 +3071,8 @@ Stat.prototype.color = aggSetter('color');
 Stat.prototype.alpha = aggSetter('alpha');
 Stat.prototype.size = aggSetter('size');
 Stat.prototype.size = aggSetter('size');
+Stat.prototype.yint = aggSetter('yint');
+Stat.prototype.slope = d3.functor(null);
 Stat.prototype.label = function() {
   return function(arr) {
     return arr[0];
@@ -3084,7 +3145,7 @@ Stat.prototype.calcBin = function(data) {
   n = h === "y" ? "x": "y";
 
   var hist = d3.layout.histogram()
-                .bins(g.breaks())
+                .bins(g.breaks() || g.bins())
                 .frequency(g.frequency())
                 .value(function(d) {
                   return d[aes[n]];

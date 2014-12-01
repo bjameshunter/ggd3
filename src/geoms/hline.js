@@ -22,13 +22,13 @@ Hline.prototype = new Line();
 
 Hline.prototype.constructor = Hline;
 
-Hline.prototype.generator = function(aes, x, y) {
+Hline.prototype.generator = function(aes) {
   // get list of intercepts and translate them
   // in the data to the actual coordinates
-  var s = this.setup();
+  var s = this.setup(),
   x = d3.scale.linear()
         .range([0, s.dim.x])
-        .domain([0, s.dim.x]);
+        .domain([0, s.dim.x]),
   y = d3.scale.linear()
           .range([0, s.dim.y])
           .domain([0, s.dim.y]);

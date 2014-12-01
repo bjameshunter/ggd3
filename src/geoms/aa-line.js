@@ -73,7 +73,9 @@ Line.prototype.prepareData = function(data, s) {
 };
 
 Line.prototype.draw = function draw(sel, data, i, layerNum){
-
+// data should be passed in in order
+// missing data should be allowed somehow
+// the 
   var s     = this.setup(),
       scales = this.scalesAxes(sel, s, data.selector, layerNum,
                                  this.drawX(), this.drawY());

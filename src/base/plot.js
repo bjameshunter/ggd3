@@ -30,7 +30,7 @@ function Plot() {
     alpha: d3.functor(0.5),
     fill: d3.functor('steelblue'),
     color: d3.functor(null),
-    size: d3.functor(8), 
+    size: d3.functor(3), 
     shape: d3.functor('circle'),
     lineType: d3.functor('1,1'),
     lineWidth: 2,
@@ -159,6 +159,7 @@ Plot.prototype.alphaScale = scaleConfig('alpha');
 
 Plot.prototype.layers = function(layers) {
   if(!arguments.length) { return this.attributes.layers; }
+  var aes;
   if(_.isArray(layers)) {
     // allow reseting of layers by passing empty array
     if(layers.length === 0){
@@ -175,12 +176,13 @@ Plot.prototype.layers = function(layers) {
               .geom(l);
       } else if ( l instanceof ggd3.layer ){
         // user specified layer
+        aes = _.clone(l.aes());
         if(!l.data()) { 
           l.data(this.data()); 
         } else {
           l.ownData(true);
         }
-        if(!l.aes()) { l.aes(_.clone(this.aes())); }
+        l.aes(_.merge(_.clone(this.aes()), aes));
       } else if (l instanceof ggd3.geom){
         var g = l;
         l = ggd3.layer()
@@ -193,12 +195,15 @@ Plot.prototype.layers = function(layers) {
     }, this);
   } else if (layers instanceof ggd3.layer) {
     if(!layers.data()) { 
-      layers.data(this.data()).dtypes(this.dtypes()); 
+      layers.data(this.data()); 
     } else {
       layers.ownData(true);
     }
-    if(!layers.aes()) { layers.aes(_.clone(this.aes())); }
-    this.attributes.layers.push(layers.plot(this));
+    aes = layers.aes();
+    layers.aes(_.merge(_.clone(this.aes()), aes))
+      .dtypes(this.dtypes())
+      .plot(this);
+    this.attributes.layers.push(layers);
   } 
   return this;
 };
@@ -235,7 +240,7 @@ Plot.prototype.updateLayers = function() {
   _.each(this.layers(), function(l) {
     l.dtypes(this.dtypes());
     if(!l.ownData()) { l.data(this.data()); }
-    if(_.isEmpty(l.aes())) { l.aes(this.aes()); }
+    l.aes(_.merge(_.clone(this.aes()), l.aes()));
   }, this);
 };
 
@@ -256,13 +261,11 @@ Plot.prototype.facet = function(spec) {
 Plot.prototype.aes = function(aes) {
   if(!arguments.length) { return this.attributes.aes; }
   // all layers need aesthetics
-  aes = _.merge(this.attributes.aes, aes);
+  aes = _.merge(this.attributes.aes, _.clone(aes));
   _.each(this.layers(), function(layer) {
-    if(_.isEmpty(layer.aes())){
-      layer.aes(_.clone(aes));
-    }
+    layer.aes(_.merge(_.clone(aes), _.clone(layer.aes()) ));
   });
-  this.attributes.aes = aes;
+  this.attributes.aes = _.clone(aes);
   return this;
 };
 
