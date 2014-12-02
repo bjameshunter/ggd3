@@ -162,22 +162,24 @@ Stat.prototype.boxplot = function(arr) {
   return 'boxplot';
 };
 Stat.prototype.compute_boxplot = function(data) {
+  // console.log(data);
   var aes = this.layer().aes(),
       g = this.layer().geom(),
       factor = this.layer().dtypes()[aes.x][1] === "few" ? 'x': 'y',
       number = factor === 'x' ? 'y': 'x',
       arr = _.sortBy(_.pluck(data, aes[number])),
       iqr = this.iqr(arr),
-      upper = d3.quantile(arr, (1-g.tail()) || g.upper()),
+      upper = d3.quantile(arr, g.tail() ? (1 - g.tail()): g.upper()),
       lower = d3.quantile(arr, g.tail() || g.lower()),
       out = _.merge({
-        quantiles: iqr,
-        upper: upper,
-        lower: lower,
+        "quantiles": iqr,
+        "upper": upper,
+        "lower": lower,
       }, this.agg(data, aes));
+      out["n. observations"] = data.length;
       out.data = data.filter(function(d) {
-        return (d[aes[number]] < lower || 
-                d[aes[number]] > upper);
+        return ((d[aes[number]] < lower) || 
+                (d[aes[number]] > upper));
       });
   return out;
 };
