@@ -68,13 +68,15 @@ Point.prototype.position = function(d, x, y, size) {
 
 Point.prototype.draw = function(sel, data, i, layerNum) {
 
+  // should be able to pass a setup object from a different geom
+  // if a different geom wants to create a point object.
   var s     = this.setup(),
       scales = this.scalesAxes(sel, s, data.selector, layerNum,
                                true, true);
   s.groups = _.unique(_.pluck(data.data, s.group));
   data = this.unNest(this.compute(data.data, s  ));
-  // get rid of wrong elements if they exist.
 
+  // get rid of wrong elements if they exist.
   ggd3.tools.removeElements(sel, layerNum, this.geom());
   var points = sel.select('.plot')
                 .selectAll(this.geom() + '.geom.g' + layerNum)
@@ -93,9 +95,9 @@ Point.prototype.draw = function(sel, data, i, layerNum) {
     .remove();
 };
 
-Point.prototype.drawGeom = function (point, x, y, s, i) {
+Point.prototype.drawGeom = function (point, x, y, s, layerNum) {
   point
-    .attr('class', 'geom g' + i + " geom-point")
+    .attr('class', 'geom g' + layerNum + " geom-point")
     .attr({
       cx: x,
       cy: y,

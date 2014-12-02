@@ -10,7 +10,7 @@ function Facet(spec) {
     nrows: null,
     ncols: null,
     margins: {x: 5, y:5}, 
-    titleProps: [0.15, 0.15],
+    titleSize: [20, 20],
     // inherit from plot, but allow override
     // if scales are fixed, much smaller margins
     // because scales won't be drawn for inner plots.
@@ -146,8 +146,8 @@ Facet.prototype.makeSVG = function(selection, rowNum, colNum) {
       plot = this.plot(),
       dim = plot.plotDim(),
       x = selection.data()[0],
-      addHeight = (rowNum === 0 || this.type() === "wrap") ? dim.y*that.titleProps()[1]:0,
-      addWidth = colNum === 0 ? dim.x*that.titleProps()[0]:0,
+      addHeight = (rowNum === 0 || this.type() === "wrap") ? that.titleSize()[1]:0,
+      addWidth = colNum === 0 ? that.titleSize()[0]:0,
       width = plot.width() + addWidth,
       height = plot.height() + addHeight,
       svg = selection
@@ -289,8 +289,8 @@ Facet.prototype.makeTitle = function(selection, colNum, rowNum) {
       plot = this.plot(),
       dim = plot.plotDim(),
       margins = plot.margins(),
-      addHeight = dim.y*that.titleProps()[1],
-      addWidth = colNum === 0 ? dim.x*that.titleProps()[0]:0;
+      addHeight = that.titleSize()[1],
+      addWidth = colNum === 0 ? that.titleSize()[0]:0;
   var xlab = selection
               .selectAll('svg.facet-title-x')
               .data([that.x() + " - " + that.xFacets[colNum]]);

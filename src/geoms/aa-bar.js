@@ -217,7 +217,12 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
   } else if(that.name() === "histogram"){
     valueVar = "binHeight";
     categoryVar = s.group;
-    rb = o(o.domain()[0] + data[0].values[0].dx);
+    if(vertical){
+      rb = o(o.domain()[0] + data[0].values[0].dx );
+    } else {
+      rb = o(o.domain()[1] - data[0].values[0].dx );
+      console.log(rb);
+    }
   }
   if(s.grouped && 
      !_.contains([s.aes.x, s.aes.y, s.facet.y(), s.facet.x()], s.group)){
@@ -250,11 +255,20 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     };
   }
   
-  var placeBar = function(d) {
-    var p = o(d[s.aes[width.p]]);
-    p += groupOrd(d[s.group]) || 0;
-    return p || 0;
-  };
+  var placeBar = (function() {
+    if(that.name() === "bar" || vertical){
+      return function(d) {
+        var p = o(d[s.aes[width.p]]);
+        p += groupOrd(d[s.group]) || 0;
+        return p || 0;};
+    } else {
+      return function(d) {
+        var p = o(d[s.aes[width.p]]) - rb;
+        p += groupOrd(d[s.group]) || 0;
+        return p || 0;
+        };
+    }
+  })();
 
   // I think this is unnecessary.
   var calcSizeS = (function() {
@@ -274,7 +288,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       };
     }
     return function(d) {
-      return n(d[valueVar]); 
+      return n(d[valueVar]) - n(0); 
     };
   })();
   var calcSizeP = (function () {
@@ -294,7 +308,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       };
     }
     return function(d) {
-      return 0;
+      return n(0);
     };
   } )();
 

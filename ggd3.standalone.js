@@ -239,7 +239,7 @@ function Facet(spec) {
     nrows: null,
     ncols: null,
     margins: {x: 5, y:5}, 
-    titleProps: [0.15, 0.15],
+    titleSize: [20, 20],
     // inherit from plot, but allow override
     // if scales are fixed, much smaller margins
     // because scales won't be drawn for inner plots.
@@ -375,8 +375,8 @@ Facet.prototype.makeSVG = function(selection, rowNum, colNum) {
       plot = this.plot(),
       dim = plot.plotDim(),
       x = selection.data()[0],
-      addHeight = (rowNum === 0 || this.type() === "wrap") ? dim.y*that.titleProps()[1]:0,
-      addWidth = colNum === 0 ? dim.x*that.titleProps()[0]:0,
+      addHeight = (rowNum === 0 || this.type() === "wrap") ? that.titleSize()[1]:0,
+      addWidth = colNum === 0 ? that.titleSize()[0]:0,
       width = plot.width() + addWidth,
       height = plot.height() + addHeight,
       svg = selection
@@ -518,8 +518,8 @@ Facet.prototype.makeTitle = function(selection, colNum, rowNum) {
       plot = this.plot(),
       dim = plot.plotDim(),
       margins = plot.margins(),
-      addHeight = dim.y*that.titleProps()[1],
-      addWidth = colNum === 0 ? dim.x*that.titleProps()[0]:0;
+      addHeight = that.titleSize()[1],
+      addWidth = colNum === 0 ? that.titleSize()[0]:0;
   var xlab = selection
               .selectAll('svg.facet-title-x')
               .data([that.x() + " - " + that.xFacets[colNum]]);
@@ -1565,6 +1565,24 @@ Plot.prototype.setDomains = function() {
 
 Plot.prototype.setScales = SetScales;
 
+// tooltip
+function Tooltip (spec) {
+  if(!(this instanceof Tooltip)){
+    return new Tooltip(spec);
+  }
+  var attributes = {
+
+  };
+
+  for(var attr in attributes) {
+    if((!this[attr] && this.attributes.hasOwnProperty(attr))){
+    this[attr] = createAccessor(attr);
+    }
+  }
+}
+
+
+ggd3.tooltip = Tooltip;
 // Base geom from which all geoms inherit
 function Geom(aes) {
   if(!(this instanceof Geom)){
@@ -1968,7 +1986,12 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
   } else if(that.name() === "histogram"){
     valueVar = "binHeight";
     categoryVar = s.group;
-    rb = o(o.domain()[0] + data[0].values[0].dx);
+    if(vertical){
+      rb = o(o.domain()[0] + data[0].values[0].dx );
+    } else {
+      rb = o(o.domain()[1] - data[0].values[0].dx );
+      console.log(rb);
+    }
   }
   if(s.grouped && 
      !_.contains([s.aes.x, s.aes.y, s.facet.y(), s.facet.x()], s.group)){
@@ -2001,11 +2024,20 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     };
   }
   
-  var placeBar = function(d) {
-    var p = o(d[s.aes[width.p]]);
-    p += groupOrd(d[s.group]) || 0;
-    return p || 0;
-  };
+  var placeBar = (function() {
+    if(that.name() === "bar" || vertical){
+      return function(d) {
+        var p = o(d[s.aes[width.p]]);
+        p += groupOrd(d[s.group]) || 0;
+        return p || 0;};
+    } else {
+      return function(d) {
+        var p = o(d[s.aes[width.p]]) - rb;
+        p += groupOrd(d[s.group]) || 0;
+        return p || 0;
+        };
+    }
+  })();
 
   // I think this is unnecessary.
   var calcSizeS = (function() {
@@ -2025,7 +2057,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       };
     }
     return function(d) {
-      return n(d[valueVar]); 
+      return n(d[valueVar]) - n(0); 
     };
   })();
   var calcSizeP = (function () {
@@ -2045,7 +2077,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       };
     }
     return function(d) {
-      return 0;
+      return n(0);
     };
   } )();
 
@@ -2412,6 +2444,81 @@ Abline.prototype.prepareData = function(d, s, scales) {
 
 ggd3.geoms.abline = Abline;
 // 
+function Box(spec) {
+  if(!(this instanceof Geom)){
+    return new Box(spec);
+  }
+  Geom.apply(this);
+  var attributes = {
+    name: "box",
+    stat: "box",
+  };
+
+  this.attributes = _.merge(this.attributes, attributes);
+
+  for(var attr in this.attributes){
+    if((!this[attr] && this.attributes.hasOwnProperty(attr))){
+      this[attr] = createAccessor(attr);
+    }
+  }
+}
+
+Box.prototype = new Geom();
+
+Box.prototype.constructor = Box;
+
+Box.prototype.determineOrdinal = function(s) {
+  // this is dumb, this logic needs to happen when scales are created;
+  if(s.plot.xScale().single.scaleType() === "ordinal"){
+    return 'x';
+  } else {
+    return 'y';
+  }
+};
+
+Box.prototype.domain = function(data, a) {
+
+  var s = this.setup(),
+      factor = this.determineOrdinal(s),
+      number = factor === 'x' ? 'y': 'x',
+      domain,
+      extent;
+  if(a === factor) {
+    domain = _.sortBy(_.map(data, function(d) {
+      return _.unique(_.pluck(d.data, s.aes[a]));
+    }));
+  } else {
+    domain = d3.extent(_.flatten(_.map(data, function(d) {
+      return _.pluck(d.data, s.aes[a]);
+    })));
+    extent = domain[1] - domain[0];
+    domain[0] -= extent*0.1;
+    domain[1] += extent*0.1;
+  }
+  return domain;
+};
+// box takes an array of numbers and draws a box around the 
+// two extremes and lines at the inner points.
+Box.prototype.drawGeom = function(box, x, y, w, h, s, layerNum) {
+  box.attr({
+    x: x,
+    y: y,
+    width: w,
+    height: h,
+    fill: s.fill,
+    "fill-opacity": s.alpha,
+    stroke: s.color,
+    "stroke-opacity": s.alpha
+  });
+
+};
+Box.prototype.draw = function(sel, data, i, layerNum) {
+  // not really necessary, but can look a lot like point and text.
+  // might be the same. 
+};
+
+ggd3.geoms.box = Box;
+// 
 function Boxplot(spec) {
   if(!(this instanceof Geom)){
     return new Boxplot(spec);
@@ -2424,6 +2531,8 @@ function Boxplot(spec) {
     upper: 0.95,
     lower: 0.05,
     tail: null,
+    outliers: true,
+    mean: false,
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -2502,10 +2611,30 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
     // vertical boxes
     size = {s: "height", p: 'y', c: "cy"};
     width = {s: "width", p: 'x', c: "cx"};
+    // point scales;
+    px = function(d) { return (d._jitter * rb/2) + rb/2; };
+    py = function(d) { return n(d[s.aes[number]]); };
+    // box scales
+    rx = function(d) { return 0; };
+    ry = function(d) { 
+      return n(d.quantiles["75th percentile"] ); };
+    rw = function() { return rb; };
+    rh = function(d) { 
+      return (n(d.quantiles["25th percentile"]) - 
+              n(d.quantiles["75th percentile"])); };
   } else {
     // horizontal boxes
     size = {s: "width", p:'x', c: "cx"};
     width = {s:"height", p: 'y', c: "cy"};
+    py = function(d) { return (d._jitter * rb/2) + rb/2; };
+    px = function(d) { return n(d[s.aes[number]]); };
+    ry = function(d) { return 0; };
+    rx = function(d) { 
+      return n(d.quantiles["25th percentile"] ); };
+    rh = function() { return rb; };
+    rw = function(d) { 
+      return (n(d.quantiles["75th percentile"]) - 
+              n(d.quantiles["25th percentile"])); };
   }
   if(s.grouped) {
     s.groups = _.sortBy(_.unique(_.flatten(_.map(data, function(d) {
@@ -2546,14 +2675,10 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
     return out;
   }
 
-
-
   function draw(box) {
-
     var d = box.datum(),
-    rect = box.select('rect'),
-    points = box.selectAll('circle')
-              .data(d.data);
+    rect = box.selectAll('rect')
+              .data([d]);
     box.select(".upper")
       .datum(whisker(d, 'upper'))
       .attr('d', line)
@@ -2575,41 +2700,20 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
         } 
         return "translate(" + v + ",0)" ;
       });
-    rect.attr(size.p, function(d) {
-        return n(d.quantiles["75th percentile"]);
-      })
-      .attr(size.s, function(d) {
-        return (n(d.quantiles["25th percentile"]) - 
-                n(d.quantiles["75th percentile"]));
-      })
-      .attr(width.s, function(d) {
-        return rb;
-      })
-      .attr('fill', s.fill)
-      .attr('fill-opacity', s.alpha);
-    points.attr(size.c, function(d) {
-        return n(d[s.aes[number]]);
-      })
-      .attr(width.c, function(d) {
-        return (d._jitter * rb/2);
-      })
-      .attr('r', s.size)
-      .attr('fill', s.fill)
-      .attr('stroke', s.color)
-      .attr('opacity', s.alpha);
-    points.enter().append('circle')
-      .attr('class', 'outlier')
-      .attr(size.c, function(d) {
-        return n(d[s.aes[number]]);
-      })
-      .attr(width.c, function(d) {
-        return (d._jitter * rb/2) + rb/2;
-      })
-      .attr('r', s.size)
-      .attr('fill', s.fill)
-      .attr('stroke', s.color)
-      .attr('opacity', s.alpha);
-
+    var r = ggd3.geoms.box();
+    rect.call(r.drawGeom, rx, ry, rw, rh, s, layerNum);
+    rect.enter().append('rect')
+      .attr('class', 'quantile-box')
+      .call(r.drawGeom, rx, ry, rw, rh, s, layerNum);
+    if(that.outliers()) {
+      var p = ggd3.geoms.point(),
+          points = box.selectAll('circle')
+                .data(d.data);
+      points.call(p.drawGeom, px, py, s, layerNum);
+      points.enter().append('circle')
+        .attr('class', 'outlier')
+        .call(p.drawGeom, px, py, s, layerNum);
+    }
   }
   var boxes = sel.select('.plot')
                 .selectAll('.geom g' + layerNum)
@@ -2621,7 +2725,6 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
   boxes.enter().append('g').each(function(d) {
     var b = d3.select(this);
     b.attr('class', 'geom g' + layerNum + ' geom-' + that.name());
-    b.append('rect').attr('class', 'quantile-box');
     b.append('path').attr('class', 'upper');
     b.append('path').attr('class', 'lower');
     b.append('path').attr('class', 'median');
@@ -2922,13 +3025,15 @@ Point.prototype.position = function(d, x, y, size) {
 
 Point.prototype.draw = function(sel, data, i, layerNum) {
 
+  // should be able to pass a setup object from a different geom
+  // if a different geom wants to create a point object.
   var s     = this.setup(),
       scales = this.scalesAxes(sel, s, data.selector, layerNum,
                                true, true);
   s.groups = _.unique(_.pluck(data.data, s.group));
   data = this.unNest(this.compute(data.data, s  ));
-  // get rid of wrong elements if they exist.
 
+  // get rid of wrong elements if they exist.
   ggd3.tools.removeElements(sel, layerNum, this.geom());
   var points = sel.select('.plot')
                 .selectAll(this.geom() + '.geom.g' + layerNum)
@@ -2947,9 +3052,9 @@ Point.prototype.draw = function(sel, data, i, layerNum) {
     .remove();
 };
 
-Point.prototype.drawGeom = function (point, x, y, s, i) {
+Point.prototype.drawGeom = function (point, x, y, s, layerNum) {
   point
-    .attr('class', 'geom g' + i + " geom-point")
+    .attr('class', 'geom g' + layerNum + " geom-point")
     .attr({
       cx: x,
       cy: y,
