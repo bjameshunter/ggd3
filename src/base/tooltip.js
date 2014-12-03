@@ -7,13 +7,8 @@ function Tooltip (spec) {
     offset: {x: 15, y:15},
     styleClass: null,
     opacity: 1,
-  };
-  attributes.content = function(data) {
-    var tt = [];
-    for(var d in data) {
-      tt.push(["<p><strong>" + d + "</strong>: " + data[d] + "</p>"]);
-    }
-    return tt.join('\n');
+    content: null,
+    geom: null,
   };
 
   this.attributes = attributes;
@@ -23,24 +18,34 @@ function Tooltip (spec) {
     }
   }
 }
+
 Tooltip.prototype.find = function(el) {
   var parent = d3.select(el.parentNode);
   if(!parent.select('.ggd3tip').empty()) { return parent.select('.ggd3tip'); }
   return this.find(el.parentNode);
 };
-Tooltip.prototype.tooltip = function(selection) {
-  that = this;
+
+Tooltip.prototype.tooltip = function(selection, s) {
+  var that = this;
+  if(_.isUndefined(s)){
+    s = this.geom().setup();
+  }
   selection.each(function(data) {
     var tooltipdiv = that.find(this);
     d3.select(this)
-      .on('mouseover', function(d) {that.show(d, tooltipdiv); })
+      .on('mouseover', function(d) {that.show(d, tooltipdiv, s); })
       .on('mousemove', function(d) {that.move(d, tooltipdiv); })
       .on('mouseout', function(d) {that.hide(d, tooltipdiv); });
   });
 };
 
-Tooltip.prototype.show = function(data, sel) {
-  this.content()(sel, data);
+Tooltip.prototype.show = function(data, sel, s) {
+  var tt = sel.select('.tooltip-content');
+  tt.selectAll('*')
+    .remove();
+  this.content()(tt.data([data]), s);
+  sel.transition().duration(200)
+    .style('opacity', 1);
 };
 
 Tooltip.prototype.move = function(data, sel) {
@@ -52,7 +57,12 @@ Tooltip.prototype.move = function(data, sel) {
 Tooltip.prototype.hide = function(data, sel) {
   sel.attr('class', 'ggd3tip')
     .transition().duration(200)
-    .style('opacity', 0);
+    .style('opacity', 0)
+    .transition().delay(200).duration(0)
+    .style("top", 0)
+    .style("left", 0)
+    .select('.tooltip-content').selectAll('*')
+    .remove();
 };
 
 ggd3.tooltip = Tooltip;

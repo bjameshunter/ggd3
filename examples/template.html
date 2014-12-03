@@ -49,7 +49,7 @@ $("#facet-scales").on('change', function() {
 });
 var facets = {'mtcars.csv': {y: "am", nrows: 2},
             "iris.csv" : null, //{y: "Species", nrows:1},
-            "diamonds.csv":  {y: 'clarity', nrows:1},
+            "diamonds.csv":  {y: 'clarity', x:'cut'},
             "baseball.csv": {x: 'team', ncols:3},
             "nelplo.csv": {x: 'group', ncols: 3},
             "ustimeseries.csv": {x: 'group', nrows:3},
@@ -61,7 +61,7 @@ var aes = {'mtcars.csv': {x: "cyl", y:"mpg", fill: "gear"},
             color:"Species"
           },
             "diamonds.csv": { 
-              y: 'cut',
+              y: 'color',
               x: 'price',
             fill: "color",
           },
@@ -113,7 +113,8 @@ var FacetType = {'mtcars.csv': "wrap",
 var square = ggd3.geoms.point();
 var text = ggd3.geoms.text();
 var line = ggd3.geoms.line().interpolate('step')
-var layers = {'mtcars.csv': ['bar'],
+var layers = {'mtcars.csv': [ggd3.layer().geom('bar')
+                                .stat({y:'median'})],
             "iris.csv" : [ggd3.geoms.histogram()
                             .frequency(false),
                           ggd3.geoms.density()
@@ -167,10 +168,10 @@ var charts = {'mtcars.csv': ggd3.plot()
             "diamonds.csv": ggd3.plot()
                   .layers(layers["diamonds.csv"])
                   .width(200)
-                  .height(1000)
+                  .height(200)
                   .yScale({axis: {ticks: 4, position:'right',
                           orient: "left"}})
-                  .margins({top: 5, bottom:20, left:2, right:2})
+                  .margins({top: 5, bottom:2, left:2, right:2})
                   .xScale({axis: {ticks: 4, position: "top",
                           orient: "bottom"}}) 
 ,

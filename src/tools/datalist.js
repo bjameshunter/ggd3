@@ -31,7 +31,6 @@ function DataList(data) {
     // nothing yet
   }
   if(!x && !y){
-    console.log("neither x nor y");
     return [{selector: 'single', data: this.data()}];
   }
 }

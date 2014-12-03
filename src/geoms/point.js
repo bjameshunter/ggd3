@@ -18,9 +18,9 @@ function Point(spec) {
   this.attributes = _.merge(this.attributes, attributes);
 
   for(var attr in this.attributes){
-    // if((!this[attr] && this.attributes.hasOwnProperty(attr))){
+    if((!this[attr] && this.attributes.hasOwnProperty(attr))){
       this[attr] = createAccessor(attr);
-    // }
+    }
   }
 }
 Point.prototype = new Geom();
@@ -58,37 +58,43 @@ Point.prototype.positionPoint = function(s, group, groups) {
   };
 };
 
-Point.prototype.position = function(d, x, y, size) {
-  return {
-    cx: x(d),
-    cy: y(d),
-    r: size(d)
-  };
-};
-
-Point.prototype.draw = function(sel, data, i, layerNum) {
+Point.prototype.draw = function(sel, data, i, layerNum, s) {
 
   // should be able to pass a setup object from a different geom
   // if a different geom wants to create a point object.
-  var s     = this.setup(),
-      scales = this.scalesAxes(sel, s, data.selector, layerNum,
-                               true, true);
-  s.groups = _.unique(_.pluck(data.data, s.group));
-  data = this.unNest(this.compute(data.data, s  ));
-
-  // get rid of wrong elements if they exist.
-  ggd3.tools.removeElements(sel, layerNum, this.geom());
-  var points = sel.select('.plot')
+  var x, y, scales, points;
+  if(_.isUndefined(s)) {
+    s     = this.setup();
+    scales = this.scalesAxes(sel, s, data.selector, layerNum,
+                                 true, true);
+    s.groups = _.unique(_.pluck(data.data, s.group));
+    // poing should have both canvas and svg functions.
+    x = this.positionPoint(scales.x, s.group, s.groups);
+    y = this.positionPoint(scales.y, s.group, s.groups);
+    data = this.unNest(this.compute(data.data, s  ));
+    // get rid of wrong elements if they exist.
+    ggd3.tools.removeElements(sel, layerNum, this.geom());
+    points = sel.select('.plot')
                 .selectAll(this.geom() + '.geom.g' + layerNum)
                 .data(data);
-  
-  // poing should have both canvas and svg functions.
-  var x = this.positionPoint(scales.x, s.group, s.groups),
-      y = this.positionPoint(scales.y, s.group, s.groups);
+  } else {
+    points = sel.selectAll(this.geom() + '.geom.g' + layerNum)
+                .data(data);
+    x = s.x;
+    y = s.y;
+  }
+
+  var tt = ggd3.tooltip()
+            .content(this.tooltip())
+            .geom(this);
+
 
   points.transition().call(this.drawGeom, x, y, s, layerNum);
   points.enter().append(this.geom())
-    .call(this.drawGeom, x, y, s, layerNum);
+    .call(this.drawGeom, x, y, s, layerNum)
+    .each(function() {
+      tt.tooltip(d3.select(this), s);
+    });
   points.exit()
     .transition()
     .style('opacity', 0)

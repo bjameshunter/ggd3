@@ -127,8 +127,7 @@ Layer.prototype.data = function(data, fromPlot) {
 
 Layer.prototype.draw = function(sel, layerNum) {
 
-  var that = this,
-      facet = this.plot().facet(),
+  var facet = this.plot().facet(),
       plot = this.plot(),
       aes = this.aes(),
       dtypes = this.dtypes(),
@@ -155,12 +154,12 @@ Layer.prototype.draw = function(sel, layerNum) {
           return d.selector === id;
         })[0];
     if(_.isEmpty(d)) { d = {selector: id, data: []}; }
-    if(that.position() === "jitter" && 
+    if(this.position() === "jitter" && 
        !plot.hasJitter) {
       _.each(d.data, function(r) { r._jitter = _.random(-1,1,1); });        
     }
-    that.geom().draw(s, d, i, layerNum);
-  });
+    this.geom().draw(s, d, i, layerNum);
+  }, this);
 };
 
 // same as on plot, for when Layer has it's own data

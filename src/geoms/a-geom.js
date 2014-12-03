@@ -17,7 +17,21 @@ function Geom(aes) {
     style: "", // optional class attributes for css 
     tooltip: null,
   };
+  var r = function(d) { return ggd3.tools.round(d, 2);};
+  // default tooltip
+  // done here because setting a big long
+  // default function on attributes is messy.
+  function tooltip(sel, s, opts) {
+    var that = this;
+    sel.each(function(d) {
+        var el = d3.select(this);
+        that._otherAesthetics(el, d, s, []);
+    });
+  }
   this.attributes = attributes;
+
+  this.attributes.tooltip = _.bind(tooltip, this);
+
 }
 Geom.prototype.defaultPosition = function() {
   var n = this.name();
@@ -38,50 +52,68 @@ Geom.prototype.defaultPosition = function() {
     }[n];
 };
 
-Geom.prototype.tooltip = function(tooltip) {
-  if(!arguments.length) { return this.attributes.tooltip; }
-  var t = ggd3.tooltip();
+Geom.prototype._otherAesthetics = function(sel, d, s, omit){
+  _.each(_.difference(_.keys(s.aes), omit), function(k) {
+    var stat = s.stat[k]()._name || "identity";
+    stat = stat === "identity" ? "": " (" + stat + ")";
+    sel.append('h4')
+      .text(s.aes[k] + stat + ": ")
+      .append('span').text('(' + k + ') ' + d[s.aes[k]]);
+  });
+};
 
+Geom.prototype.tooltip = function(obj, data) {
+  if(!arguments.length) { return this.attributes.tooltip; }
+  if(_.isFunction(obj)){
+    this.attributes.tooltip = _.bind(obj, this);
+    return this;
+  } else {
+    console.warn("tooltips should be a function accepting a selection with data attached and an optional object of options.");
+  }
+  return this;
 };
 
 Geom.prototype.setup = function() {
+  // when calling a geom from within
+  // another geom, many of these properties will not exist.
   var s = {
       layer     : this.layer(),
     };
-  s.plot      = s.layer.plot();
-  s.stat      = s.layer.stat();
-  s.nest      = this.nest();
-  s.dtypes    = s.layer.dtypes();
-  s.position  = s.layer.position();
-  s.dim       = s.plot.plotDim();
-  s.facet     = s.plot.facet();
-  s.aes       = s.layer.aes();
-  s.fill      = d3.functor(this.fill() || s.plot.fill());
-  s.size      = d3.functor(this.size() || s.plot.size());
-  s.alpha     = d3.functor(this.alpha() || s.plot.alpha());
-  s.color     = d3.functor(this.color() || s.plot.color());
+  if(s.layer){
+    s.plot      = s.layer.plot();
+    s.stat      = s.layer.stat();
+    s.nest      = this.nest();
+    s.dtypes    = s.layer.dtypes();
+    s.position  = s.layer.position();
+    s.dim       = s.plot.plotDim();
+    s.facet     = s.plot.facet();
+    s.aes       = s.layer.aes();
+    s.fill      = d3.functor(this.fill() || s.plot.fill());
+    s.size      = d3.functor(this.size() || s.plot.size());
+    s.alpha     = d3.functor(this.alpha() || s.plot.alpha());
+    s.color     = d3.functor(this.color() || s.plot.color());
+    s.nest.rollup(function(d) {
+      return s.stat.compute(d);
+    });
 
-  s.nest.rollup(function(d) {
-    return s.stat.compute(d);
-  });
-
-  if(s.aes.fill) {
-    s.grouped = true;
-    s.group = s.aes.fill;
-  } else if(s.aes.color){
-    s.grouped = true;
-    s.group = aes.color;
-  } else if(aes.group){
-    s.grouped = true;
-    s.group = s.aes.group;
-  }
-  if(_.contains([s.facet.x(), s.facet.y(), 
-                s.aes.x, s.aes.y], 
-                s.group)) {
-    // uninteresting grouping, get rid of it.
-    grouped = false;
-    group = null;
-    groups = null;
+    if(s.aes.fill) {
+      s.grouped = true;
+      s.group = s.aes.fill;
+    } else if(s.aes.color){
+      s.grouped = true;
+      s.group = aes.color;
+    } else if(aes.group){
+      s.grouped = true;
+      s.group = s.aes.group;
+    }
+    if(_.contains([s.facet.x(), s.facet.y(), 
+                  s.aes.x, s.aes.y], 
+                  s.group)) {
+      // uninteresting grouping, get rid of it.
+      s.grouped = false;
+      s.group = null;
+      s.groups = null;
+    }
   }
 
   return s;

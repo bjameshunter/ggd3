@@ -126,7 +126,6 @@ function DataList(data) {
     // nothing yet
   }
   if(!x && !y){
-    console.log("neither x nor y");
     return [{selector: 'single', data: this.data()}];
   }
 }
@@ -757,8 +756,7 @@ Layer.prototype.data = function(data, fromPlot) {
 
 Layer.prototype.draw = function(sel, layerNum) {
 
-  var that = this,
-      facet = this.plot().facet(),
+  var facet = this.plot().facet(),
       plot = this.plot(),
       aes = this.aes(),
       dtypes = this.dtypes(),
@@ -785,12 +783,12 @@ Layer.prototype.draw = function(sel, layerNum) {
           return d.selector === id;
         })[0];
     if(_.isEmpty(d)) { d = {selector: id, data: []}; }
-    if(that.position() === "jitter" && 
+    if(this.position() === "jitter" && 
        !plot.hasJitter) {
       _.each(d.data, function(r) { r._jitter = _.random(-1,1,1); });        
     }
-    that.geom().draw(s, d, i, layerNum);
-  });
+    this.geom().draw(s, d, i, layerNum);
+  }, this);
 };
 
 // same as on plot, for when Layer has it's own data
@@ -1578,13 +1576,8 @@ function Tooltip (spec) {
     offset: {x: 15, y:15},
     styleClass: null,
     opacity: 1,
-  };
-  attributes.content = function(data) {
-    var tt = [];
-    for(var d in data) {
-      tt.push(["<p><strong>" + d + "</strong>: " + data[d] + "</p>"]);
-    }
-    return tt.join('\n');
+    content: null,
+    geom: null,
   };
 
   this.attributes = attributes;
@@ -1594,24 +1587,34 @@ function Tooltip (spec) {
     }
   }
 }
+
 Tooltip.prototype.find = function(el) {
   var parent = d3.select(el.parentNode);
   if(!parent.select('.ggd3tip').empty()) { return parent.select('.ggd3tip'); }
   return this.find(el.parentNode);
 };
-Tooltip.prototype.tooltip = function(selection) {
-  that = this;
+
+Tooltip.prototype.tooltip = function(selection, s) {
+  var that = this;
+  if(_.isUndefined(s)){
+    s = this.geom().setup();
+  }
   selection.each(function(data) {
     var tooltipdiv = that.find(this);
     d3.select(this)
-      .on('mouseover', function(d) {that.show(d, tooltipdiv); })
+      .on('mouseover', function(d) {that.show(d, tooltipdiv, s); })
       .on('mousemove', function(d) {that.move(d, tooltipdiv); })
       .on('mouseout', function(d) {that.hide(d, tooltipdiv); });
   });
 };
 
-Tooltip.prototype.show = function(data, sel) {
-  this.content()(sel, data);
+Tooltip.prototype.show = function(data, sel, s) {
+  var tt = sel.select('.tooltip-content');
+  tt.selectAll('*')
+    .remove();
+  this.content()(tt.data([data]), s);
+  sel.transition().duration(200)
+    .style('opacity', 1);
 };
 
 Tooltip.prototype.move = function(data, sel) {
@@ -1623,7 +1626,12 @@ Tooltip.prototype.move = function(data, sel) {
 Tooltip.prototype.hide = function(data, sel) {
   sel.attr('class', 'ggd3tip')
     .transition().duration(200)
-    .style('opacity', 0);
+    .style('opacity', 0)
+    .transition().delay(200).duration(0)
+    .style("top", 0)
+    .style("left", 0)
+    .select('.tooltip-content').selectAll('*')
+    .remove();
 };
 
 ggd3.tooltip = Tooltip;
@@ -1646,7 +1654,21 @@ function Geom(aes) {
     style: "", // optional class attributes for css 
     tooltip: null,
   };
+  var r = function(d) { return ggd3.tools.round(d, 2);};
+  // default tooltip
+  // done here because setting a big long
+  // default function on attributes is messy.
+  function tooltip(sel, s, opts) {
+    var that = this;
+    sel.each(function(d) {
+        var el = d3.select(this);
+        that._otherAesthetics(el, d, s, []);
+    });
+  }
   this.attributes = attributes;
+
+  this.attributes.tooltip = _.bind(tooltip, this);
+
 }
 Geom.prototype.defaultPosition = function() {
   var n = this.name();
@@ -1667,50 +1689,68 @@ Geom.prototype.defaultPosition = function() {
     }[n];
 };
 
-Geom.prototype.tooltip = function(tooltip) {
-  if(!arguments.length) { return this.attributes.tooltip; }
-  var t = ggd3.tooltip();
+Geom.prototype._otherAesthetics = function(sel, d, s, omit){
+  _.each(_.difference(_.keys(s.aes), omit), function(k) {
+    var stat = s.stat[k]()._name || "identity";
+    stat = stat === "identity" ? "": " (" + stat + ")";
+    sel.append('h4')
+      .text(s.aes[k] + stat + ": ")
+      .append('span').text('(' + k + ') ' + d[s.aes[k]]);
+  });
+};
 
+Geom.prototype.tooltip = function(obj, data) {
+  if(!arguments.length) { return this.attributes.tooltip; }
+  if(_.isFunction(obj)){
+    this.attributes.tooltip = _.bind(obj, this);
+    return this;
+  } else {
+    console.warn("tooltips should be a function accepting a selection with data attached and an optional object of options.");
+  }
+  return this;
 };
 
 Geom.prototype.setup = function() {
+  // when calling a geom from within
+  // another geom, many of these properties will not exist.
   var s = {
       layer     : this.layer(),
     };
-  s.plot      = s.layer.plot();
-  s.stat      = s.layer.stat();
-  s.nest      = this.nest();
-  s.dtypes    = s.layer.dtypes();
-  s.position  = s.layer.position();
-  s.dim       = s.plot.plotDim();
-  s.facet     = s.plot.facet();
-  s.aes       = s.layer.aes();
-  s.fill      = d3.functor(this.fill() || s.plot.fill());
-  s.size      = d3.functor(this.size() || s.plot.size());
-  s.alpha     = d3.functor(this.alpha() || s.plot.alpha());
-  s.color     = d3.functor(this.color() || s.plot.color());
+  if(s.layer){
+    s.plot      = s.layer.plot();
+    s.stat      = s.layer.stat();
+    s.nest      = this.nest();
+    s.dtypes    = s.layer.dtypes();
+    s.position  = s.layer.position();
+    s.dim       = s.plot.plotDim();
+    s.facet     = s.plot.facet();
+    s.aes       = s.layer.aes();
+    s.fill      = d3.functor(this.fill() || s.plot.fill());
+    s.size      = d3.functor(this.size() || s.plot.size());
+    s.alpha     = d3.functor(this.alpha() || s.plot.alpha());
+    s.color     = d3.functor(this.color() || s.plot.color());
+    s.nest.rollup(function(d) {
+      return s.stat.compute(d);
+    });
 
-  s.nest.rollup(function(d) {
-    return s.stat.compute(d);
-  });
-
-  if(s.aes.fill) {
-    s.grouped = true;
-    s.group = s.aes.fill;
-  } else if(s.aes.color){
-    s.grouped = true;
-    s.group = aes.color;
-  } else if(aes.group){
-    s.grouped = true;
-    s.group = s.aes.group;
-  }
-  if(_.contains([s.facet.x(), s.facet.y(), 
-                s.aes.x, s.aes.y], 
-                s.group)) {
-    // uninteresting grouping, get rid of it.
-    grouped = false;
-    group = null;
-    groups = null;
+    if(s.aes.fill) {
+      s.grouped = true;
+      s.group = s.aes.fill;
+    } else if(s.aes.color){
+      s.grouped = true;
+      s.group = aes.color;
+    } else if(aes.group){
+      s.grouped = true;
+      s.group = s.aes.group;
+    }
+    if(_.contains([s.facet.x(), s.facet.y(), 
+                  s.aes.x, s.aes.y], 
+                  s.group)) {
+      // uninteresting grouping, get rid of it.
+      s.grouped = false;
+      s.group = null;
+      s.groups = null;
+    }
   }
 
   return s;
@@ -2041,11 +2081,10 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       rb = o(o.domain()[0] + data[0].values[0].dx );
     } else {
       rb = o(o.domain()[1] - data[0].values[0].dx );
-      console.log(rb);
     }
   }
   if(s.grouped && 
-     !_.contains([s.aes.x, s.aes.y, s.facet.y(), s.facet.x()], s.group)){
+     _.contains([s.aes.x, s.aes.y], s.group)){
     console.log('grouping is already shown by facets' +
                 ' unnecessary color scales probably generated');
   }
@@ -2137,7 +2176,8 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
                 .selectAll('rect.geom.g' + layerNum)
                 .data(data),
       tt = ggd3.tooltip()
-            .content(that.tooltip(), s);
+            .content(this.tooltip())
+            .geom(this);
   // add canvas and svg functions.
   function draw(rect) {
     rect.attr('class', 'geom g' + layerNum + ' geom-bar')
@@ -2175,7 +2215,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     .transition()
     .call(draw)
     .each(function(d) {
-      d3.select(this).call(_.bind(tt.tooltip, tt));
+      tt.tooltip(d3.select(this));
     });
 
   bars.exit()
@@ -2303,30 +2343,25 @@ function Histogram(spec) {
   };
   var r = function(d) { return ggd3.tools.round(d, 2);};
   this.attributes = _.merge(this.attributes, attributes);
-  function tooltip(sel, data, opts) {
+
+  function tooltip(sel, opts) {
     var s = this.setup(),
+        that = this,
         v = s.aes.y === "binHeight" ? s.aes.x: s.aes.y,
         c = s.aes.fill || s.aes.color;
-    var tt = sel.selectAll('.tooltip-content')
-              .data([data]);
-    tt.each(function(d) {
+    sel.each(function(d) {
         var el = d3.select(this);
-        el.selectAll('*').remove();
         el.append('h4')
           .text(v + ": " )
           .append("span").text(r(d[v]) + " - " + r(d[v]+d.dx));
         el.append('h4')
           .text("bin size: " )
           .append("span").text(r(d.binHeight));
+        that._otherAesthetics(el, d, s, ['x', 'y']);
         el.append('h4')
           .text("n: " )
           .append("span").text(d.length);
-        el.append('h4')
-          .text(c + ": " )
-          .append("span").text(d[c]);
     });
-    sel.transition().duration(200)
-      .style('opacity', 1);
   }
   this.attributes.tooltip = _.bind(tooltip, this);
 
@@ -2340,14 +2375,6 @@ function Histogram(spec) {
 Histogram.prototype = new Bar();
   
 Histogram.prototype.constructor = Histogram;
-
-Histogram.prototype.tooltip = function(obj, data) {
-  if(!arguments.length) { return this.attributes.tooltip; }
-  if(_.isFunction(obj)){
-    this.attributes.tooltip = obj;
-    return this;
-  }
-};
 
 Histogram.prototype.domain = function(data, v) {
   var s = this.setup(),
@@ -2625,6 +2652,19 @@ function Boxplot(spec) {
     mean: false,
   };
 
+  var r = function(d) { return ggd3.tools.round(d, 2);};
+  function tooltip(sel, s, opts) {
+    var that = this;
+    sel.each(function(d) {
+        var el = d3.select(this);
+        _.mapValues(d.quantiles, function(v, k) {
+          el.append('h5')
+            .text(k + ": " + r(v));
+        });
+    });
+  }
+  attributes.tooltip = _.bind(tooltip, this);
+
   this.attributes = _.merge(this.attributes, attributes);
 
   for(var attr in this.attributes){
@@ -2638,6 +2678,8 @@ Boxplot.prototype = new Geom();
 
 
 Boxplot.prototype.constructor = Boxplot;
+
+// Boxplot.prototype.tooltip = 
 
 Boxplot.prototype.determineOrdinal = function(s) {
   // this is dumb, this logic needs to happen when scales are created;
@@ -2668,9 +2710,6 @@ Boxplot.prototype.domain = function(data, a) {
     domain[1] += extent*0.1;
   }
   return domain;
-};
-Boxplot.prototype.positionOutlier = function() {
-
 };
 
 Boxplot.prototype.positionBar = function() {
@@ -2785,24 +2824,27 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
       .attr("transform", function(d) {
         var v = o(d[s.aes[factor]]) + o2(d[s.group]);
         if(!vertical) { 
-          v += rb; // add rb the other way
+          // v -= rb/2; // add rb the other way
           return "translate(0," + v + ")";
         } 
         return "translate(" + v + ",0)" ;
       });
-    var r = ggd3.geoms.box();
+    var r = ggd3.geoms.box(),
+        tt = ggd3.tooltip()
+                .content(that.tooltip())
+                .geom(that);
     rect.call(r.drawGeom, rx, ry, rw, rh, s, layerNum);
     rect.enter().append('rect')
       .attr('class', 'quantile-box')
-      .call(r.drawGeom, rx, ry, rw, rh, s, layerNum);
+      .call(r.drawGeom, rx, ry, rw, rh, s, layerNum)
+      .each(function(d) {
+        tt.tooltip(d3.select(this));
+      });
     if(that.outliers()) {
-      var p = ggd3.geoms.point(),
-          points = box.selectAll('circle')
-                .data(d.data);
-      points.call(p.drawGeom, px, py, s, layerNum);
-      points.enter().append('circle')
-        .attr('class', 'outlier')
-        .call(p.drawGeom, px, py, s, layerNum);
+      var p = ggd3.geoms.point();
+      s.x = px;
+      s.y = py;
+      p.draw(box, d.data, i, layerNum, s);
     }
   }
   var boxes = sel.select('.plot')
@@ -3065,9 +3107,9 @@ function Point(spec) {
   this.attributes = _.merge(this.attributes, attributes);
 
   for(var attr in this.attributes){
-    // if((!this[attr] && this.attributes.hasOwnProperty(attr))){
+    if((!this[attr] && this.attributes.hasOwnProperty(attr))){
       this[attr] = createAccessor(attr);
-    // }
+    }
   }
 }
 Point.prototype = new Geom();
@@ -3105,37 +3147,43 @@ Point.prototype.positionPoint = function(s, group, groups) {
   };
 };
 
-Point.prototype.position = function(d, x, y, size) {
-  return {
-    cx: x(d),
-    cy: y(d),
-    r: size(d)
-  };
-};
-
-Point.prototype.draw = function(sel, data, i, layerNum) {
+Point.prototype.draw = function(sel, data, i, layerNum, s) {
 
   // should be able to pass a setup object from a different geom
   // if a different geom wants to create a point object.
-  var s     = this.setup(),
-      scales = this.scalesAxes(sel, s, data.selector, layerNum,
-                               true, true);
-  s.groups = _.unique(_.pluck(data.data, s.group));
-  data = this.unNest(this.compute(data.data, s  ));
-
-  // get rid of wrong elements if they exist.
-  ggd3.tools.removeElements(sel, layerNum, this.geom());
-  var points = sel.select('.plot')
+  var x, y, scales, points;
+  if(_.isUndefined(s)) {
+    s     = this.setup();
+    scales = this.scalesAxes(sel, s, data.selector, layerNum,
+                                 true, true);
+    s.groups = _.unique(_.pluck(data.data, s.group));
+    // poing should have both canvas and svg functions.
+    x = this.positionPoint(scales.x, s.group, s.groups);
+    y = this.positionPoint(scales.y, s.group, s.groups);
+    data = this.unNest(this.compute(data.data, s  ));
+    // get rid of wrong elements if they exist.
+    ggd3.tools.removeElements(sel, layerNum, this.geom());
+    points = sel.select('.plot')
                 .selectAll(this.geom() + '.geom.g' + layerNum)
                 .data(data);
-  
-  // poing should have both canvas and svg functions.
-  var x = this.positionPoint(scales.x, s.group, s.groups),
-      y = this.positionPoint(scales.y, s.group, s.groups);
+  } else {
+    points = sel.selectAll(this.geom() + '.geom.g' + layerNum)
+                .data(data);
+    x = s.x;
+    y = s.y;
+  }
+
+  var tt = ggd3.tooltip()
+            .content(this.tooltip())
+            .geom(this);
+
 
   points.transition().call(this.drawGeom, x, y, s, layerNum);
   points.enter().append(this.geom())
-    .call(this.drawGeom, x, y, s, layerNum);
+    .call(this.drawGeom, x, y, s, layerNum)
+    .each(function() {
+      tt.tooltip(d3.select(this), s);
+    });
   points.exit()
     .transition()
     .style('opacity', 0)
@@ -3418,23 +3466,20 @@ function Stat(setting) {
     size: null,
     shape: null,
     label: null,
-    yint: null, // default is median of group, like the rest
+    yint: null, 
   }; 
   if(_.isPlainObject(setting)) {
     for(var a in setting){
       if(_.isFunction(setting[a])){
         attributes[a] = setting[a];
       } else {
-        // map[a] is a string specifying a function
-        // that lives on Stat
         attributes[a] = this[setting[a]];
       }
     }
   } else if(_.isString(setting)){
     attributes.linearAgg = setting;
   }
-  // object storing column names and agg functions
-  // to be optionally used on tooltips.
+
   this.attributes = attributes;
   var getSet = ["layer", "linearAgg"];
   for(var attr in attributes){
@@ -3466,7 +3511,6 @@ Stat.prototype.compute = function(data) {
   if(_.contains(specialStats, this.linearAgg()) ){
     return this["compute_" + this.linearAgg()](data);
   }
-
   // most situations will need these two
   if(id){
     return data;
@@ -3518,45 +3562,69 @@ Stat.prototype.median = function(arr) {
   }
   return d3.median(arr);
 };
+Stat.prototype.median._name = "median";
 Stat.prototype.count = function(arr) {
   return arr.length;
 };
+Stat.prototype.count._name = "count";
+
 Stat.prototype.min = function(arr) {
   return d3.min(arr);
 };
+Stat.prototype.min._name = "min";
+
 Stat.prototype.max = function(arr) {
   return d3.max(arr);
 };
+Stat.prototype.max._name = "max";
+
 Stat.prototype.mean = function(arr) {
   return d3.mean(arr);
 };
+Stat.prototype.mean._name = "mean";
+
 Stat.prototype.iqr = function(arr) {
   // arr = _.sortBy(arr);
-  return {"25th percentile": d3.quantile(arr, 0.25),
+  return {"75th percentile": d3.quantile(arr, 0.75),
           "50th percentile": d3.quantile(arr, 0.5),
-          "75th percentile": d3.quantile(arr, 0.75)
+          "25th percentile": d3.quantile(arr, 0.25),
         };
 };
+Stat.prototype.iqr._name = "iqr";
 
 // don't do anything with character columns
 Stat.prototype.first = function(arr) {
   return arr[0];
 };
+Stat.prototype.first._name = "";
 
 Stat.prototype.mode = function(arr) {
   return "nuthing yet for mode.";
 };
+Stat.prototype.mode._name = "mode";
+
 // how to deal with less convential computations?
 // ugly hack? Most of this is ugly.
 Stat.prototype.identity = function(arr) {
   return "identity";
 };
+Stat.prototype.identity._name = "identity";
+
 Stat.prototype.density = function(arr) {
   return 'density';
 };
+Stat.prototype.density._name = "density";
+
 Stat.prototype.boxplot = function(arr) {
   return 'boxplot';
 };
+Stat.prototype.boxplot._name = "boxplot";
+
+Stat.prototype.bin = function() {
+  return 'bin';
+};
+Stat.prototype.bin._name = "bin";
+
 Stat.prototype.compute_boxplot = function(data) {
   // console.log(data);
   var aes = this.layer().aes(),

@@ -221,11 +221,10 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       rb = o(o.domain()[0] + data[0].values[0].dx );
     } else {
       rb = o(o.domain()[1] - data[0].values[0].dx );
-      console.log(rb);
     }
   }
   if(s.grouped && 
-     !_.contains([s.aes.x, s.aes.y, s.facet.y(), s.facet.x()], s.group)){
+     _.contains([s.aes.x, s.aes.y], s.group)){
     console.log('grouping is already shown by facets' +
                 ' unnecessary color scales probably generated');
   }
@@ -317,7 +316,8 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
                 .selectAll('rect.geom.g' + layerNum)
                 .data(data),
       tt = ggd3.tooltip()
-            .content(that.tooltip(), s);
+            .content(this.tooltip())
+            .geom(this);
   // add canvas and svg functions.
   function draw(rect) {
     rect.attr('class', 'geom g' + layerNum + ' geom-bar')
@@ -355,7 +355,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     .transition()
     .call(draw)
     .each(function(d) {
-      d3.select(this).call(_.bind(tt.tooltip, tt));
+      tt.tooltip(d3.select(this));
     });
 
   bars.exit()

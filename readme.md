@@ -31,7 +31,7 @@ Roadmap:
   - box
   - geom error that mounts on geom point, bar, box, line, etc.
   - smooth with loess or lm methods
-- Possible adoption of bin-summarize-smooth methods for plots that draw a lot of DOM elements.
+- Possible adoption of bin-summarize-smooth methods to replace plots that draw too many DOM elements.
 - Sampling methods for large datasets
 - Write geom-specific, smarter tooltips that abbreviate numbers appropriately.
 

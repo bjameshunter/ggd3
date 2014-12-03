@@ -21,6 +21,7 @@ svg {
   display: inline;
   text-align: left;
   box-shadow: 5px 5px 5px #888888;
+  z-index: 1000;
 }
 .tooltip-content{
 }

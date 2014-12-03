@@ -22,23 +22,20 @@ function Stat(setting) {
     size: null,
     shape: null,
     label: null,
-    yint: null, // default is median of group, like the rest
+    yint: null, 
   }; 
   if(_.isPlainObject(setting)) {
     for(var a in setting){
       if(_.isFunction(setting[a])){
         attributes[a] = setting[a];
       } else {
-        // map[a] is a string specifying a function
-        // that lives on Stat
         attributes[a] = this[setting[a]];
       }
     }
   } else if(_.isString(setting)){
     attributes.linearAgg = setting;
   }
-  // object storing column names and agg functions
-  // to be optionally used on tooltips.
+
   this.attributes = attributes;
   var getSet = ["layer", "linearAgg"];
   for(var attr in attributes){
@@ -70,7 +67,6 @@ Stat.prototype.compute = function(data) {
   if(_.contains(specialStats, this.linearAgg()) ){
     return this["compute_" + this.linearAgg()](data);
   }
-
   // most situations will need these two
   if(id){
     return data;
@@ -122,45 +118,69 @@ Stat.prototype.median = function(arr) {
   }
   return d3.median(arr);
 };
+Stat.prototype.median._name = "median";
 Stat.prototype.count = function(arr) {
   return arr.length;
 };
+Stat.prototype.count._name = "count";
+
 Stat.prototype.min = function(arr) {
   return d3.min(arr);
 };
+Stat.prototype.min._name = "min";
+
 Stat.prototype.max = function(arr) {
   return d3.max(arr);
 };
+Stat.prototype.max._name = "max";
+
 Stat.prototype.mean = function(arr) {
   return d3.mean(arr);
 };
+Stat.prototype.mean._name = "mean";
+
 Stat.prototype.iqr = function(arr) {
   // arr = _.sortBy(arr);
-  return {"25th percentile": d3.quantile(arr, 0.25),
+  return {"75th percentile": d3.quantile(arr, 0.75),
           "50th percentile": d3.quantile(arr, 0.5),
-          "75th percentile": d3.quantile(arr, 0.75)
+          "25th percentile": d3.quantile(arr, 0.25),
         };
 };
+Stat.prototype.iqr._name = "iqr";
 
 // don't do anything with character columns
 Stat.prototype.first = function(arr) {
   return arr[0];
 };
+Stat.prototype.first._name = "";
 
 Stat.prototype.mode = function(arr) {
   return "nuthing yet for mode.";
 };
+Stat.prototype.mode._name = "mode";
+
 // how to deal with less convential computations?
 // ugly hack? Most of this is ugly.
 Stat.prototype.identity = function(arr) {
   return "identity";
 };
+Stat.prototype.identity._name = "identity";
+
 Stat.prototype.density = function(arr) {
   return 'density';
 };
+Stat.prototype.density._name = "density";
+
 Stat.prototype.boxplot = function(arr) {
   return 'boxplot';
 };
+Stat.prototype.boxplot._name = "boxplot";
+
+Stat.prototype.bin = function() {
+  return 'bin';
+};
+Stat.prototype.bin._name = "bin";
+
 Stat.prototype.compute_boxplot = function(data) {
   // console.log(data);
   var aes = this.layer().aes(),

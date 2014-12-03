@@ -15,6 +15,19 @@ function Boxplot(spec) {
     mean: false,
   };
 
+  var r = function(d) { return ggd3.tools.round(d, 2);};
+  function tooltip(sel, s, opts) {
+    var that = this;
+    sel.each(function(d) {
+        var el = d3.select(this);
+        _.mapValues(d.quantiles, function(v, k) {
+          el.append('h5')
+            .text(k + ": " + r(v));
+        });
+    });
+  }
+  attributes.tooltip = _.bind(tooltip, this);
+
   this.attributes = _.merge(this.attributes, attributes);
 
   for(var attr in this.attributes){
@@ -28,6 +41,8 @@ Boxplot.prototype = new Geom();
 
 
 Boxplot.prototype.constructor = Boxplot;
+
+// Boxplot.prototype.tooltip = 
 
 Boxplot.prototype.determineOrdinal = function(s) {
   // this is dumb, this logic needs to happen when scales are created;
@@ -58,9 +73,6 @@ Boxplot.prototype.domain = function(data, a) {
     domain[1] += extent*0.1;
   }
   return domain;
-};
-Boxplot.prototype.positionOutlier = function() {
-
 };
 
 Boxplot.prototype.positionBar = function() {
@@ -175,24 +187,27 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
       .attr("transform", function(d) {
         var v = o(d[s.aes[factor]]) + o2(d[s.group]);
         if(!vertical) { 
-          v += rb; // add rb the other way
+          // v -= rb/2; // add rb the other way
           return "translate(0," + v + ")";
         } 
         return "translate(" + v + ",0)" ;
       });
-    var r = ggd3.geoms.box();
+    var r = ggd3.geoms.box(),
+        tt = ggd3.tooltip()
+                .content(that.tooltip())
+                .geom(that);
     rect.call(r.drawGeom, rx, ry, rw, rh, s, layerNum);
     rect.enter().append('rect')
       .attr('class', 'quantile-box')
-      .call(r.drawGeom, rx, ry, rw, rh, s, layerNum);
+      .call(r.drawGeom, rx, ry, rw, rh, s, layerNum)
+      .each(function(d) {
+        tt.tooltip(d3.select(this));
+      });
     if(that.outliers()) {
-      var p = ggd3.geoms.point(),
-          points = box.selectAll('circle')
-                .data(d.data);
-      points.call(p.drawGeom, px, py, s, layerNum);
-      points.enter().append('circle')
-        .attr('class', 'outlier')
-        .call(p.drawGeom, px, py, s, layerNum);
+      var p = ggd3.geoms.point();
+      s.x = px;
+      s.y = py;
+      p.draw(box, d.data, i, layerNum, s);
     }
   }
   var boxes = sel.select('.plot')
