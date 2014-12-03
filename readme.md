@@ -33,6 +33,7 @@ Roadmap:
   - smooth with loess or lm methods
 - Possible adoption of bin-summarize-smooth methods for plots that draw a lot of DOM elements.
 - Sampling methods for large datasets
+- Write geom-specific, smarter tooltips that abbreviate numbers appropriately.
 
 #### Problems and questions:
 

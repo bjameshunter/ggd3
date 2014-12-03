@@ -12,8 +12,34 @@ function Histogram(spec) {
     breaks: null,
     frequency: true,
   };
-
+  var r = function(d) { return ggd3.tools.round(d, 2);};
   this.attributes = _.merge(this.attributes, attributes);
+  function tooltip(sel, data, opts) {
+    var s = this.setup(),
+        v = s.aes.y === "binHeight" ? s.aes.x: s.aes.y,
+        c = s.aes.fill || s.aes.color;
+    var tt = sel.selectAll('.tooltip-content')
+              .data([data]);
+    tt.each(function(d) {
+        var el = d3.select(this);
+        el.selectAll('*').remove();
+        el.append('h4')
+          .text(v + ": " )
+          .append("span").text(r(d[v]) + " - " + r(d[v]+d.dx));
+        el.append('h4')
+          .text("bin size: " )
+          .append("span").text(r(d.binHeight));
+        el.append('h4')
+          .text("n: " )
+          .append("span").text(d.length);
+        el.append('h4')
+          .text(c + ": " )
+          .append("span").text(d[c]);
+    });
+    sel.transition().duration(200)
+      .style('opacity', 1);
+  }
+  this.attributes.tooltip = _.bind(tooltip, this);
 
   for(var attr in this.attributes){
     if((!this[attr] && this.attributes.hasOwnProperty(attr))){
@@ -25,6 +51,14 @@ function Histogram(spec) {
 Histogram.prototype = new Bar();
   
 Histogram.prototype.constructor = Histogram;
+
+Histogram.prototype.tooltip = function(obj, data) {
+  if(!arguments.length) { return this.attributes.tooltip; }
+  if(_.isFunction(obj)){
+    this.attributes.tooltip = obj;
+    return this;
+  }
+};
 
 Histogram.prototype.domain = function(data, v) {
   var s = this.setup(),

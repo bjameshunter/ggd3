@@ -136,6 +136,10 @@ Facet.prototype.makeDIV = function(selection, rowNum, ncols) {
   row.enter().append('div')
     .attr('class', 'plot-div')
     .each(function(colNum) {
+      d3.select(this).append('div')
+        .attr('class', 'ggd3tip')
+        .style('opacity', 0)
+        .append('div').attr('class', 'tooltip-content');
       that.makeSVG(d3.select(this), rowNum, colNum);
     });
   row.exit().remove();

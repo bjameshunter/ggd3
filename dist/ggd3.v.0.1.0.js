@@ -354,6 +354,10 @@ Facet.prototype.makeDIV = function(selection, rowNum, ncols) {
   row.enter().append('div')
     .attr('class', 'plot-div')
     .each(function(colNum) {
+      d3.select(this).append('div')
+        .attr('class', 'ggd3tip')
+        .style('opacity', 0)
+        .append('div').attr('class', 'tooltip-content');
       that.makeSVG(d3.select(this), rowNum, colNum);
     });
   row.exit().remove();
@@ -1560,16 +1564,56 @@ function Tooltip (spec) {
     return new Tooltip(spec);
   }
   var attributes = {
-
+    offset: {x: 15, y:15},
+    styleClass: null,
+    opacity: 1,
+  };
+  attributes.content = function(data) {
+    var tt = [];
+    for(var d in data) {
+      tt.push(["<p><strong>" + d + "</strong>: " + data[d] + "</p>"]);
+    }
+    return tt.join('\n');
   };
 
+  this.attributes = attributes;
   for(var attr in attributes) {
     if((!this[attr] && this.attributes.hasOwnProperty(attr))){
     this[attr] = createAccessor(attr);
     }
   }
 }
+Tooltip.prototype.find = function(el) {
+  var parent = d3.select(el.parentNode);
+  if(!parent.select('.ggd3tip').empty()) { return parent.select('.ggd3tip'); }
+  return this.find(el.parentNode);
+};
+Tooltip.prototype.tooltip = function(selection) {
+  that = this;
+  selection.each(function(data) {
+    var tooltipdiv = that.find(this);
+    d3.select(this)
+      .on('mouseover', function(d) {that.show(d, tooltipdiv); })
+      .on('mousemove', function(d) {that.move(d, tooltipdiv); })
+      .on('mouseout', function(d) {that.hide(d, tooltipdiv); });
+  });
+};
 
+Tooltip.prototype.show = function(data, sel) {
+  this.content()(sel, data);
+};
+
+Tooltip.prototype.move = function(data, sel) {
+  sel
+    .style('left', d3.event.offsetX + this.offset().x)
+    .style('top', d3.event.offsetY + this.offset().y);
+};
+
+Tooltip.prototype.hide = function(data, sel) {
+  sel.attr('class', 'ggd3tip')
+    .transition().duration(200)
+    .style('opacity', 0);
+};
 
 ggd3.tooltip = Tooltip;
 // Base geom from which all geoms inherit
@@ -1589,6 +1633,7 @@ function Geom(aes) {
     drawX: true,
     drawY: true,
     style: "", // optional class attributes for css 
+    tooltip: null,
   };
   this.attributes = attributes;
 }
@@ -1609,6 +1654,12 @@ Geom.prototype.defaultPosition = function() {
     "path" : "identity",
     "ribbon" : "identity",
     }[n];
+};
+
+Geom.prototype.tooltip = function(tooltip) {
+  if(!arguments.length) { return this.attributes.tooltip; }
+  var t = ggd3.tooltip();
+
 };
 
 Geom.prototype.setup = function() {
@@ -2073,7 +2124,9 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
 
   var bars = sel.select('.plot')
                 .selectAll('rect.geom.g' + layerNum)
-                .data(data);
+                .data(data),
+      tt = ggd3.tooltip()
+            .content(that.tooltip(), s);
   // add canvas and svg functions.
   function draw(rect) {
     rect.attr('class', 'geom g' + layerNum + ' geom-bar')
@@ -2109,7 +2162,10 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       'stroke-width': that.lineWidth()
     })
     .transition()
-    .call(draw);
+    .call(draw)
+    .each(function(d) {
+      d3.select(this).call(_.bind(tt.tooltip, tt));
+    });
 
   bars.exit()
     .transition()
@@ -2234,8 +2290,34 @@ function Histogram(spec) {
     breaks: null,
     frequency: true,
   };
-
+  var r = function(d) { return ggd3.tools.round(d, 2);};
   this.attributes = _.merge(this.attributes, attributes);
+  function tooltip(sel, data, opts) {
+    var s = this.setup(),
+        v = s.aes.y === "binHeight" ? s.aes.x: s.aes.y,
+        c = s.aes.fill || s.aes.color;
+    var tt = sel.selectAll('.tooltip-content')
+              .data([data]);
+    tt.each(function(d) {
+        var el = d3.select(this);
+        el.selectAll('*').remove();
+        el.append('h4')
+          .text(v + ": " )
+          .append("span").text(r(d[v]) + " - " + r(d[v]+d.dx));
+        el.append('h4')
+          .text("bin size: " )
+          .append("span").text(r(d.binHeight));
+        el.append('h4')
+          .text("n: " )
+          .append("span").text(d.length);
+        el.append('h4')
+          .text(c + ": " )
+          .append("span").text(d[c]);
+    });
+    sel.transition().duration(200)
+      .style('opacity', 1);
+  }
+  this.attributes.tooltip = _.bind(tooltip, this);
 
   for(var attr in this.attributes){
     if((!this[attr] && this.attributes.hasOwnProperty(attr))){
@@ -2247,6 +2329,14 @@ function Histogram(spec) {
 Histogram.prototype = new Bar();
   
 Histogram.prototype.constructor = Histogram;
+
+Histogram.prototype.tooltip = function(obj, data) {
+  if(!arguments.length) { return this.attributes.tooltip; }
+  if(_.isFunction(obj)){
+    this.attributes.tooltip = obj;
+    return this;
+  }
+};
 
 Histogram.prototype.domain = function(data, v) {
   var s = this.setup(),

@@ -15,6 +15,7 @@ function Geom(aes) {
     drawX: true,
     drawY: true,
     style: "", // optional class attributes for css 
+    tooltip: null,
   };
   this.attributes = attributes;
 }
@@ -35,6 +36,12 @@ Geom.prototype.defaultPosition = function() {
     "path" : "identity",
     "ribbon" : "identity",
     }[n];
+};
+
+Geom.prototype.tooltip = function(tooltip) {
+  if(!arguments.length) { return this.attributes.tooltip; }
+  var t = ggd3.tooltip();
+
 };
 
 Geom.prototype.setup = function() {

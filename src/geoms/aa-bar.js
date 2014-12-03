@@ -315,7 +315,9 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
 
   var bars = sel.select('.plot')
                 .selectAll('rect.geom.g' + layerNum)
-                .data(data);
+                .data(data),
+      tt = ggd3.tooltip()
+            .content(that.tooltip(), s);
   // add canvas and svg functions.
   function draw(rect) {
     rect.attr('class', 'geom g' + layerNum + ' geom-bar')
@@ -351,7 +353,10 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       'stroke-width': that.lineWidth()
     })
     .transition()
-    .call(draw);
+    .call(draw)
+    .each(function(d) {
+      d3.select(this).call(_.bind(tt.tooltip, tt));
+    });
 
   bars.exit()
     .transition()
