@@ -1,0 +1,13 @@
+include: []
+
+keep_files: []
+
+timezone: America/Chicago
+
+defaults:
+  -
+    scope:
+      path: ""
+      type: "example"
+    values:
+      layout: "default"

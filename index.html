@@ -1,252 +1,290 @@
-<html>
+<!DOCTYPE html>
+<!--[if IE 8]> <html lang="en" class="ie8"> <![endif]-->  
+<!--[if IE 9]> <html lang="en" class="ie9"> <![endif]-->  
+<!--[if !IE]><!--> <html lang="en"> <!--<![endif]-->  
 <head>
-<link rel='stylesheet' href='css/style.css'>
-<link rel='stylesheet' href='node_modules/bootstrap/dist/css/bootstrap.css'>
-<script type='text/javascript' src='ggd3.standalone.js'></script></head>
-</head>
-<body>
-<div>
-  <select id="dataset" class='btn btn-primary'>
-  <option value="mtcars.csv" id='cars' >cars</option>
-  <option value="iris.csv" id='iris' selected>iris</option>
-  <option value="diamonds.csv" id='diamonds' >diamonds</option>
-  <option value="baseball.csv" id='baseball' >baseball</option>
-  <option value="nelplo.csv" id='nelplo' >nelplo</option>
-  <option value="wells.csv" id='wells' >wells</option>
-  <option value="ustimeseries.csv" id='ustimeseries' >ustimeseries</option>
-  <option value="movies.csv" id='movies' >movies</option>
-</select>
-<!-- <select id="xVar" class='btn btn-primary'>
-</select>    
-<select id="yVar" class='btn btn-primary'>
-</select>    
- -->
-<select id="facet-scales" class='btn btn-primary'>
-  <option value="fixed" id="fixed" selected>fixed</option>
-  <option value="free" id="free" >free</option>
-  <option value="free_x" id="free_x" >free x</option>
-  <option value="free_y" id="free_y" >free y</option>
-</select>    
-<!-- <select id="xAxisPos" class='btn btn-primary'>
-  <option value="bottom" selected>x axis bottom</option>
-  <option value="top">x axis top</option>
-</select>    
-<select id="yAxisPos" class='btn btn-primary'>
-  <option value="left" selected>y axis left</option>
-  <option value="right">y axis right</option>
-</select>    
- -->
-</div>
-<div id='chart01' class='chart-frame'></div>
-<script>
-var ch;
-var div = d3.select('#chart01');
-$("#dataset").on('change', function() {
-  redraw();
-});
-$("#facet-scales").on('change', function() {
-  redraw();
-});
-var facets = {'mtcars.csv': {y: "am", nrows: 2},
-            "iris.csv" : null, //{y: "Species", nrows:1},
-            "diamonds.csv":  {y: 'clarity', x:'cut'},
-            "baseball.csv": {x: 'team', ncols:3},
-            "nelplo.csv": {x: 'group', ncols: 3},
-            "ustimeseries.csv": {x: 'group', nrows:3},
-            "wells.csv":{x:'switch', y: "assoc"},
-            "movies.csv": {x: "Comedy", y: "Short"}, 
-          };
-var aes = {'mtcars.csv': {x: "cyl", y:"mpg", fill: "gear"},
-            "iris.csv" : {y: "Sepal.Length", fill: "Species",
-            color:"Species"
-          },
-            "diamonds.csv": { 
-              y: 'color',
-              x: 'price',
-            fill: "color",
-          },
-            "baseball.csv": {x: "ab", y:"batting",
-            fill: "decade",
-            alpha: "hr"},
-            "nelplo.csv": {x: 'date', y: 'value', 
-            label: "variable", color:'variable'},
-            "ustimeseries.csv": {x: 'date', y: 'value', 
-            color:'variable'},
-            "wells.csv": {x: "arsenic", y: 'dist', fill:'switch', alpha:'dist',
-            color:"switch"},
-            "movies.csv": {
-              y:"rating", x: "Documentary", 
-              fill: "Romance"
-            }
-          };
-var dtypes = {'mtcars.csv': {"gear": ["string"], "cyl": ["string"]},
-            "iris.csv" : {},
-            "diamonds.csv": {},
-            "baseball.csv": {"year": ['date', 'many', "%Y"],
-            "decade": ['string'],
-            "stint": ['string'],
-            "batting": ["number", "many"]},
-            "nelplo.csv": {"date": ['date', 'many', "%Y-%m"]},
-            "ustimeseries.csv": {"date": ['date', 'many', "%Y-%m"]},
-            "wells.csv": {},
-            "movies.csv": {
-              Documentary: ['string', 'few'],
-              Comedy: ['string', 'few'],
-              Romance: ['string', 'few'],
-              Action: ['string', 'few'],
-              Drama: ['string', 'few'],
-              Animation: ['string', 'few'],
-              Short: ['string', 'few'],
-            },
-          };
-var FacetType = {'mtcars.csv': "wrap",
-            "iris.csv" : "wrap",
-            "diamonds.csv": "wrap",
-            "baseball.csv": "wrap",
-            "nelplo.csv": "wrap",
-            "ustimeseries.csv": "wrap",
-            "wells.csv": "wrap",
-            "movies.csv": "grid",
-          };
-// I don't understand why setting scales (alpha, fill, etc.)
-// here sets them for all future geoms of that type.
-var square = ggd3.geoms.point();
-var text = ggd3.geoms.text();
-var line = ggd3.geoms.line().interpolate('step')
-var layers = {'mtcars.csv': [ggd3.layer().geom('bar')
-                                .stat({y:'median'})],
-            "iris.csv" : [ggd3.geoms.histogram()
-                            .frequency(false),
-                          ggd3.geoms.density()
-                            .kernel('gaussianKernel'),
-                          ggd3.layer()
-                            .geom(ggd3.geoms.density()
-                            .kernel('gaussianKernel')
-                            .color('black'))
-                            .aes({fill:null,
-                                  color:null })
-                          ],
-            "diamonds.csv": [ggd3.geoms.boxplot()] ,
-            "baseball.csv": [ggd3.layer()
-                                .geom('point')],
-            "nelplo.csv": [line],
-            "ustimeseries.csv": [line],
-            "wells.csv": [ggd3.layer()
-                            .geom(ggd3.geoms.point().color(null)),
-                          ggd3.layer()
-                            .data([{int: 100, slope: 20, assoc: 0, switch: 1}, 
-                                  {int: 120, slope:-10, assoc: 1, switch: 1},
-                                  {int: 150, slope: 0, assoc: 1, switch: 0}])
-                            .geom(ggd3.geoms.abline().lineType("5,3")
-                                    .color('darkseagreen').alpha(1))
-                            .aes({yint: "int", slope: "slope"})],
-            "movies.csv": [ggd3.layer()
-                              .geom(ggd3.geoms.boxplot()
-                                      .tail(0.01))]
-          };
-var charts = {'mtcars.csv': ggd3.plot()
-                    .width(300)
-                    .height(300)
-                    .yScale({axis:{ position:'left', 
-                            orient:'left'}})
-                    .xScale({axis: {position: 'top',
-                            orient: 'bottom',
-                            ticks: 4}})
-                    .color('black')
-                    .margins({top: 5, bottom:10, left:35, right:10})
-                    .layers(layers["mtcars.csv"]),
-            "iris.csv" : ggd3.plot()
-                    .width(700)
-                    .height(700)
-                    .yScale({axis: {ticks: 4, position:'left',
-                      orient: "left"}})
-                    .sizeRange([5, 50])
-                    .margins({top: 5, bottom:20, left:25, right:5})
-                    .xScale({axis: {ticks: 4, position: "bottom",
-                            orient: "bottom"}})
-                    .layers(layers["iris.csv"]),
-            "diamonds.csv": ggd3.plot()
-                  .layers(layers["diamonds.csv"])
-                  .width(200)
-                  .height(200)
-                  .yScale({axis: {ticks: 4, position:'right',
-                          orient: "left"}})
-                  .margins({top: 5, bottom:2, left:2, right:2})
-                  .xScale({axis: {ticks: 4, position: "top",
-                          orient: "bottom"}}) 
-,
-            "baseball.csv": ggd3.plot()
-                  .layers(layers["baseball.csv"])
-                  .width(200)
-                  .height(200)
-                  .size(3)
-                  .yScale({axis: {ticks: 4, 
-                          position:'right',
-                          orient: "left"}})
-                  .margins({top: 0, bottom:5, left:0, right:10})
-                  .xScale({axis: {ticks: 4, 
-                          position: "top",
-                          orient: "bottom"}})
-,
-            "nelplo.csv": ggd3.plot()
-                  .layers(layers["nelplo.csv"])
-                  .width(300)
-                  .facet(facets["nelplo.csv"])
-                  .height(150)
-                  .yScale({axis: {ticks: 4, position:'left',
-                          orient: "left"}})
-                  .margins({top: 15, bottom:20, left:20, right:5})
-                  .xScale({axis: {ticks: 4, position: "bottom",
-                          orient: "bottom"}})
-,
-            "ustimeseries.csv": ggd3.plot()
-                  .layers(layers["ustimeseries.csv"])
-                  .width(500)
-                  .facet(facets["ustimeseries.csv"])
-                  .height(300)
-                  .yScale({axis: {ticks: 4, position:'left',
-                          orient: "left"}})
-                  .margins({top: 5, bottom:10, left:30, right:2})
-                  .xScale({axis: {ticks: 4, position: "top",
-                          orient: "bottom"}})
-,
-            "wells.csv": ggd3.plot()
-                  .width(300)
-                  .height(300)
-                  .layers(layers["wells.csv"])
-                  .yScale({axis: {ticks: 4, position:'left',
-                          orient: "right"}})
-                  .margins({top: 5, bottom:20, left:2, right:2}),
-            "movies.csv": ggd3.plot()
-                            .width(300)
-                            .height(300)
-                            .layers(layers['movies.csv'])
-                            .xScale({axis:{ticks:5,
-                                orient: "bottom",
-                                position: "top"}})
-                            .yScale({axis:{orient: "right",
-                                    position: "left"}}),
+    <title>Free Bootstrap Theme for Developers</title>
+    <!-- Meta -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="">
+    <meta name="author" content="">    
+    <link rel="shortcut icon" href="favicon.ico">  
+    <link href='http://fonts.googleapis.com/css?family=Lato:300,400,300italic,400italic' rel='stylesheet' type='text/css'>
+    <link href='http://fonts.googleapis.com/css?family=Montserrat:400,700' rel='stylesheet' type='text/css'> 
+    <!-- Global CSS -->
+    <link rel="stylesheet" href="assets/plugins/bootstrap/css/bootstrap.min.css">
+    <!-- Plugins CSS -->    
+    <link rel="stylesheet" href="assets/plugins/font-awesome/css/font-awesome.css">
+    <link rel="stylesheet" href="assets/plugins/prism/prism.css">
+    <!-- Theme CSS -->  
+    <link id="theme-style" rel="stylesheet" href="assets/css/styles-2.css">
+    <link rel="stylesheet" href="assets/css/ggd3style.css">
 
-          };
 
-// this should work;
-var chart;
+    <script type="text/javascript" src="assets/js/ggd3.standalone.js"></script>
+    <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+      <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+</head> 
 
-function redraw() {
-  var dataset = $("#dataset")[0].value;
-  d3.csv("data/" + dataset, function(error, data) {
-  chart = charts[dataset]
-                .dtypes(dtypes[dataset])
-                .data(data)
-                .aes(aes[dataset]);
-    var facet = new ggd3.facet(facets[dataset])
-                  .type(FacetType[dataset])
-                  .scales($("#facet-scales")[0].value)
-    chart.facet(facet);
-    chart.draw(div);
-  })
-}
-redraw();
-</script>
+<body data-spy="scroll">
+    
+    <!-- ******HEADER****** --> 
+    <header id="header" class="header">  
+        <div class="container">            
+            <h1 class="logo pull-left">
+                <a class="scrollto" href="#promo">
+                    <span class="logo-title"></span>
+                </a>
+            </h1><!--//logo-->              
+            <nav id="main-nav" class="main-nav navbar-right" role="navigation">
+                <div class="navbar-header">
+                    <button class="navbar-toggle" type="button" data-toggle="collapse" data-target="#navbar-collapse">
+                        <span class="sr-only">Toggle navigation</span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button><!--//nav-toggle-->
+                </div><!--//navbar-header-->            
+                <div class="navbar-collapse collapse" id="navbar-collapse">
+                    <ul class="nav navbar-nav">
+                        <li class="active nav-item sr-only"><a class="scrollto" href="#promo">top</a></li>
+                        <li class="nav-item"><a class="scrollto" href="#plan">the plan</a></li>
+                        <li class="nav-item"><a class="scrollto" href="#start">start</a></li>
+                        <li class="nav-item"><a href="examples.html">examples</a></li>
+<!--                         <li class="nav-item"><a class="scrollto" href="#license">License</a></li>                        
+ -->                    </ul><!--//nav-->
+                </div><!--//navabr-collapse-->
+            </nav><!--//main-nav-->
+        </div>
+    </header><!--//header-->
+    
+    <!-- ******PROMO****** -->
+    <section id="promo" class="promo section offset-header">
+        <div class="container text-center">
+            <h2 class="title">gg<span class="highlight">D3</span></h2>
+            <p class="intro">grammar of graphics in D3</p>
+            <div class="btns">
+                <a class="btn btn-cta-primary" href="https://github.com/benjh33/ggd3/archive/master.zip" target="_blank">Download</a>
+            </div>
+            <ul class="meta list-inline">
+<!--                 <li><a href="#" target="_blank">View on GitHub</a></li>
+                <li><a href="https://github.com/benj33/ggd3" target="_blank">Full Documentation</a></li>
+ -->            </ul><!--//meta-->
+        </div><!--//container-->
+        <div class="social-media">
+            <div class="social-media-inner container text-center">
+                <ul class="list-inline">
+                    <li class="twitter-follow"><a href="https://twitter.com/benjhunter" class="twitter-follow-button" data-show-count="false">Follow @benjhunter</a>
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+                    </li><!--//twitter-follow-->
+                    <li class="twitter-tweet">
+                        <a href="https://twitter.com/share" class="twitter-share-button" data-via="benjhunter" data-hashtags="ggd3,dataviz">Tweet</a>
+    <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+                    </li><!--//twitter-tweet-->
+                    <!--// Generate github buttons: https://github.com/mdo/github-buttons -->
+                    <li class="github-star"><iframe src="http://ghbtns.com/github-btn.html?user=benjh33&repo=ggd3&type=watch&count=true" allowtransparency="true" frameborder="0" scrolling="0" width="110" height="20"></iframe></li>
+                    <li class="github-fork"><iframe src="http://ghbtns.com/github-btn.html?user=benjh33&repo=ggd3&type=fork" allowtransparency="true" frameborder="0" scrolling="0" width="53" height="20"></iframe></li>
+                    <li class="github-follow"><iframe src="http://ghbtns.com/github-btn.html?user=benjh33&type=follow&count=true"
+  allowtransparency="true" frameborder="0" scrolling="0" width="165" height="20"></iframe></li>
+                    
+                </ul>
+            </div>
+        </div>
+    </section><!--//promo-->
+    
+    <!-- ******ABOUT****** --> 
+    <section id="plan" class="about section">
+        <div class="container">
+            <h2 class="title text-center">Why the grammar of graphics in D3?</h2>
+            <p class="intro text-center">I have enjoyed working with D3 and many D3 libraries over the past couple years, but always hoped one would come along that would somewhat replicate the features of <code>ggplot2</code>. <a href="https://github.com/gigamonkey/gg">Gigamonkey</a> has started one, but it looks like he's got more pressing things to do. I've been casually writing and learning javascript for a couple years, I guess, but have no formal CS pedigree and have never embarked on something this big. I'd like it to work well, eventually. After starting and restarting twice, I now have something that works and appears to be extendable. If you have advice on architecture, features, or something consistent and blatantly dumb that I'm doing, please let me know. In the meantime, I plan to build out the following features and would love some collaborators.</p>
+            <div class="row">
+                <div class="item col-md-4 col-sm-6 col-xs-12">
+<!--                     <div class="icon-holder">
+                        <i class="fa fa-heart"></i>
+                    </div>
+ -->                    <div class="content">
+                        <h3 class="sub-title">Facets</h3>
+                        <p>I find it the most useful feature in ggplot2 and wonder why other libraries don't start with a plan for small multiples. Fixed and free scales both work and I'd like to adopt free space as well.</p>
+                    </div><!--//content-->
+                </div><!--//item-->
+                <div class="item col-md-4 col-sm-6 col-xs-12">
+<!--                     <div class="icon-holder">
+                        <i class="fa fa-clock-o"></i>
+                    </div>
+ -->                    <div class="content">
+                        <h3 class="sub-title">Composable</h3>
+                        <p>So far this is working okay. A chart has a <code>layers</code> method that appends a layer to an array of layers. Layers have their own aesthetic maps that inherit undefined aesthetics from the chart object. An entry in the array can be a string of a geom name, a layer object, or a geom object.</p>
+                    </div><!--//content-->
+                </div><!--//item-->
+                <div class="item col-md-4 col-sm-6 col-xs-12">
+<!--                     <div class="icon-holder">
+                        <i class="fa fa-crosshairs"></i>
+                    </div>
+ -->                    <div class="content">
+                        <h3 class="sub-title">Style</h3>
+                        <p>I'd like a handful of css files that can be applied at the chart level to easily change the theme and allow for customization or quick overrides of defaults.</p>
+                    </div><!--//content-->
+                </div><!--//item-->           
+            </div><!--//row-->
+            <div class='row'>
+                <div class="item col-md-4 col-sm-6 col-xs-12">
+<!--                     <div class="icon-holder">
+                        <i class="fa fa-tablet"></i>
+                    </div>
+ -->                    <div class="content">
+                        <h3 class="sub-title">Geoms</h3>
+                        <p>Currently in fairly working order are point, line, histogram, density, bar, boxplot, text and abline. Hline and vline should come next without too much effort, then path, ribbon, area and error/linerange.</p>
+                    </div><!--//content-->
+                </div><!--//item-->                
+                <div class="item col-md-4 col-sm-6 col-xs-12">
+<!--                     <div class="icon-holder">
+                        <i class="fa fa-code"></i>
+                    </div>
+ -->                    <div class="content">
+                        <h3 class="sub-title">Todo: Axis pan and zoom</h3>
+                        <p>For continuous axes, a default zoom behavior would save a lot of hassle when dealing with uncertain differences in domains between facets or groups of geoms. If someone has an example of how to do such a thing on an ordinal axis, I'd like to see it. </p>
+                    </div><!--//content-->
+                </div><!--//item-->
+                <div class="item col-md-4 col-sm-6 col-xs-12">
+<!--                     <div class="icon-holder">
+                        <i class="fa fa-coffee"></i>
+                    </div>
+ -->                    <div class="content">
+                        <h3 class="sub-title">Todo: Brushing</h3>
+                        <p>I'd like each geom to have a default brush behavior that exports the brush range to drive behaviors or highlight the same ranges or same data points in other facets. </p>
+                    </div><!--//content-->
+                </div><!--//item-->               
+        </div><!--//container-->
+    </section><!--//about-->
+    
+    <!-- ******docs****** --> 
+    <section id="start" class="docs section">
+        <div class="container">
+            <div class="docs-inner">
+            <h2 class="title text-center">Get Started</h2>            
+            <div class="block">
+                <h3 class="sub-title text-center">The basics</h3>
+                <p>This features a gaussian density curve drawn over a histogram with 30 bins. Proportions are shown, rather than frequency counts to allow you to see the density curve. With stacked histograms, the proportion will add up to more than one. I'll have to fix that. </p>
+                <p>I confess, I don't want the mouseover text to be green, but am tired and don't want to figure out where my css wires are crossed.</p>
+                <div class="code-block">
+                    <pre><code class="language-javascript">
+var gaussian = ggd3.geoms.density().kernel('gaussianKernel');
+var proportionHist = ggd3.geoms.histogram().frequency(false);
+var irisHistogram = ggd3.plot()
+                    .facet({titleSize: [0,0]})
+                    .aes({x: "Sepal.Width", fill: "Species",
+                            color:'Species'})
+                    .layers([proportionHist, gaussian])
+                    .facet({x:"Species", nrows:1})
+                    .data(iris)
+                    .width(250)
+                    .height(250);
+irisHistogram.draw(d3.select('#iris'));
+                    </code></pre>
+                </div><!--//code-block-->
+            <div id="iris" class='chart-frame'>
+            </div>
+                <p>To see the histograms side-by-side, crack open the console and type the following: </p>
+                <div class="code-block">
+                    <pre><code class="language-javascript">
+irisHistogram.layers()[0].position('dodge');
+irisHistogram.draw(d3.select('#iris')); 
+                    </code></pre>
+                </div>                           </div><!--//block-->   
+            <div class="block">
+                <h3 class="sub-title text-center">A little fancier</h3>
+                <p>This example employs a facet according to whether the car is American. The use of D3's "silhouette" option on the stack layout is a bit gratuitous, but I like it for show. </p>
+                <p> I feel I've got a pretty good method for aggregating continuous variables and mapping them to aesthetics. Here the y variable is mapped to the mean and the alpha is mapped, by default, to the median. For kicks, I threw in the points geom as well, though you can't see the y-axis because that is not drawn with the "silhouette" option.</p>
+
+                <div class="code-block">
+                    <pre><code class="language-javascript">
+var carLayer = ggd3.layer()
+                    .position('stack')
+                    .stat({y: 'mean'})
+                    .geom(ggd3.geoms.bar().offset('silhouette'));
+var jitterLayer = ggd3.layer().position('jitter').geom('point');
+var carChart = ggd3.plot()
+                    .layers([carLayer, jitterLayer])
+                    .width(250)
+                    .facet({x:'am', nrows: 1})
+                    .dtypes({"gear": ["string"], "cyl": ["string"]})
+                    .data(cars)
+                    .aes({x: "cyl", y: "mpg", fill: "gear", 
+                         alpha: "hp"});
+carChart.draw(d3.select('#cars'));
+                    </code></pre>
+                </div><!--//code-block-->
+            <div id="cars" class='chart-frame'>
+            </div>
+            </div><!--//block-->   
+            <div class="block">
+                <p>And yes, there are no axis labels yet. Those'll happen in due time. Check out the examples, they're still a little rough, but they make sense. Thanks for reading. Hit me up on github.</p>
+            </div>    
+<!--             <div class="block">
+                <h3 class="sub-title text-center">Full Documentation</h3>
+                <p>If your documentation is very long you can host the full docs page (including FAQ etc) on GitHub and provide a Call to Action button below to direct users there.</p>
+                <p class="text-center">
+                    <a class="btn btn-cta-primary" href="https://github.com/twbs/bootstrap" target="_blank">More on GitHub</a>
+                </p>
+            </div><!--//block
+ -->            
+            </div><!--//docs-inner-->         
+        </div><!--//container-->
+    </section><!--//features-->
+    
+    <!-- ******LICENSE****** 
+    <section id="license" class="license section">
+        <div class="container">
+            <div class="license-inner">
+            <h2 class="title text-center">License</h2>
+                <div class="info">
+                    <p>This Bootstrap theme is made by UX designer <a href="https://www.linkedin.com/in/xiaoying" target="_blank">Xiaoying Riley</a> at 3rd Wave Media for developers and is <strong>100% FREE</strong> under the <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank">Creative Commons Attribution 3.0 License (CC BY 3.0)</a></p>
+                    <p><strong>[Tip for developers]:</strong> If your project is open source, you might want to put a <a href="https://www.paypal.com/us/cgi-bin/?cmd=_donate-intro-outside" target="_blank">PayPal "Donate" button</a> below so your users can express their gratitude. If your project is commercial, you can put a <a href="https://www.paypal.com/us/cgi-bin/webscr?cmd=_singleitem-intro-outside" target="_blank">PayPal "Buy Now" button</a> instead.</p>
+                </div><!--//info-->
+<!--
+                <div class="cta-container">
+                    <div class="speech-bubble">                    
+                        <p class="intro">If you are feeling generous and want to show your support to Xiaoying, you can buy her a beer or coffee via the PayPal donate button below. :)</p>
+                        <div class="icon-holder  text-center"><i class="fa fa-smile-o"></i></div>
+                    </div><!--//speech-bubble
+                    <div class="btn-container  text-center">
+                        <!--//You need to generate your own PayPal button - https://www.paypal.com/us/cgi-bin/?cmd=_donate-intro-outside -->         
+                        <!--PayPal generated code starts
+                        <form action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_top">
+                        <input type="hidden" name="cmd" value="_s-xclick">
+                        <input type="hidden" name="hosted_button_id" value="Y46LJNXGAVVWW">
+                        <input type="image" src="https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif" border="0" name="submit" alt="PayPal - The safer, easier way to pay online!">
+                        <img alt="" border="0" src="https://www.paypalobjects.com/en_GB/i/scr/pixel.gif" width="1" height="1">
+                        </form>
+                        <!--//PayPal generated code ends
+                        
+                    </div><!--//btn-container
+                </div><!--//cta-container-->
+            </div><!--//license-inner-->
+        </div><!--//container-->
+    </section><!--//how-->
+      
+    <!-- ******FOOTER****** --> 
+    <footer class="footer">
+        <div class="container text-center">
+            <small class="copyright">Designed with <i class="fa fa-heart"></i> by <a href="http://themes.3rdwavemedia.com" target="_blank">Xiaoying Riley</a> for developers</small>
+        </div><!--//container-->
+    </footer><!--//footer-->
+     
+    <!-- Javascript -->          
+    <script type="text/javascript" src="assets/plugins/jquery-1.11.1.min.js"></script>
+    <script type="text/javascript" src="assets/plugins/jquery-migrate-1.2.1.min.js"></script>    
+    <script type="text/javascript" src="assets/plugins/jquery.easing.1.3.js"></script>   
+    <script type="text/javascript" src="assets/plugins/bootstrap/js/bootstrap.min.js"></script>     
+    <script type="text/javascript" src="assets/plugins/jquery-scrollTo/jquery.scrollTo.min.js"></script> 
+    <script type="text/javascript" src="assets/plugins/prism/prism.js"></script>    
+    <script type="text/javascript" src="assets/js/main.js"></script>       
+    <script type="text/javascript" src="assets/js/homepage.js"></script>
 </body>
-</html>
+</html> 
+

@@ -227,6 +227,9 @@ function recurseNest(data) {
 
 
 function Facet(spec) {
+  if(!(this instanceof Facet)){
+    return new ggd3.facet(spec);
+  }
   var attributes = {
     x: null,
     y: null,
@@ -821,7 +824,7 @@ function Plot() {
     aes: {},
     legends: null, // strings corresponding to scales
     // that need legends or legend objects
-    facet: null,
+    facet: ggd3.facet(),
     width: 400,
     height: 400,
     margins: {left:20, right:20, top:20, bottom:20},
@@ -878,7 +881,7 @@ function Plot() {
                 .plot(this); 
   // explicitly declare which attributes get a basic
   // getter/setter
-  var getSet = ["opts", "theme", "margins", 
+  var getSet = ["opts", "theme", 
     "width", "height", "xAdjust", "yAdjust", 
     'colorRange', 'sizeRange',
     'fillRange', "lineType",
@@ -962,6 +965,12 @@ Plot.prototype.shapeScale = scaleConfig('shape');
 Plot.prototype.fillScale = scaleConfig('fill');
 
 Plot.prototype.alphaScale = scaleConfig('alpha');
+
+Plot.prototype.margins = function(margins) {
+  if(!arguments.length) { return this.attributes.margins; }
+  this.attributes.margins = _.merge(this.attributes.margins, margins);
+  return this;
+};
 
 Plot.prototype.layers = function(layers) {
   if(!arguments.length) { return this.attributes.layers; }
@@ -1127,7 +1136,7 @@ Plot.prototype.draw = function(sel) {
     .transition().style('opacity', 0).remove();
   // if any of the layers had a jitter, it has
   // been added to each facet's dataset
-  if(_.any(chart.layers(), function(l) {
+  if(_.any(that.layers(), function(l) {
     return l.position() === "jitter";
   }) ) { 
     that.hasJitter = true; 
@@ -1619,8 +1628,8 @@ Tooltip.prototype.show = function(data, sel, s) {
 
 Tooltip.prototype.move = function(data, sel) {
   sel
-    .style('left', d3.event.offsetX + this.offset().x)
-    .style('top', d3.event.offsetY + this.offset().y);
+    .style('left', d3.event.offsetX + this.offset().x + "px")
+    .style('top', d3.event.offsetY + this.offset().y + "px");
 };
 
 Tooltip.prototype.hide = function(data, sel) {
@@ -1628,8 +1637,8 @@ Tooltip.prototype.hide = function(data, sel) {
     .transition().duration(200)
     .style('opacity', 0)
     .transition().delay(200).duration(0)
-    .style("top", 0)
-    .style("left", 0)
+    .style("top", 0 + "px")
+    .style("left", 0 + "px")
     .select('.tooltip-content').selectAll('*')
     .remove();
 };
@@ -1739,7 +1748,7 @@ Geom.prototype.setup = function() {
     } else if(s.aes.color){
       s.grouped = true;
       s.group = aes.color;
-    } else if(aes.group){
+    } else if(s.aes.group){
       s.grouped = true;
       s.group = s.aes.group;
     }
