@@ -336,7 +336,10 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       });
   }
 
-  bars.transition().call(draw);
+  bars.transition().call(draw)
+    .each(function(d) {
+      tt.tooltip(d3.select(this));
+    });
   
   bars.enter()
     .append(this.geom())

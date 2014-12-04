@@ -89,7 +89,10 @@ Point.prototype.draw = function(sel, data, i, layerNum, s) {
             .geom(this);
 
 
-  points.transition().call(this.drawGeom, x, y, s, layerNum);
+  points.transition().call(this.drawGeom, x, y, s, layerNum)
+    .each(function() {
+      tt.tooltip(d3.select(this), s);
+    });
   points.enter().append(this.geom())
     .call(this.drawGeom, x, y, s, layerNum)
     .each(function() {
