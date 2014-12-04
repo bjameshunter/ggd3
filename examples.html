@@ -245,7 +245,7 @@ var chart;
 
 function redraw() {
   var dataset = $("#dataset")[0].value;
-  d3.csv("data/" + dataset, function(error, data) {
+  d3.csv("/assets/data/" + dataset, function(error, data) {
   chart = charts[dataset]
                 .dtypes(dtypes[dataset])
                 .data(data)

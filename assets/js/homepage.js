@@ -1,6 +1,6 @@
 var gaussian, proportionHist, irisHistogram,
     carLayer, jitterLayer, carChart;
-d3.csv("../../data/iris.csv", function(error, iris) {
+d3.csv("/assets/data/iris.csv", function(error, iris) {
     gaussian = ggd3.geoms.density().kernel('gaussianKernel');
     proportionHist = ggd3.geoms.histogram().frequency(false);
     irisHistogram = ggd3.plot()
@@ -15,7 +15,7 @@ d3.csv("../../data/iris.csv", function(error, iris) {
     irisHistogram.draw(d3.select('#iris'));
 
 });
-d3.csv("../../data/mtcars.csv", function(error, cars) {
+d3.csv("/assets/data/mtcars.csv", function(error, cars) {
     carLayer = ggd3.layer()
                     .position('stack')
                     .stat({y: 'mean'})
