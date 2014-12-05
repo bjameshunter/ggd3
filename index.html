@@ -101,31 +101,25 @@
     <section id="plan" class="about section">
         <div class="container">
             <h2 class="title text-center">Why the grammar of graphics in D3?</h2>
-            <p class="intro text-center">I have enjoyed working with D3 and many D3 libraries over the past couple years, but always hoped one would come along that would somewhat replicate the features of <code>ggplot2</code>. <a href="https://github.com/gigamonkey/gg">Gigamonkey</a> has started one, but it looks like he's got more pressing things to do. I've been casually writing and learning javascript for a couple years, I guess, but have no formal CS pedigree and have never embarked on something this big. I'd like it to work well, eventually. After starting and restarting twice, I now have something that works and appears to be extendable. If you have advice on architecture, features, or something consistent and blatantly dumb that I'm doing, please let me know. In the meantime, I plan to build out the following features and would love some collaborators.</p>
+            <p class="intro">It needs to be done. As I get better at using D3, I sometimes think that it is as general as it can and should be. Of course, hours later when I sort of have what I want, I realize that development has overshadowed whatever statistical question I was thinking of.  Panning, zooming, tooltips and brushing are valuable features that should be available in exploratory data analysis. Faceting and interactivity can go a long way toward eliminating silly dual x and y axes plots that are often showcased as an advanced feature of many packages (with apologies to fans of them and authors of packages that include them). </p>
+
+            <p class="intro">I first got into R, like many people, by learning <a href="https://github.com/hadley">Hadley Wickham's</a> <a href="http://ggplot2.org/">ggplot2</a>. Its goal of shortening the effort between brain and picture is laudable and should be replicated in D3. <a href="https://github.com/gigamonkey/gg">Gigamonkey</a> has started one, but it looks like he's got more pressing things to do. I've been casually writing and learning javascript for a couple of years, but have no formal CS pedigree and have never embarked on something this big. I'd like it to work well, eventually. After starting and restarting twice, I now have something that works and appears to be extendable. If you have advice on architecture, features, or something blatantly dumb that I'm doing, please let me know. In the meantime, I plan to build out the following features and would love some collaborators.</p>
+
             <div class="row">
                 <div class="item col-md-4 col-sm-6 col-xs-12">
-<!--                     <div class="icon-holder">
-                        <i class="fa fa-heart"></i>
-                    </div>
- -->                    <div class="content">
+                    <div class="content">
                         <h3 class="sub-title">Facets</h3>
                         <p>I find it the most useful feature in ggplot2 and wonder why other libraries don't start with a plan for small multiples. Fixed and free scales both work and I'd like to adopt free space as well.</p>
                     </div><!--//content-->
                 </div><!--//item-->
                 <div class="item col-md-4 col-sm-6 col-xs-12">
-<!--                     <div class="icon-holder">
-                        <i class="fa fa-clock-o"></i>
-                    </div>
- -->                    <div class="content">
+                    <div class="content">
                         <h3 class="sub-title">Composable</h3>
-                        <p>So far this is working okay. A chart has a <code>layers</code> method that appends a layer to an array of layers. Layers have their own aesthetic maps that inherit undefined aesthetics from the chart object. An entry in the array can be a string of a geom name, a layer object, or a geom object.</p>
+                        <p>So far this is working okay. A chart has a <code>layers</code> method that appends a layer to an array of layers. Erase them by passing an empty array. Layers have their own aesthetic maps that inherit undefined aesthetics from the chart object. An entry in the array can be a string of a geom name, a layer object, or a geom object.</p>
                     </div><!--//content-->
                 </div><!--//item-->
                 <div class="item col-md-4 col-sm-6 col-xs-12">
-<!--                     <div class="icon-holder">
-                        <i class="fa fa-crosshairs"></i>
-                    </div>
- -->                    <div class="content">
+                    <div class="content">
                         <h3 class="sub-title">Style</h3>
                         <p>I'd like a handful of css files that can be applied at the chart level to easily change the theme and allow for customization or quick overrides of defaults.</p>
                     </div><!--//content-->
@@ -133,28 +127,19 @@
             </div><!--//row-->
             <div class='row'>
                 <div class="item col-md-4 col-sm-6 col-xs-12">
-<!--                     <div class="icon-holder">
-                        <i class="fa fa-tablet"></i>
-                    </div>
- -->                    <div class="content">
+                    <div class="content">
                         <h3 class="sub-title">Geoms</h3>
                         <p>Currently in fairly working order are point, line, histogram, density, bar, boxplot, text and abline. Hline and vline should come next without too much effort, then path, ribbon, area and error/linerange.</p>
                     </div><!--//content-->
                 </div><!--//item-->                
                 <div class="item col-md-4 col-sm-6 col-xs-12">
-<!--                     <div class="icon-holder">
-                        <i class="fa fa-code"></i>
-                    </div>
- -->                    <div class="content">
+                    <div class="content">
                         <h3 class="sub-title">Todo: Axis pan and zoom</h3>
                         <p>For continuous axes, a default zoom behavior would save a lot of hassle when dealing with uncertain differences in domains between facets or groups of geoms. If someone has an example of how to do such a thing on an ordinal axis, I'd like to see it. </p>
                     </div><!--//content-->
                 </div><!--//item-->
                 <div class="item col-md-4 col-sm-6 col-xs-12">
-<!--                     <div class="icon-holder">
-                        <i class="fa fa-coffee"></i>
-                    </div>
- -->                    <div class="content">
+                    <div class="content">
                         <h3 class="sub-title">Todo: Brushing</h3>
                         <p>I'd like each geom to have a default brush behavior that exports the brush range to drive behaviors or highlight the same ranges or same data points in other facets. </p>
                     </div><!--//content-->
@@ -170,13 +155,14 @@
             <div class="block">
                 <h3 class="sub-title text-center">The basics</h3>
                 <p>This features a gaussian density curve drawn over a histogram with 30 bins. Proportions are shown, rather than frequency counts to allow you to see the density curve. With stacked histograms, the proportion will add up to more than one. I'll have to fix that. </p>
-                <p>I confess, I don't want the mouseover text to be green, but am tired and don't want to figure out where my css wires are crossed.</p>
+                <p>I confess, I don't want the mouseover text to be green, but I am tired and don't want to figure out where my css wires are crossed.</p>
                 <div class="code-block">
                     <pre><code class="language-javascript">
 gaussian = ggd3.geoms.density().kernel('gaussianKernel');
 proportionHist = ggd3.geoms.histogram().frequency(false);
 irisHistogram = ggd3.plot()
-                // all plots come with a 20px high title bar and 20px wide
+                // all plots come with a 20px high title 
+                // bar and 20px wide
                 // y-title if needed. Setting both to zero.
                 .facet({titleSize: [0,0]})
                 .margins({left: 50})
