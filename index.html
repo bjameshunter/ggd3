@@ -3,7 +3,7 @@
 <!--[if IE 9]> <html lang="en" class="ie9"> <![endif]-->  
 <!--[if !IE]><!--> <html lang="en"> <!--<![endif]-->  
 <head>
-    <title>Free Bootstrap Theme for Developers</title>
+    <title>ggD3 - the grammar of graphics in D3</title>
     <!-- Meta -->
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -173,17 +173,19 @@
                 <p>I confess, I don't want the mouseover text to be green, but am tired and don't want to figure out where my css wires are crossed.</p>
                 <div class="code-block">
                     <pre><code class="language-javascript">
-var gaussian = ggd3.geoms.density().kernel('gaussianKernel');
-var proportionHist = ggd3.geoms.histogram().frequency(false);
-var irisHistogram = ggd3.plot()
-                    .facet({titleSize: [0,0]})
-                    .aes({x: "Sepal.Width", fill: "Species",
-                            color:'Species'})
-                    .layers([proportionHist, gaussian])
-                    .facet({x:"Species", nrows:1})
-                    .data(iris)
-                    .width(250)
-                    .height(250);
+gaussian = ggd3.geoms.density().kernel('gaussianKernel');
+proportionHist = ggd3.geoms.histogram().frequency(false);
+irisHistogram = ggd3.plot()
+                // all plots come with a 20px high title bar and 20px wide
+                // y-title if needed. Setting both to zero.
+                .facet({titleSize: [0,0]})
+                .margins({left: 50})
+                .aes({x: "Sepal.Width", fill: "Species",
+                        color:'Species'})
+                .layers([proportionHist, gaussian])
+                .data(iris)
+                .width(700)
+                .height(350);
 irisHistogram.draw(d3.select('#iris'));
                     </code></pre>
                 </div><!--//code-block-->
@@ -272,7 +274,7 @@ carChart.draw(d3.select('#cars'));
     <!-- ******FOOTER****** --> 
     <footer class="footer">
         <div class="container text-center">
-            <small class="copyright">Designed with <i class="fa fa-heart"></i> by <a href="http://themes.3rdwavemedia.com" target="_blank">Xiaoying Riley</a> for developers</small>
+            <small class="copyright">Thanks to </i><a href="http://themes.3rdwavemedia.com" target="_blank">Xiaoying Riley</a> for the design.</small>
         </div><!--//container-->
     </footer><!--//footer-->
      

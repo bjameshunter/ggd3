@@ -13,7 +13,6 @@ d3.csv("assets/data/iris.csv", function(error, iris) {
                     .width(700)
                     .height(350);
     irisHistogram.draw(d3.select('#iris'));
-
 });
 d3.csv("assets/data/mtcars.csv", function(error, cars) {
     carLayer = ggd3.layer()
