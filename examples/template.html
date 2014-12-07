@@ -8,13 +8,13 @@
 <div>
   <select id="dataset" class='btn btn-primary'>
   <option value="mtcars.csv" id='cars' >cars</option>
-  <option value="iris.csv" id='iris' >iris</option>
+  <option value="iris.csv" id='iris'>iris</option>
   <option value="diamonds.csv" id='diamonds' >diamonds</option>
   <option value="baseball.csv" id='baseball' >baseball</option>
-  <option value="nelplo.csv" id='nelplo' selected>nelplo</option>
+  <option value="nelplo.csv" id='nelplo'>nelplo</option>
   <option value="wells.csv" id='wells' >wells</option>
   <option value="ustimeseries.csv" id='ustimeseries' >ustimeseries</option>
-  <option value="movies.csv" id='movies' >movies</option>
+  <option value="movies.csv" id='movies' selected>movies</option>
 </select>
 <!-- <select id="xVar" class='btn btn-primary'>
 </select>    
@@ -39,6 +39,9 @@
 </div>
 <div id='chart01' class='chart-frame'></div>
 <script>
+function collectData(layer) {
+  return d3.selectAll('.geom.' + layer).data();
+}
 var ch;
 var div = d3.select('#chart01');
 $("#dataset").on('change', function() {

@@ -843,13 +843,7 @@ Layer.prototype.data = function(data, fromPlot) {
 };
 Layer.prototype.compute = function(sel, layerNum) {
   this.setStat();
-  var facet = this.plot().facet(),
-      plot = this.plot(),
-      aes = this.aes(),
-      dtypes = this.dtypes(),
-      stat = this.stat(),
-      dtype,
-      scaleType,
+  var plot = this.plot(),
       dlist;
   if(this.ownData()) {
     dlist = this.dataList(this.nest(this.data()));
@@ -857,7 +851,8 @@ Layer.prototype.compute = function(sel, layerNum) {
     dlist = plot.dataList(plot.data());
   } 
   var divs = [];
-
+  // reset geom's data array;
+  this.geom().data([]);
   sel.selectAll('.plot-div')
     .each(function(d) {
       divs.push(d3.select(this).attr('id'));
@@ -879,26 +874,15 @@ Layer.prototype.compute = function(sel, layerNum) {
     if(_.isEmpty(d)) { d = {selector: id, data: []}; }
     this.geom().data().push(d);
   }, this);
+
 };
 Layer.prototype.draw = function(sel, layerNum) {
 
-  this.setStat();
-  var facet = this.plot().facet(),
-      plot = this.plot(),
-      aes = this.aes(),
-      dtypes = this.dtypes(),
-      stat = this.stat(),
-      dtype,
-      scaleType,
-      dlist;
-
   var divs = [];
-
   sel.selectAll('.plot-div')
     .each(function(d) {
       divs.push(d3.select(this).attr('id'));
     });
-  console.log(divs);
   _.each(divs, function(id, i){
     // cycle through all divs, drawing data if it exists.
     var s = sel.select("#" + id),
@@ -947,18 +931,18 @@ function Plot() {
     yScale: {single: ggd3.scale()},
     xDomain: null,
     yDomain: null,
-    colorScale: {single: ggd3.scale()},
-    sizeScale: {single: ggd3.scale()},
     fillScale: {single: ggd3.scale()},
-    shapeScale: {single: ggd3.scale()},
+    colorScale: {single: ggd3.scale()},
     alphaScale: {single: ggd3.scale()},
+    sizeScale: {single: ggd3.scale()},
+    shapeScale: {single: ggd3.scale()},
     strokeScale: {single: ggd3.scale()},
-    alpha: d3.functor(0.5),
+    alpha: d3.functor(0.7),
     fill: d3.functor('steelblue'),
     color: d3.functor(null),
     size: d3.functor(3), 
     shape: d3.functor('circle'),
-    lineType: d3.functor('1,1'),
+    lineType: d3.functor('2,2'),
     lineWidth: 2,
     xAdjust: false,
     yAdjust: false,
@@ -1078,6 +1062,8 @@ Plot.prototype.colorScale = scaleConfig('color');
 
 Plot.prototype.sizeScale = scaleConfig('size');
 
+Plot.prototype.strokeScale = scaleConfig('stroke');
+
 Plot.prototype.shapeScale = scaleConfig('shape');
 
 Plot.prototype.fillScale = scaleConfig('fill');
@@ -1149,9 +1135,6 @@ Plot.prototype.dtypes = function(dtypes) {
 
 Plot.prototype.data = function(data) {
   if(!arguments.length || _.isNull(data)) { return this.attributes.data; }
-  // clean data according to data types
-  // and set top level ranges of scales.
-  // dataset is passed through once here.
   // if passing 'dtypes', must be done before
   // let's just always nest and unNest
   this.hasJitter = false;
@@ -1168,11 +1151,11 @@ Plot.prototype.data = function(data) {
 };
 
 Plot.prototype.updateLayers = function() {
-  // for right now we are not planning on having more than
-  // one layer
+
   _.each(this.layers(), function(l) {
     l.dtypes(this.dtypes());
     if(!l.ownData()) { l.data(this.data(), true); }
+    // plot level aes never override layer level.
     l.aes(_.merge(_.clone(this.aes()), l.aes()));
   }, this);
 };
@@ -1195,33 +1178,33 @@ Plot.prototype.aes = function(aes) {
   if(!arguments.length) { return this.attributes.aes; }
   // all layers need aesthetics
   aes = _.merge(this.attributes.aes, _.clone(aes));
-  _.each(this.layers(), function(layer) {
-    layer.aes(_.merge(_.clone(aes), _.clone(layer.aes()) ));
-  });
   this.attributes.aes = _.clone(aes);
+  this.updateLayers();
   return this;
 };
 
 Plot.prototype.setFixedScale = function(a) {
   var scale = this[a + "Scale"]().single;
-  var domain;
+  var domain = [];
+  if(_.keys(this[a + "Scale"]()).length === 1) { return scale; }
   if(_.contains(linearScales, scale.scaleType())){
-    var max, min;
-    _.map(this[a + "Scale"](), function(v, k) {
-      var d = v.scale().domain();
-      if(_.isUndefined(max)) { max = d[1]; }
-      if(_.isUndefined(min)) { min = d[0]; }
-      if(max < d[1]) { max = d[1]; }
-      if(min > d[0]) { max = d[0]; }
-    });
-    domain = [min, max];
+    domain[0] = _.min(this[a + "Scale"](), function(v, k) {
+                  if(k === "single") { return undefined; }
+                  return v.domain()[0];
+                }).domain()[0];
+    domain[1] = _.max(this[a + "Scale"](), function(v, k) {
+                  if(k === "single") { return undefined; }
+                  return v.domain()[1];
+                }).domain()[1];
   } else {
-    domain = _.unique(
+    domain = _.compact(_.sortBy(_.unique(
                   _.flatten(
-                    _.map(this[a + "Scales"](), function(v, k){
+                    _.map(this[a + "Scale"](), function(v, k){
+                  if(k === "single") { return undefined; }
                       return v.domain();
-                    }) ) );
+                    }, this) ))));
   }
+  // scale.scale().domain(domain);
   return scale.domain(domain);
 };
 
@@ -1243,8 +1226,6 @@ Plot.prototype.draw = function(sel) {
   updateFacet(sel);
   // reset nSVGs after they're drawn.
   this.facet().nSVGs = 0;
-  // make single scales
-  this.setScale('single', this.aes());
   // get the layer classes that should
   // be present in the plot to remove 
   // layers that no longer exist.
@@ -1253,9 +1234,18 @@ Plot.prototype.draw = function(sel) {
                     return "g" + (n);
                   }, this);
 
+  this.setScale('single', this.aes());
   _.each(this.layers(), function(l, layerNum) {
     l.compute(sel, layerNum);
   });
+  // make single scales
+  this.setFixedScale('x'); 
+  this.setFixedScale('y'); 
+  this.setFixedScale('alpha'); 
+  this.setFixedScale('size'); 
+  this.setFixedScale('stroke'); 
+  this.setFixedScale('fill'); 
+  this.setFixedScale('color'); 
   _.each(this.layers(), function(l, layerNum) {
     l.draw(sel, layerNum);
   });
@@ -1847,7 +1837,6 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
   if(!_.contains(["free", "free_x"], setup.facet.scales()) || 
      _.isUndefined(setup.plot.xScale()[selector])){
     x = setup.plot.xScale().single;
-    if(!x.domain()){ x = setup.plot.setFixedScale('x'); }
     xfree = false;
   } else {
     x = setup.plot.xScale()[selector];
@@ -1856,7 +1845,6 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
   if(!_.contains(["free", "free_y"], setup.facet.scales()) || 
      _.isUndefined(setup.plot.xScale()[selector])){
     y = setup.plot.yScale().single;
-    if(!y.domain()){ y = setup.plot.setFixedScale('y'); }
     yfree = false;
   } else {
     y = setup.plot.yScale()[selector];
@@ -2101,9 +2089,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     size = {s: "width", p:'x'};
     width = {s:"height", p: 'y'};
   }
-
-
-  s.groups = _.pluck(data, 'key');
+  s.groups = _.unique(_.pluck(data, s.group));
 
   data = this.unNest(data);
   // data must be nested to go into stack algorithm
@@ -2219,6 +2205,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       return n(0);
     };
   } )();
+  console.log(rb);
 
 
   var bars = sel.select('.plot')
@@ -2339,7 +2326,7 @@ Line.prototype.drawLines = function (path, line, s, layerNum) {
     path
       .attr('stroke-opacity', function(d) { return s.alpha(d[1]) ;})
       .attr('stroke', function(d) { return s.color(d[1]);})
-      .attr('stroke-width', this.lineWidth() || s.plot.lineWidth())
+      // .attr('stroke-width', this.lineWidth() || s.plot.lineWidth())
       .attr('fill', 'none'); // must explicitly declare no grid.
   }
 };
@@ -2818,7 +2805,7 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
   }
   if(s.grouped) {
     s.groups = _.sortBy(_.unique(_.flatten(_.map(data, function(d) {
-      return _.pluck(d.data, s.group);
+      return _.compact(_.pluck(d.data, s.group));
     }))));
     o2 = d3.scale.ordinal()
             .rangeBands([0, o.rangeBand()], 0.1, 0)
@@ -2989,7 +2976,7 @@ Density.prototype.draw = function(sel, data, i, layerNum){
     if(that.fill()){
       path
         .style('fill', function(d) {
-          return s.color(d.values[1]);
+          return s.color(d.key);
         })
         .style('fill-opacity', that.alpha());
     }
@@ -3005,11 +2992,12 @@ Density.prototype.draw = function(sel, data, i, layerNum){
     n = 'y';
     d = 'x';
   }
-  data = s.nest
+  // nest, but don't compute
+  data = s.nest.rollup(function(d) { return d; })
           .entries(data.data);
 
   // if data are not grouped, it will not be nested
-  // but will be computed, so we have to manually nest
+  // so we have to manually nest to pass to drawDensity
   if(!data[0].key && !data[0].values){
     data = [{key:'key', values: data}];
   }
@@ -3676,7 +3664,7 @@ Stat.prototype.bin = function() {
 Stat.prototype.bin._name = "bin";
 
 Stat.prototype.compute_boxplot = function(data) {
-  // console.log(data);
+  console.log(data);
   var aes = this.layer().aes(),
       g = this.layer().geom(),
       factor = this.layer().dtypes()[aes.x][1] === "few" ? 'x': 'y',
@@ -3737,7 +3725,7 @@ Stat.prototype.compute_bin = function(data) {
 };
 
 Stat.prototype.compute_density = function(data) {
-
+  console.log(data.length);
   var out = {},
       start = {},
       end = {},
@@ -3751,9 +3739,11 @@ Stat.prototype.compute_density = function(data) {
     aes[d] = "density";
   }
   n = d === "y" ? "x": "y";
-  _.map(['color', 'group'], function(a) {
+  _.map(['color', 'group', "fill"], function(a) {
     if(aes[a]){
       out[aes[a]] = data[0][aes[a]];
+      start[aes[a]] = data[0][aes[a]];
+      end[aes[a]] = data[0][aes[a]];
     }
   });
   data = _.pluck(data, aes[n]);

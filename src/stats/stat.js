@@ -182,7 +182,7 @@ Stat.prototype.bin = function() {
 Stat.prototype.bin._name = "bin";
 
 Stat.prototype.compute_boxplot = function(data) {
-  // console.log(data);
+  console.log(data);
   var aes = this.layer().aes(),
       g = this.layer().geom(),
       factor = this.layer().dtypes()[aes.x][1] === "few" ? 'x': 'y',
@@ -243,7 +243,7 @@ Stat.prototype.compute_bin = function(data) {
 };
 
 Stat.prototype.compute_density = function(data) {
-
+  console.log(data.length);
   var out = {},
       start = {},
       end = {},
@@ -257,9 +257,11 @@ Stat.prototype.compute_density = function(data) {
     aes[d] = "density";
   }
   n = d === "y" ? "x": "y";
-  _.map(['color', 'group'], function(a) {
+  _.map(['color', 'group', "fill"], function(a) {
     if(aes[a]){
       out[aes[a]] = data[0][aes[a]];
+      start[aes[a]] = data[0][aes[a]];
+      end[aes[a]] = data[0][aes[a]];
     }
   });
   data = _.pluck(data, aes[n]);

@@ -130,7 +130,7 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
   }
   if(s.grouped) {
     s.groups = _.sortBy(_.unique(_.flatten(_.map(data, function(d) {
-      return _.pluck(d.data, s.group);
+      return _.compact(_.pluck(d.data, s.group));
     }))));
     o2 = d3.scale.ordinal()
             .rangeBands([0, o.rangeBand()], 0.1, 0)

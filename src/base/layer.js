@@ -132,13 +132,7 @@ Layer.prototype.data = function(data, fromPlot) {
 };
 Layer.prototype.compute = function(sel, layerNum) {
   this.setStat();
-  var facet = this.plot().facet(),
-      plot = this.plot(),
-      aes = this.aes(),
-      dtypes = this.dtypes(),
-      stat = this.stat(),
-      dtype,
-      scaleType,
+  var plot = this.plot(),
       dlist;
   if(this.ownData()) {
     dlist = this.dataList(this.nest(this.data()));
@@ -146,7 +140,8 @@ Layer.prototype.compute = function(sel, layerNum) {
     dlist = plot.dataList(plot.data());
   } 
   var divs = [];
-
+  // reset geom's data array;
+  this.geom().data([]);
   sel.selectAll('.plot-div')
     .each(function(d) {
       divs.push(d3.select(this).attr('id'));
@@ -168,26 +163,15 @@ Layer.prototype.compute = function(sel, layerNum) {
     if(_.isEmpty(d)) { d = {selector: id, data: []}; }
     this.geom().data().push(d);
   }, this);
+
 };
 Layer.prototype.draw = function(sel, layerNum) {
 
-  this.setStat();
-  var facet = this.plot().facet(),
-      plot = this.plot(),
-      aes = this.aes(),
-      dtypes = this.dtypes(),
-      stat = this.stat(),
-      dtype,
-      scaleType,
-      dlist;
-
   var divs = [];
-
   sel.selectAll('.plot-div')
     .each(function(d) {
       divs.push(d3.select(this).attr('id'));
     });
-  console.log(divs);
   _.each(divs, function(id, i){
     // cycle through all divs, drawing data if it exists.
     var s = sel.select("#" + id),

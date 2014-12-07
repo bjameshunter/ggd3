@@ -188,9 +188,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     size = {s: "width", p:'x'};
     width = {s:"height", p: 'y'};
   }
-
-
-  s.groups = _.pluck(data, 'key');
+  s.groups = _.unique(_.pluck(data, s.group));
 
   data = this.unNest(data);
   // data must be nested to go into stack algorithm
@@ -306,6 +304,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       return n(0);
     };
   } )();
+  console.log(rb);
 
 
   var bars = sel.select('.plot')

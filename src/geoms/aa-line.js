@@ -59,7 +59,7 @@ Line.prototype.drawLines = function (path, line, s, layerNum) {
     path
       .attr('stroke-opacity', function(d) { return s.alpha(d[1]) ;})
       .attr('stroke', function(d) { return s.color(d[1]);})
-      .attr('stroke-width', this.lineWidth() || s.plot.lineWidth())
+      // .attr('stroke-width', this.lineWidth() || s.plot.lineWidth())
       .attr('fill', 'none'); // must explicitly declare no grid.
   }
 };

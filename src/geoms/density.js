@@ -69,7 +69,7 @@ Density.prototype.draw = function(sel, data, i, layerNum){
     if(that.fill()){
       path
         .style('fill', function(d) {
-          return s.color(d.values[1]);
+          return s.color(d.key);
         })
         .style('fill-opacity', that.alpha());
     }
@@ -85,11 +85,12 @@ Density.prototype.draw = function(sel, data, i, layerNum){
     n = 'y';
     d = 'x';
   }
-  data = s.nest
+  // nest, but don't compute
+  data = s.nest.rollup(function(d) { return d; })
           .entries(data.data);
 
   // if data are not grouped, it will not be nested
-  // but will be computed, so we have to manually nest
+  // so we have to manually nest to pass to drawDensity
   if(!data[0].key && !data[0].values){
     data = [{key:'key', values: data}];
   }

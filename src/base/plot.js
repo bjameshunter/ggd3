@@ -23,18 +23,18 @@ function Plot() {
     yScale: {single: ggd3.scale()},
     xDomain: null,
     yDomain: null,
-    colorScale: {single: ggd3.scale()},
-    sizeScale: {single: ggd3.scale()},
     fillScale: {single: ggd3.scale()},
-    shapeScale: {single: ggd3.scale()},
+    colorScale: {single: ggd3.scale()},
     alphaScale: {single: ggd3.scale()},
+    sizeScale: {single: ggd3.scale()},
+    shapeScale: {single: ggd3.scale()},
     strokeScale: {single: ggd3.scale()},
-    alpha: d3.functor(0.5),
+    alpha: d3.functor(0.7),
     fill: d3.functor('steelblue'),
     color: d3.functor(null),
     size: d3.functor(3), 
     shape: d3.functor('circle'),
-    lineType: d3.functor('1,1'),
+    lineType: d3.functor('2,2'),
     lineWidth: 2,
     xAdjust: false,
     yAdjust: false,
@@ -154,6 +154,8 @@ Plot.prototype.colorScale = scaleConfig('color');
 
 Plot.prototype.sizeScale = scaleConfig('size');
 
+Plot.prototype.strokeScale = scaleConfig('stroke');
+
 Plot.prototype.shapeScale = scaleConfig('shape');
 
 Plot.prototype.fillScale = scaleConfig('fill');
@@ -225,9 +227,6 @@ Plot.prototype.dtypes = function(dtypes) {
 
 Plot.prototype.data = function(data) {
   if(!arguments.length || _.isNull(data)) { return this.attributes.data; }
-  // clean data according to data types
-  // and set top level ranges of scales.
-  // dataset is passed through once here.
   // if passing 'dtypes', must be done before
   // let's just always nest and unNest
   this.hasJitter = false;
@@ -244,11 +243,11 @@ Plot.prototype.data = function(data) {
 };
 
 Plot.prototype.updateLayers = function() {
-  // for right now we are not planning on having more than
-  // one layer
+
   _.each(this.layers(), function(l) {
     l.dtypes(this.dtypes());
     if(!l.ownData()) { l.data(this.data(), true); }
+    // plot level aes never override layer level.
     l.aes(_.merge(_.clone(this.aes()), l.aes()));
   }, this);
 };
@@ -271,33 +270,33 @@ Plot.prototype.aes = function(aes) {
   if(!arguments.length) { return this.attributes.aes; }
   // all layers need aesthetics
   aes = _.merge(this.attributes.aes, _.clone(aes));
-  _.each(this.layers(), function(layer) {
-    layer.aes(_.merge(_.clone(aes), _.clone(layer.aes()) ));
-  });
   this.attributes.aes = _.clone(aes);
+  this.updateLayers();
   return this;
 };
 
 Plot.prototype.setFixedScale = function(a) {
   var scale = this[a + "Scale"]().single;
-  var domain;
+  var domain = [];
+  if(_.keys(this[a + "Scale"]()).length === 1) { return scale; }
   if(_.contains(linearScales, scale.scaleType())){
-    var max, min;
-    _.map(this[a + "Scale"](), function(v, k) {
-      var d = v.scale().domain();
-      if(_.isUndefined(max)) { max = d[1]; }
-      if(_.isUndefined(min)) { min = d[0]; }
-      if(max < d[1]) { max = d[1]; }
-      if(min > d[0]) { max = d[0]; }
-    });
-    domain = [min, max];
+    domain[0] = _.min(this[a + "Scale"](), function(v, k) {
+                  if(k === "single") { return undefined; }
+                  return v.domain()[0];
+                }).domain()[0];
+    domain[1] = _.max(this[a + "Scale"](), function(v, k) {
+                  if(k === "single") { return undefined; }
+                  return v.domain()[1];
+                }).domain()[1];
   } else {
-    domain = _.unique(
+    domain = _.compact(_.sortBy(_.unique(
                   _.flatten(
-                    _.map(this[a + "Scales"](), function(v, k){
+                    _.map(this[a + "Scale"](), function(v, k){
+                  if(k === "single") { return undefined; }
                       return v.domain();
-                    }) ) );
+                    }, this) ))));
   }
+  // scale.scale().domain(domain);
   return scale.domain(domain);
 };
 
@@ -319,8 +318,6 @@ Plot.prototype.draw = function(sel) {
   updateFacet(sel);
   // reset nSVGs after they're drawn.
   this.facet().nSVGs = 0;
-  // make single scales
-  this.setScale('single', this.aes());
   // get the layer classes that should
   // be present in the plot to remove 
   // layers that no longer exist.
@@ -329,9 +326,18 @@ Plot.prototype.draw = function(sel) {
                     return "g" + (n);
                   }, this);
 
+  this.setScale('single', this.aes());
   _.each(this.layers(), function(l, layerNum) {
     l.compute(sel, layerNum);
   });
+  // make single scales
+  this.setFixedScale('x'); 
+  this.setFixedScale('y'); 
+  this.setFixedScale('alpha'); 
+  this.setFixedScale('size'); 
+  this.setFixedScale('stroke'); 
+  this.setFixedScale('fill'); 
+  this.setFixedScale('color'); 
   _.each(this.layers(), function(l, layerNum) {
     l.draw(sel, layerNum);
   });

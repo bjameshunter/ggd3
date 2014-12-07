@@ -164,7 +164,6 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
   if(!_.contains(["free", "free_x"], setup.facet.scales()) || 
      _.isUndefined(setup.plot.xScale()[selector])){
     x = setup.plot.xScale().single;
-    if(!x.domain()){ x = setup.plot.setFixedScale('x'); }
     xfree = false;
   } else {
     x = setup.plot.xScale()[selector];
@@ -173,7 +172,6 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
   if(!_.contains(["free", "free_y"], setup.facet.scales()) || 
      _.isUndefined(setup.plot.xScale()[selector])){
     y = setup.plot.yScale().single;
-    if(!y.domain()){ y = setup.plot.setFixedScale('y'); }
     yfree = false;
   } else {
     y = setup.plot.yScale()[selector];
