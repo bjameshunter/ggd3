@@ -71,7 +71,7 @@ Point.prototype.draw = function(sel, data, i, layerNum, s) {
     // poing should have both canvas and svg functions.
     x = this.positionPoint(scales.x, s.group, s.groups);
     y = this.positionPoint(scales.y, s.group, s.groups);
-    data = this.unNest(this.compute(data.data, s  ));
+    data = this.unNest(data.data);
     // get rid of wrong elements if they exist.
     ggd3.tools.removeElements(sel, layerNum, this.geom());
     points = sel.select('.plot')

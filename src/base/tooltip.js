@@ -50,8 +50,8 @@ Tooltip.prototype.show = function(data, sel, s) {
 
 Tooltip.prototype.move = function(data, sel) {
   sel
-    .style('left', d3.event.offsetX + this.offset().x)
-    .style('top', d3.event.offsetY + this.offset().y);
+    .style('left', d3.event.offsetX + this.offset().x + "px")
+    .style('top', d3.event.offsetY + this.offset().y + "px");
 };
 
 Tooltip.prototype.hide = function(data, sel) {
@@ -59,8 +59,8 @@ Tooltip.prototype.hide = function(data, sel) {
     .transition().duration(200)
     .style('opacity', 0)
     .transition().delay(200).duration(0)
-    .style("top", 0)
-    .style("left", 0)
+    .style("top", 0 + "px")
+    .style("left", 0 + "px")
     .select('.tooltip-content').selectAll('*')
     .remove();
 };

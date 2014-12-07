@@ -66,7 +66,6 @@ Line.prototype.drawLines = function (path, line, s, layerNum) {
 
 Line.prototype.prepareData = function(data, s) {
   data = s.nest
-          .rollup(function(d) { return s.stat.compute(d);})
           .entries(data.data) ;
 
   data = _.map(data, function(d) { return this.recurseNest(d);}, this);

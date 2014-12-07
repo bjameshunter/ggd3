@@ -1,8 +1,8 @@
-// 1. jittering points on ordinal axes.
-// 2. figure out how to make aggregated values on barcharts
-// work with stacking. 
-// 3. Build in expand to stack bar. 
-// 4. Maybe start thinking about tooltip.
+// 1. Fix tooltip details with 'identity' and special stats.
+// 2. Label facets better and provide option to label with function.
+// 3. Better details on boxplot tooltip
+// 4. Consider annotation object
+// 5. Calculate scale domains at last second. If fixed, as each facet is calculated, keep track of extremes. After last facet, reset all facet scales and draw but do not calculate. Duh. 
 
 function Plot() {
   if(!(this instanceof Plot)){
@@ -15,12 +15,14 @@ function Plot() {
     aes: {},
     legends: null, // strings corresponding to scales
     // that need legends or legend objects
-    facet: null,
+    facet: ggd3.facet(),
     width: 400,
     height: 400,
     margins: {left:20, right:20, top:20, bottom:20},
     xScale: {single: ggd3.scale()}, 
     yScale: {single: ggd3.scale()},
+    xDomain: null,
+    yDomain: null,
     colorScale: {single: ggd3.scale()},
     sizeScale: {single: ggd3.scale()},
     fillScale: {single: ggd3.scale()},
@@ -72,8 +74,9 @@ function Plot() {
                 .plot(this); 
   // explicitly declare which attributes get a basic
   // getter/setter
-  var getSet = ["opts", "theme", "margins", 
+  var getSet = ["opts", "theme", 
     "width", "height", "xAdjust", "yAdjust", 
+    "xDomain", "yDomain",
     'colorRange', 'sizeRange',
     'fillRange', "lineType",
     "alphaRange", "lineWidth",
@@ -156,6 +159,12 @@ Plot.prototype.shapeScale = scaleConfig('shape');
 Plot.prototype.fillScale = scaleConfig('fill');
 
 Plot.prototype.alphaScale = scaleConfig('alpha');
+
+Plot.prototype.margins = function(margins) {
+  if(!arguments.length) { return this.attributes.margins; }
+  this.attributes.margins = _.merge(this.attributes.margins, margins);
+  return this;
+};
 
 Plot.prototype.layers = function(layers) {
   if(!arguments.length) { return this.attributes.layers; }
@@ -269,6 +278,29 @@ Plot.prototype.aes = function(aes) {
   return this;
 };
 
+Plot.prototype.setFixedScale = function(a) {
+  var scale = this[a + "Scale"]().single;
+  var domain;
+  if(_.contains(linearScales, scale.scaleType())){
+    var max, min;
+    _.map(this[a + "Scale"](), function(v, k) {
+      var d = v.scale().domain();
+      if(_.isUndefined(max)) { max = d[1]; }
+      if(_.isUndefined(min)) { min = d[0]; }
+      if(max < d[1]) { max = d[1]; }
+      if(min > d[0]) { max = d[0]; }
+    });
+    domain = [min, max];
+  } else {
+    domain = _.unique(
+                  _.flatten(
+                    _.map(this[a + "Scales"](), function(v, k){
+                      return v.domain();
+                    }) ) );
+  }
+  return scale.domain(domain);
+};
+
 Plot.prototype.plotDim = function() {
   var margins = this.margins();
   if(this.facet().type() === "grid"){
@@ -279,38 +311,28 @@ Plot.prototype.plotDim = function() {
    y: this.height() - margins.top - margins.bottom};
 };
 
-Plot.prototype.draw = function(sel) {
-  var that = this,
-      updateFacet = that.facet().updateFacet();
-  
-  // get basic info about scales/aes;
-  this.setScales();
 
-  // set stats on layers
-  _.each(that.layers(), function(layer) {
-    layer.setStat();
-  });
-  // set fixed/free domains
-  this.setDomains();
+Plot.prototype.draw = function(sel) {
+  var updateFacet = this.facet().updateFacet();
+  
+  // draw/update facets
   updateFacet(sel);
   // reset nSVGs after they're drawn.
-  that.facet().nSVGs = 0;
-
-  if(that.yGrid() || that.xGrid()) {
-    if(that.yGrid()) { 
-      that.hgrid.draw(sel, 1, ".ygrid");}
-    if(that.xGrid()) { 
-      that.vgrid.draw(sel, 1, ".xgrid");}
-  }
-
-  // get the number of geom classes that should
-  // be present in the plot
-  var classes = _.map(_.range(that.layers().length),
+  this.facet().nSVGs = 0;
+  // make single scales
+  this.setScale('single', this.aes());
+  // get the layer classes that should
+  // be present in the plot to remove 
+  // layers that no longer exist.
+  var classes = _.map(_.range(this.layers().length),
                   function(n) {
                     return "g" + (n);
-                  });
+                  }, this);
 
-  _.each(that.layers(), function(l, layerNum) {
+  _.each(this.layers(), function(l, layerNum) {
+    l.compute(sel, layerNum);
+  });
+  _.each(this.layers(), function(l, layerNum) {
     l.draw(sel, layerNum);
   });
   sel.selectAll('.geom')
@@ -321,11 +343,22 @@ Plot.prototype.draw = function(sel) {
     .transition().style('opacity', 0).remove();
   // if any of the layers had a jitter, it has
   // been added to each facet's dataset
-  if(_.any(chart.layers(), function(l) {
+  if(_.any(this.layers(), function(l) {
     return l.position() === "jitter";
   }) ) { 
-    that.hasJitter = true; 
+    this.hasJitter = true; 
   }
+
+  // drawing grids last, after all
+  // facet scales are calculated.
+  // if you're drawing something with more than
+  // 30 layers, you can tweak this yourself.
+  if(this.yGrid()) { 
+    this.hgrid.compute(sel, 30);
+    this.hgrid.draw(sel, 30);}
+  if(this.xGrid()) { 
+    this.vgrid.compute(sel, 30);
+    this.vgrid.draw(sel, 30);}
 };
 
 Plot.prototype.nest = Nest;

@@ -21,6 +21,12 @@ module.exports = function(grunt){
         ],
         dest: "dist/<%= pkg.name %>.v.<%= pkg.version%>.js"
       },
+      css: {
+        src: [
+          "css/*.css"
+        ],
+        dest: "../v3_site/ggd3/assets/css/ggd3style.css"
+      },
       test: {
         "plot": "test/plot.js"
       }
@@ -51,7 +57,8 @@ module.exports = function(grunt){
     browserify: {
       all: {
         files: {
-          "./<%= pkg.name%>.standalone.js": ["./browserified.js"]
+          "./<%= pkg.name%>.standalone.js": ["./browserified.js"],
+          "../v3_site/ggd3/assets/js/<%= pkg.name%>.standalone.js": ['./browserified.js']
         },
         options: {
           browserifyOptions: {
@@ -69,6 +76,7 @@ module.exports = function(grunt){
         files: [
           '*.js', "src/*/*.js", "src/*.js",
           "!dist/*",
+          "css/*",
           ],
         tasks: ['concat', 'browserify', 'jshint'],
         options: {

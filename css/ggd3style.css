@@ -9,24 +9,27 @@ svg {
   font: 10px sans-serif;
 }
 /* tooltips */
-.ggd3tip {
+.plot-div .ggd3tip {
   min-width: 200px;
+  color: black;
   position: absolute;
   border-style: solid;
   border-width: 1px;
   border-color: black;
-  border-radius: 5;
+  border-radius: 5px;
   padding: 5px;
   background: rgba(255, 255, 255, 0.9);
   display: inline;
   text-align: left;
+  font-size: 1em;
   box-shadow: 5px 5px 5px #888888;
   z-index: 1000;
 }
-.tooltip-content{
+.plot-div .tooltip-content {
+  color: black;
 }
 
-.tooltip-content h4 span{
+.tooltip-content h4 span {
     font-size: 12pt;
 }
 
@@ -61,18 +64,22 @@ rect.brushframe {
   stroke: #222222;
 }
 .facet-label-x{
-  fill: steelblue;
+  fill: white;
   fill-opacity: 0.3;
+  stroke: black;
+  stroke-width: 1px;
 }
 .facet-label-y{
-  fill: steelblue;
+  fill: white;
   fill-opacity: 0.3;
+  stroke: black;
+  stroke-width: 1px;
 }
 .facet-title-x {
-  font-size: 15;
+  font-size: 20px;
 }
 .facet-title-y {
-  font-size: 15;
+  font-size: 20px;
 }
 .brush .extent {
   stroke: #fff;
@@ -110,7 +117,7 @@ circle.shade {
   stroke: black;
 }
 .domain {
-  stroke: none !important;
+  stroke: black !important;
 }
 /*.tick line{
   stroke: none !important;

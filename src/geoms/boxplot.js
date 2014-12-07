@@ -93,7 +93,7 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
 
   ggd3.tools.removeElements(sel, layerNum, "geom-" + this.name());
 
-  data = this.unNest(this.compute(data.data, s));
+  data = this.unNest(data.data);
   o = scales[factor].scale();
   rb = o.rangeBand();
   n = scales[number].scale();
@@ -187,7 +187,6 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
       .attr("transform", function(d) {
         var v = o(d[s.aes[factor]]) + o2(d[s.group]);
         if(!vertical) { 
-          // v -= rb/2; // add rb the other way
           return "translate(0," + v + ")";
         } 
         return "translate(" + v + ",0)" ;

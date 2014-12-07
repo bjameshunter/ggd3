@@ -48,38 +48,37 @@ function Scale(opts) {
 
 Scale.prototype.scaleType = function(scaleType) {
   if(!arguments.length) { return this.attributes.scaleType; }
-  var that = this;
   this.attributes.scaleType = scaleType;
   switch(scaleType) {
     case 'linear':
-      that.attributes.scale = d3.scale.linear();
+      this.attributes.scale = d3.scale.linear();
       break;
     case 'log':
-      that.attributes.scale = d3.scale.log();
+      this.attributes.scale = d3.scale.log();
       break;
     case 'ordinal':
-      that.attributes.scale = d3.scale.ordinal();
+      this.attributes.scale = d3.scale.ordinal();
       break;
     case 'time':
-      that.attributes.scale = d3.time.scale();
+      this.attributes.scale = d3.time.scale();
       break;
     case 'date':
-      that.attributes.scale = d3.time.scale();
+      this.attributes.scale = d3.time.scale();
       break;
     case "category10":
-      that.attributes.scale = d3.scale.category10();
+      this.attributes.scale = d3.scale.category10();
       break;
     case "category20":
-      that.attributes.scale = d3.scale.category20();
+      this.attributes.scale = d3.scale.category20();
       break;
     case "category20b":
-      that.attributes.scale = d3.scale.category20b();
+      this.attributes.scale = d3.scale.category20b();
       break;
     case "category20c":
-      that.attributes.scale = d3.scale.category20c();
+      this.attributes.scale = d3.scale.category20c();
       break;
   }
-  return that;
+  return this;
 };
 
 Scale.prototype.scale = function(settings){
@@ -116,10 +115,21 @@ Scale.prototype.domain = function(domain) {
       domain[0] = 1;
     }
   }
-  this.attributes.domain = domain;
-  this.attributes.scale.domain(domain);
+  if(_.isNull(this.domain())){ 
+    this.attributes.domain = domain; 
+  } else {
+    var d = this.attributes.domain;
+    if(_.contains(linearScales, this.scaleType())){
+      if(domain[0] < d[0]) { this.attributes.domain[0] = domain[0];}
+      if(domain[1] > d[1]) { this.attributes.domain[1] = domain[1];}
+    } else {
+      this.attributes.domain = _.unique(_.flatten([d, domain]));
+    }
+  }
+  this.scale().domain(this.attributes.domain);
   return this;
 };
+
 Scale.prototype.positionAxis = function() {
   var margins = this.plot().margins(),
       dim = this.plot().plotDim(),

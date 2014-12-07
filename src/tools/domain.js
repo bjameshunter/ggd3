@@ -16,5 +16,5 @@ ggd3.tools.numericDomain = function(data, variable, rule, zero) {
   return extent;
 };
 ggd3.tools.categoryDomain = function(data, variable) {
-  return _.sortBy(_.unique(_.pluck(data, variable)));
+  return _.sortBy(_.compact(_.unique(_.pluck(data, variable))));
 };

@@ -190,10 +190,6 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
   }
 
 
-  // calculate stat
-  // but why isn't this already done since 
-  // we've trained domains?
-  data = this.compute(data, s);
   s.groups = _.pluck(data, 'key');
 
   data = this.unNest(data);

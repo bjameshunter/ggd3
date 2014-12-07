@@ -86,9 +86,6 @@ Density.prototype.draw = function(sel, data, i, layerNum){
     d = 'x';
   }
   data = s.nest
-          .rollup(function(d) {
-            return s.stat.compute(d);
-          })
           .entries(data.data);
 
   // if data are not grouped, it will not be nested

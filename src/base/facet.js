@@ -1,4 +1,7 @@
 function Facet(spec) {
+  if(!(this instanceof Facet)){
+    return new ggd3.facet(spec);
+  }
   var attributes = {
     x: null,
     y: null,

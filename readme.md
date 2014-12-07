@@ -24,11 +24,6 @@ Roadmap:
 
 #### Problems and questions:
 
-- Cannot update clipPath - selecting "clipPath" does not work
-  - currently getting around this by adding class "clip" and selecting that.
-or median doesn't make much sense, but should work.
-- Is using the super formula worth it? 
-  - does it cost more to draw and animate?
 - Find smarter way to decide, during computation step, which axis is the number and which the factor. Currently my dtypes function returns a two tuple
   - the first is one of "number", "string", or "date"
   - the second is one of "few" or "many", 20 being the cutoff

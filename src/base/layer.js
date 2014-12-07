@@ -103,15 +103,21 @@ Layer.prototype.setStat = function() {
   // if a stat has not been set, it is x or y
   // and should be set to count if geom is not density/hist.
   _.each(['x', 'y'], function(a) {
-    if(!stat[a]() && 
-       !_.contains(['density', 'bin'], this.geom().stat()) ){
+    if(!stat[a]() ){
       stat[a](stat.linearAgg());
-      aes[a] = "n. observations";
+      // what is this? 
+      if(stat.linearAgg() === "bin"){
+        aes[a] = "binHeight";
+      } else if(stat.linearAgg() === "count") {
+        aes[a] = "n. observations";
+      } else if(stat.linearAgg() === "density"){
+        aes[a] = "density";
+      }
       this.aes(aes);
     }
   }, this);
-
 };
+
 Layer.prototype.data = function(data, fromPlot) {
   if(!arguments.length) { return this.attributes.data; }
   if(fromPlot){
@@ -124,9 +130,8 @@ Layer.prototype.data = function(data, fromPlot) {
   }
   return this;
 };
-
-Layer.prototype.draw = function(sel, layerNum) {
-
+Layer.prototype.compute = function(sel, layerNum) {
+  this.setStat();
   var facet = this.plot().facet(),
       plot = this.plot(),
       aes = this.aes(),
@@ -139,8 +144,7 @@ Layer.prototype.draw = function(sel, layerNum) {
     dlist = this.dataList(this.nest(this.data()));
   } else {
     dlist = plot.dataList(plot.data());
-  }
-  
+  } 
   var divs = [];
 
   sel.selectAll('.plot-div')
@@ -153,11 +157,43 @@ Layer.prototype.draw = function(sel, layerNum) {
         d = dlist.filter(function(d) {
           return d.selector === id;
         })[0];
-    if(_.isEmpty(d)) { d = {selector: id, data: []}; }
-    if(this.position() === "jitter" && 
-       !plot.hasJitter) {
-      _.each(d.data, function(r) { r._jitter = _.random(-1,1,1); });        
+    if(d && !(this.geom().grid && this.geom().grid())) {
+      plot.setScale(d.selector, this.aes());
+      if(this.position() === "jitter" && 
+         !plot.hasJitter) {
+        _.each(d.data, function(r) { r._jitter = _.random(-1,1,1); });        
+      }
+      d = plot.setDomain(d, this);
     }
+    if(_.isEmpty(d)) { d = {selector: id, data: []}; }
+    this.geom().data().push(d);
+  }, this);
+};
+Layer.prototype.draw = function(sel, layerNum) {
+
+  this.setStat();
+  var facet = this.plot().facet(),
+      plot = this.plot(),
+      aes = this.aes(),
+      dtypes = this.dtypes(),
+      stat = this.stat(),
+      dtype,
+      scaleType,
+      dlist;
+
+  var divs = [];
+
+  sel.selectAll('.plot-div')
+    .each(function(d) {
+      divs.push(d3.select(this).attr('id'));
+    });
+  console.log(divs);
+  _.each(divs, function(id, i){
+    // cycle through all divs, drawing data if it exists.
+    var s = sel.select("#" + id),
+        d = this.geom().data().filter(function(d) {
+          return d.selector === id;
+        })[0];
     this.geom().draw(s, d, i, layerNum);
   }, this);
 };

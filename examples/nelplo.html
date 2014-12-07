@@ -1,0 +1,34 @@
+<html>
+<head>
+<link rel='stylesheet' href='../css/ggd3style.css'>
+<link rel='stylesheet' href='../node_modules/bootstrap/dist/css/bootstrap.css'>
+<script type='text/javascript' src='../ggd3.standalone.js'></script></head>
+</head>
+<body>
+<div>
+</div>
+
+<div id='chart01' class='chart-frame'></div>
+<script>
+var facets = {'nelplo.csv': {x: 'group', ncols: 3}}
+
+var chart = ggd3.plot()
+                  .layers(['line'])
+                  .width(300)
+                  .dtypes({date: ['date', 'many', "%Y-%m"]})
+                  .facet(facets["nelplo.csv"])
+                  .height(150)
+                  .yScale({axis: {ticks: 4, position:'left',
+                          orient: "left"}})
+                  .margins({top: 15, bottom:20, left:20, right:5})
+                  .xScale({axis: {ticks: 4, position: "bottom",
+                          orient: "bottom"}})
+                  .aes({x:'date', y:'value', color:'variable'})
+d3.csv("../data/nelplo.csv", function(error, data) {
+  chart.data(data)
+    .draw(d3.select("#chart01"));
+});
+
+</script>
+</body>
+</html>

@@ -14,6 +14,7 @@ function Geom(aes) {
     lineWidth: null,
     drawX: true,
     drawY: true,
+    data: [],
     style: "", // optional class attributes for css 
     tooltip: null,
   };
@@ -101,8 +102,8 @@ Geom.prototype.setup = function() {
       s.group = s.aes.fill;
     } else if(s.aes.color){
       s.grouped = true;
-      s.group = aes.color;
-    } else if(aes.group){
+      s.group = s.aes.color;
+    } else if(s.aes.group){
       s.grouped = true;
       s.group = s.aes.group;
     }
@@ -137,9 +138,11 @@ Geom.prototype.domain = function(data, a) {
     return domain;
   }
   // done if date
-  // and not histogram or density
-  if(_.contains(["date", "time"], plot.dtypes()[aes[a]][0]) ){
-    return extent;
+  // and not a calculated aesthetic
+  if(!_.contains(['binHeight', 'density', 'n. observations'], aes[a])){
+    if(_.contains(["date", "time"], plot.dtypes()[aes[a]][0]) ){
+      return extent;
+    }
   }
   // extent both ways
   if(range === 0){
@@ -155,12 +158,13 @@ Geom.prototype.domain = function(data, a) {
 Geom.prototype.scalesAxes = function(sel, setup, selector, 
                                      layerNum, drawX, drawY){
 
-  var x, y;
-    // choosing scales based on facet rule,
-  // factor out.
+  var x, y,
+      plot = this.layer().plot();
+  // choosing scales based on facet rule
   if(!_.contains(["free", "free_x"], setup.facet.scales()) || 
      _.isUndefined(setup.plot.xScale()[selector])){
     x = setup.plot.xScale().single;
+    if(!x.domain()){ x = setup.plot.setFixedScale('x'); }
     xfree = false;
   } else {
     x = setup.plot.xScale()[selector];
@@ -169,11 +173,14 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
   if(!_.contains(["free", "free_y"], setup.facet.scales()) || 
      _.isUndefined(setup.plot.xScale()[selector])){
     y = setup.plot.yScale().single;
+    if(!y.domain()){ y = setup.plot.setFixedScale('y'); }
     yfree = false;
   } else {
     y = setup.plot.yScale()[selector];
     yfree = true;
   }
+  x.axis.scale(x.scale());
+  y.axis.scale(y.scale());
 
   if(layerNum === 0 && drawX){
     sel.select('.x.axis')
