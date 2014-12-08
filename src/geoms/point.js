@@ -11,8 +11,6 @@ function Point(spec) {
     geom: "circle",
     stat: "identity",
     position: "identity",
-    subRangeBand: 0.3,
-    subRangePadding: 0.1,
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -35,11 +33,11 @@ Point.prototype.positionPoint = function(s, group, groups) {
       shift = 0,
       aes = this.layer().aes();
   if(s.scaleType() === "ordinal" && groups){
-    sub = d3.scale.ordinal()
-                .rangeBands([0, s.scale().rangeBand()], 
-                                 this.subRangeBand(), 
-                                 this.subRangePadding())
-                .domain(groups);
+    if(_.isNull(this.layer().plot().subScale())){
+      sub = this.layer().plot().makeSubScale(s, groups);
+    } else {
+      sub = this.layer().plot().subScale();
+    }
     rb = sub.rangeBand()/2;
     shift = d3.sum(s.rangeBands(), function(r) {
       return r*s.scale().rangeBand();});

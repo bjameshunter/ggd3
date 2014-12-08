@@ -29,6 +29,9 @@ function Plot() {
     sizeScale: {single: ggd3.scale()},
     shapeScale: {single: ggd3.scale()},
     strokeScale: {single: ggd3.scale()},
+    subScale: null,
+    subRangeBand: 0.3,
+    subRangePadding: 0.1,
     alpha: d3.functor(0.7),
     fill: d3.functor('steelblue'),
     color: d3.functor(null),
@@ -79,6 +82,7 @@ function Plot() {
     "xDomain", "yDomain",
     'colorRange', 'sizeRange',
     'fillRange', "lineType",
+    'subScale', 'subRangeBand', 'subRangePadding',
     "alphaRange", "lineWidth",
     "xGrid", "yGrid"];
 
@@ -167,6 +171,17 @@ Plot.prototype.margins = function(margins) {
   this.attributes.margins = _.merge(this.attributes.margins, margins);
   return this;
 };
+
+Plot.prototype.makeSubScale = function(scale, groups) {
+  var sub = d3.scale.ordinal()
+              .rangeBands([0, scale.scale().rangeBand()], 
+                               this.subRangeBand(), 
+                               this.subRangePadding())
+              .domain(groups);
+  this.subScale(sub);
+  return sub;
+};
+
 
 Plot.prototype.layers = function(layers) {
   if(!arguments.length) { return this.attributes.layers; }

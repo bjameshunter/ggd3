@@ -59,7 +59,8 @@ var facets = {'mtcars.csv': {x: 'am', nrows:1},
             "wells.csv":{x:'switch', y: "assoc"},
             "movies.csv": {x: "Comedy", y: "Short"}, 
           };
-var aes = {'mtcars.csv': {x: "mpg", fill: "cyl", color: "cyl", y: "hp"},
+var aes = {'mtcars.csv': {y: "mpg", fill: "cyl", color: "cyl", 
+                      x: "gear"},
             "iris.csv" : {x: "Sepal.Length", fill: "Species",
             color:"Species"
           },
@@ -114,14 +115,18 @@ var FacetType = {'mtcars.csv': "wrap",
           };
 // I don't understand why setting scales (alpha, fill, etc.)
 // here sets them for all future geoms of that type.
-var square = ggd3.geoms.point();
+var point = ggd3.geoms.point();
 var text = ggd3.geoms.text();
 var line = ggd3.geoms.line().interpolate('step')
-var layers = {'mtcars.csv': ["point", 
-                            ggd3.layer().geom("vline")
-                              .stat({x: "mean", y:"range"}),
-                              ggd3.layer().geom('hline')
-                                .stat({y:'mean', x:"range"})],
+var layers = {'mtcars.csv': [ggd3.layer().geom('point')
+                              .position('jitter'), 
+                            ggd3.layer().geom(ggd3.geoms.hline()
+                                              .lineType(d3.functor('none'))
+                                              .lineWidth(3))
+                              .stat({y: "median"}),
+                            ggd3.layer().geom(ggd3.geoms.vline()
+                                                .color('purple'))
+                              .aes({xintercept: [15, 35]})],
             "iris.csv" : [ggd3.geoms.histogram()
                             .frequency(false),
                           ggd3.geoms.density()
@@ -160,8 +165,6 @@ var charts = {'mtcars.csv': ggd3.plot()
                             orient: 'bottom',
                             ticks: 4}})
                     .margins({top: 5, bottom:10, left:35, right:10})
-                    .xGrid(false)
-                    .yGrid(false)
                     .layers(layers["mtcars.csv"]),
             "iris.csv" : ggd3.plot()
                     .width(700)

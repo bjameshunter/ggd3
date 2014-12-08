@@ -11,6 +11,7 @@ function Line(spec) {
     grid: false,
     interpolate: 'basis',
     lineType: null,
+    lineWidth: null,
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -32,10 +33,28 @@ Line.prototype.lineType = function(l) {
   return this;
 };
 
-Line.prototype.generator = function(aes, x, y) {
+Line.prototype.generator = function(aes, x, y, sub, group) {
+  if(x.hasOwnProperty('rangeBand')) {
+    return d3.svg.line()
+            .x(function(d, i) { 
+              return (x(d[aes.x]) + sub(d[group]) + 
+                            sub.rangeBand() * i); 
+            })
+            .y(function(d) { return y(d[aes.y]); })
+            .interpolate(this.interpolate());
+  }
+  if(y.hasOwnProperty('rangeBand')) {
+    return d3.svg.line()
+            .x(function(d) { return x(d[aes.x]); })
+            .y(function(d, i) { 
+              return (y(d[aes.y]) + sub(d[group]) +
+                            sub.rangeBand()*i); 
+            })
+            .interpolate(this.interpolate());
+  }
   return d3.svg.line()
-          .x(function(d) { return x(d[aes.x]); })
-          .y(function(d) { return y(d[aes.y]); })
+          .x(function(d, i) { return x(d[aes.x]); })
+          .y(function(d, i) { return y(d[aes.y]); })
           .interpolate(this.interpolate());
 };
 
@@ -59,7 +78,7 @@ Line.prototype.drawLines = function (path, line, s, layerNum) {
     path
       .attr('stroke-opacity', function(d) { return s.alpha(d[1]) ;})
       .attr('stroke', function(d) { return s.color(d[1]);})
-      // .attr('stroke-width', this.lineWidth() || s.plot.lineWidth())
+      .attr('stroke-width', this.lineWidth())
       .attr('fill', 'none'); // must explicitly declare no grid.
   }
 };
@@ -76,7 +95,28 @@ Line.prototype.draw = function(sel, data, i, layerNum){
 
   var s     = this.setup(),
       scales = this.scalesAxes(sel, s, data.selector, layerNum,
-                                 this.drawX(), this.drawY());
+                                 this.drawX(), this.drawY()),
+      x = scales.x.scale(),
+      y = scales.y.scale(),
+      sub = function() { return 0; };
+      sub.rangeBand = function() { return 0; };
+
+  if(x.hasOwnProperty('rangeBand') || 
+     y.hasOwnProperty('rangeBand')){
+    if(s.grouped) {
+      s.groups = _.pluck(data.data, s.group);
+      if(_.isNull(s.plot.subScale())){
+        var sc = x.hasOwnProperty('rangeBand') ? x: y;
+        sub = s.plot.makeSubScale(sc, s.groups);
+        console.log('created subscale');
+      } else {
+        sub = s.plot.subScale();
+        console.log('already has subscale');
+      }
+    } else {
+      s.groups = [];
+    }
+  }
 
   ggd3.tools.removeElements(sel, layerNum, "geom-" + this.name());
   data = this.prepareData(data, s, scales);
@@ -84,7 +124,7 @@ Line.prototype.draw = function(sel, data, i, layerNum){
   var lines = sel
               .selectAll("." + this.selector(layerNum).replace(/ /g, '.'))
               .data(data),
-  line = this.generator(s.aes, scales.x.scale(), scales.y.scale());
+  line = this.generator(s.aes, x, y, sub, s.group);
   lines.transition().call(_.bind(this.drawLines, this), line, s, layerNum);
   lines.enter().append(this.geom())
     .call(_.bind(this.drawLines, this), line, s, layerNum);

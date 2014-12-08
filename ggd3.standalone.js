@@ -799,19 +799,27 @@ Layer.prototype.setStat = function() {
       stat = this.stat(),
       plot = this.plot(),
       scaleType, dtype;
-      console.log("setting stat for " + this.geom().name());
-  for(var a in aes){
+
+  _.each(_.difference(_.keys(aes), stat.exclude), function(a) {
     dtype = dtypes[aes[a]];
     if(!stat[a]() && _.contains(measureScales, a)){
     scaleType = plot[a + "Scale"]().single.scaleType();
       if(_.contains(linearScales, scaleType) && 
          _.contains(['x', 'y'], a)){
-        stat[a](stat.linearAgg());
+        if(this.geom() instanceof ggd3.geoms.line){
+          stat[a]('range');
+        } else {
+          stat[a](stat.linearAgg());
+        }
       } else {
-        stat[a](dtype);
+        if(this.geom() instanceof ggd3.geoms.line){
+          stat[a]('unique');
+        } else {
+          stat[a](dtype);
+        }
       }
     }
-  }
+  }, this);
   // if a stat has not been set, it is x or y
   // and should be set
   _.each(['x', 'y'], function(a) {
@@ -939,6 +947,9 @@ function Plot() {
     sizeScale: {single: ggd3.scale()},
     shapeScale: {single: ggd3.scale()},
     strokeScale: {single: ggd3.scale()},
+    subScale: null,
+    subRangeBand: 0.3,
+    subRangePadding: 0.1,
     alpha: d3.functor(0.7),
     fill: d3.functor('steelblue'),
     color: d3.functor(null),
@@ -989,6 +1000,7 @@ function Plot() {
     "xDomain", "yDomain",
     'colorRange', 'sizeRange',
     'fillRange', "lineType",
+    'subScale', 'subRangeBand', 'subRangePadding',
     "alphaRange", "lineWidth",
     "xGrid", "yGrid"];
 
@@ -1077,6 +1089,17 @@ Plot.prototype.margins = function(margins) {
   this.attributes.margins = _.merge(this.attributes.margins, margins);
   return this;
 };
+
+Plot.prototype.makeSubScale = function(scale, groups) {
+  var sub = d3.scale.ordinal()
+              .rangeBands([0, scale.scale().rangeBand()], 
+                               this.subRangeBand(), 
+                               this.subRangePadding())
+              .domain(groups);
+  this.subScale(sub);
+  return sub;
+};
+
 
 Plot.prototype.layers = function(layers) {
   if(!arguments.length) { return this.attributes.layers; }
@@ -2281,6 +2304,7 @@ function Line(spec) {
     grid: false,
     interpolate: 'basis',
     lineType: null,
+    lineWidth: null,
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -2302,10 +2326,28 @@ Line.prototype.lineType = function(l) {
   return this;
 };
 
-Line.prototype.generator = function(aes, x, y) {
+Line.prototype.generator = function(aes, x, y, sub, group) {
+  if(x.hasOwnProperty('rangeBand')) {
+    return d3.svg.line()
+            .x(function(d, i) { 
+              return (x(d[aes.x]) + sub(d[group]) + 
+                            sub.rangeBand() * i); 
+            })
+            .y(function(d) { return y(d[aes.y]); })
+            .interpolate(this.interpolate());
+  }
+  if(y.hasOwnProperty('rangeBand')) {
+    return d3.svg.line()
+            .x(function(d) { return x(d[aes.x]); })
+            .y(function(d, i) { 
+              return (y(d[aes.y]) + sub(d[group]) +
+                            sub.rangeBand()*i); 
+            })
+            .interpolate(this.interpolate());
+  }
   return d3.svg.line()
-          .x(function(d) { return x(d[aes.x]); })
-          .y(function(d) { return y(d[aes.y]); })
+          .x(function(d, i) { return x(d[aes.x]); })
+          .y(function(d, i) { return y(d[aes.y]); })
           .interpolate(this.interpolate());
 };
 
@@ -2329,7 +2371,7 @@ Line.prototype.drawLines = function (path, line, s, layerNum) {
     path
       .attr('stroke-opacity', function(d) { return s.alpha(d[1]) ;})
       .attr('stroke', function(d) { return s.color(d[1]);})
-      // .attr('stroke-width', this.lineWidth() || s.plot.lineWidth())
+      .attr('stroke-width', this.lineWidth())
       .attr('fill', 'none'); // must explicitly declare no grid.
   }
 };
@@ -2346,7 +2388,28 @@ Line.prototype.draw = function(sel, data, i, layerNum){
 
   var s     = this.setup(),
       scales = this.scalesAxes(sel, s, data.selector, layerNum,
-                                 this.drawX(), this.drawY());
+                                 this.drawX(), this.drawY()),
+      x = scales.x.scale(),
+      y = scales.y.scale(),
+      sub = function() { return 0; };
+      sub.rangeBand = function() { return 0; };
+
+  if(x.hasOwnProperty('rangeBand') || 
+     y.hasOwnProperty('rangeBand')){
+    if(s.grouped) {
+      s.groups = _.pluck(data.data, s.group);
+      if(_.isNull(s.plot.subScale())){
+        var sc = x.hasOwnProperty('rangeBand') ? x: y;
+        sub = s.plot.makeSubScale(sc, s.groups);
+        console.log('created subscale');
+      } else {
+        sub = s.plot.subScale();
+        console.log('already has subscale');
+      }
+    } else {
+      s.groups = [];
+    }
+  }
 
   ggd3.tools.removeElements(sel, layerNum, "geom-" + this.name());
   data = this.prepareData(data, s, scales);
@@ -2354,7 +2417,7 @@ Line.prototype.draw = function(sel, data, i, layerNum){
   var lines = sel
               .selectAll("." + this.selector(layerNum).replace(/ /g, '.'))
               .data(data),
-  line = this.generator(s.aes, scales.x.scale(), scales.y.scale());
+  line = this.generator(s.aes, x, y, sub, s.group);
   lines.transition().call(_.bind(this.drawLines, this), line, s, layerNum);
   lines.enter().append(this.geom())
     .call(_.bind(this.drawLines, this), line, s, layerNum);
@@ -3043,7 +3106,7 @@ Hline.prototype = new Line();
 
 Hline.prototype.constructor = Hline;
 
-Hline.prototype.generator = function(aes, x, y) {
+Hline.prototype.generator = function(aes, x, y, sub, group) {
   // get list of intercepts and translate them
   // in the data to the actual coordinates
   var s = this.setup();
@@ -3059,7 +3122,7 @@ Hline.prototype.generator = function(aes, x, y) {
             .y(function(d) { return y(d.y); })
             .interpolate(this.interpolate());
   } else {
-    return Line.prototype.generator.call(this, aes, x, y);
+    return Line.prototype.generator.call(this, aes, x, y, sub, group);
   }
 };
 
@@ -3101,25 +3164,42 @@ Hline.prototype.prepareData = function(data, s, scales) {
     });
     return data;
   }
-  if(_.all(_.map(data.data, _.isObject))){
+  if(_.isUndefined(s.aes[other + "intercept"])){
+    // data must be array of objects with required aesthetics.
     data = Line.prototype.prepareData.call(this, data, s);
-
-    data = _.map(data, function(d) {
-      return _.map(d, function(r) {
-        var o1 = _.clone(r),
-            o2 = _.clone(r);
-
-        o1[s.aes[direction]] = range[0];
-        o2[s.aes[direction]] = range[1];
-        return [o1, o2];
+    // data are nested
+    if(_.contains(linearScales, scale.scaleType())) {
+      data = _.map(data, function(d) {
+        return _.map(d, function(r) {
+          return _.map(range, function(e){
+            var o = _.clone(r);
+            o[s.aes[direction]] = e;
+            return o;
+          });
+        });
       });
-    });
-    data = _.flatten(data, true);
-    return data;
+      data = _.flatten(data, true);
+    } else {
+      console.log(data);
+      data = _.map(_.flatten(data), function(d) {
+        return [d, d];
+      });
+    }
+    console.log(data);
   } else {
-    // there should be an array of intercepts on s.aes.yints or s.aes.xints
-
+    // there should be an array of intercepts on 
+    // s.aes.yintercept or s.aes.xintercept
+    data = _.map(s.aes[other + "intercept"], function(i) {
+      var o1 = {},
+          o2 = {};
+      o1[s.aes[other]] = i;
+      o1[s.aes[direction]] = range[0];
+      o2[s.aes[other]] = i;
+      o2[s.aes[direction]] = range[1];
+      return [o1, o2];
+    });
   }
+  return data;
 
 };
 
@@ -3165,8 +3245,6 @@ function Point(spec) {
     geom: "circle",
     stat: "identity",
     position: "identity",
-    subRangeBand: 0.3,
-    subRangePadding: 0.1,
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -3189,11 +3267,11 @@ Point.prototype.positionPoint = function(s, group, groups) {
       shift = 0,
       aes = this.layer().aes();
   if(s.scaleType() === "ordinal" && groups){
-    sub = d3.scale.ordinal()
-                .rangeBands([0, s.scale().rangeBand()], 
-                                 this.subRangeBand(), 
-                                 this.subRangePadding())
-                .domain(groups);
+    if(_.isNull(this.layer().plot().subScale())){
+      sub = this.layer().plot().makeSubScale(s, groups);
+    } else {
+      sub = this.layer().plot().subScale();
+    }
     rb = sub.rangeBand()/2;
     shift = d3.sum(s.rangeBands(), function(r) {
       return r*s.scale().rangeBand();});
@@ -3547,6 +3625,7 @@ function Stat(setting) {
   } else if(_.isString(setting)){
     attributes.linearAgg = setting;
   }
+  this.exclude = ["xintercept", "yintercept"];
 
   this.attributes = attributes;
   var getSet = ["layer", "linearAgg"];
@@ -3565,27 +3644,29 @@ var specialStats = [
 Stat.prototype.agg = function(data, aes) {
   var out = [{}];
   _.each(_.keys(aes), function (a) {
-    if(this[a]()._name === "range"){
-      var r = this[a]()(_.pluck(_.flatten([data]), aes[a])),
-        o1 = _.clone(out[0]);
-        o2 = _.clone(out[0]);
-        o1[aes[a]] = r[0];
-        o2[aes[a]] = r[1];
-        out = [o1, o2];
-    } else {
-      out = _.map(out, function(o) {
-        o[aes[a]] = this[a]()(_.pluck(_.flatten([data]), aes[a]));
-        return o;
-      }, this);
+    if(!_.contains(this.exclude, a)) {
+      if(_.contains(["range", "unique"], this[a]()._name) ){
+        var r = this[a]()(_.pluck(_.flatten([data]), aes[a]));
+        out = _.map(r, function(d) {
+            var o = _.clone(out[0]);
+            o[aes[a]] = d;
+            return o;
+          });
+      } else {
+        out = _.map(out, function(o) {
+          o[aes[a]] = this[a]()(_.pluck(_.flatten([data]), aes[a]));
+          return o;
+        }, this);
+      }
     }
   }, this);
-  console.log(out);
   return out;
 };
 
 Stat.prototype.compute = function(data) {
   var aes = this.layer().aes(),
-      id = _.any(_.map(_.keys(aes), function(k){
+      id = _.any(_.map(_.difference(_.keys(aes), this.exclude), 
+            function(k){
               if(!this[k]()){ return null; }
               return this[k]()([]) === "identity";
             }, this));
@@ -3633,6 +3714,10 @@ Stat.prototype.label = function() {
     return arr[0];
   };
 };
+Stat.prototype.unique = function(arr) {
+  return _.unique(arr);
+};  
+Stat.prototype.unique._name = "unique";
 
 Stat.prototype.range = function(arr) {
   return d3.extent(arr);

@@ -35,6 +35,7 @@ function Stat(setting) {
   } else if(_.isString(setting)){
     attributes.linearAgg = setting;
   }
+  this.exclude = ["xintercept", "yintercept"];
 
   this.attributes = attributes;
   var getSet = ["layer", "linearAgg"];
@@ -53,27 +54,29 @@ var specialStats = [
 Stat.prototype.agg = function(data, aes) {
   var out = [{}];
   _.each(_.keys(aes), function (a) {
-    if(this[a]()._name === "range"){
-      var r = this[a]()(_.pluck(_.flatten([data]), aes[a])),
-        o1 = _.clone(out[0]);
-        o2 = _.clone(out[0]);
-        o1[aes[a]] = r[0];
-        o2[aes[a]] = r[1];
-        out = [o1, o2];
-    } else {
-      out = _.map(out, function(o) {
-        o[aes[a]] = this[a]()(_.pluck(_.flatten([data]), aes[a]));
-        return o;
-      }, this);
+    if(!_.contains(this.exclude, a)) {
+      if(_.contains(["range", "unique"], this[a]()._name) ){
+        var r = this[a]()(_.pluck(_.flatten([data]), aes[a]));
+        out = _.map(r, function(d) {
+            var o = _.clone(out[0]);
+            o[aes[a]] = d;
+            return o;
+          });
+      } else {
+        out = _.map(out, function(o) {
+          o[aes[a]] = this[a]()(_.pluck(_.flatten([data]), aes[a]));
+          return o;
+        }, this);
+      }
     }
   }, this);
-  console.log(out);
   return out;
 };
 
 Stat.prototype.compute = function(data) {
   var aes = this.layer().aes(),
-      id = _.any(_.map(_.keys(aes), function(k){
+      id = _.any(_.map(_.difference(_.keys(aes), this.exclude), 
+            function(k){
               if(!this[k]()){ return null; }
               return this[k]()([]) === "identity";
             }, this));
@@ -121,6 +124,10 @@ Stat.prototype.label = function() {
     return arr[0];
   };
 };
+Stat.prototype.unique = function(arr) {
+  return _.unique(arr);
+};  
+Stat.prototype.unique._name = "unique";
 
 Stat.prototype.range = function(arr) {
   return d3.extent(arr);

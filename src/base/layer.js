@@ -88,19 +88,27 @@ Layer.prototype.setStat = function() {
       stat = this.stat(),
       plot = this.plot(),
       scaleType, dtype;
-      console.log("setting stat for " + this.geom().name());
-  for(var a in aes){
+
+  _.each(_.difference(_.keys(aes), stat.exclude), function(a) {
     dtype = dtypes[aes[a]];
     if(!stat[a]() && _.contains(measureScales, a)){
     scaleType = plot[a + "Scale"]().single.scaleType();
       if(_.contains(linearScales, scaleType) && 
          _.contains(['x', 'y'], a)){
-        stat[a](stat.linearAgg());
+        if(this.geom() instanceof ggd3.geoms.line){
+          stat[a]('range');
+        } else {
+          stat[a](stat.linearAgg());
+        }
       } else {
-        stat[a](dtype);
+        if(this.geom() instanceof ggd3.geoms.line){
+          stat[a]('unique');
+        } else {
+          stat[a](dtype);
+        }
       }
     }
-  }
+  }, this);
   // if a stat has not been set, it is x or y
   // and should be set
   _.each(['x', 'y'], function(a) {

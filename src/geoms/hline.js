@@ -22,7 +22,7 @@ Hline.prototype = new Line();
 
 Hline.prototype.constructor = Hline;
 
-Hline.prototype.generator = function(aes, x, y) {
+Hline.prototype.generator = function(aes, x, y, sub, group) {
   // get list of intercepts and translate them
   // in the data to the actual coordinates
   var s = this.setup();
@@ -38,7 +38,7 @@ Hline.prototype.generator = function(aes, x, y) {
             .y(function(d) { return y(d.y); })
             .interpolate(this.interpolate());
   } else {
-    return Line.prototype.generator.call(this, aes, x, y);
+    return Line.prototype.generator.call(this, aes, x, y, sub, group);
   }
 };
 
@@ -80,25 +80,42 @@ Hline.prototype.prepareData = function(data, s, scales) {
     });
     return data;
   }
-  if(_.all(_.map(data.data, _.isObject))){
+  if(_.isUndefined(s.aes[other + "intercept"])){
+    // data must be array of objects with required aesthetics.
     data = Line.prototype.prepareData.call(this, data, s);
-
-    data = _.map(data, function(d) {
-      return _.map(d, function(r) {
-        var o1 = _.clone(r),
-            o2 = _.clone(r);
-
-        o1[s.aes[direction]] = range[0];
-        o2[s.aes[direction]] = range[1];
-        return [o1, o2];
+    // data are nested
+    if(_.contains(linearScales, scale.scaleType())) {
+      data = _.map(data, function(d) {
+        return _.map(d, function(r) {
+          return _.map(range, function(e){
+            var o = _.clone(r);
+            o[s.aes[direction]] = e;
+            return o;
+          });
+        });
       });
-    });
-    data = _.flatten(data, true);
-    return data;
+      data = _.flatten(data, true);
+    } else {
+      console.log(data);
+      data = _.map(_.flatten(data), function(d) {
+        return [d, d];
+      });
+    }
+    console.log(data);
   } else {
-    // there should be an array of intercepts on s.aes.yints or s.aes.xints
-
+    // there should be an array of intercepts on 
+    // s.aes.yintercept or s.aes.xintercept
+    data = _.map(s.aes[other + "intercept"], function(i) {
+      var o1 = {},
+          o2 = {};
+      o1[s.aes[other]] = i;
+      o1[s.aes[direction]] = range[0];
+      o2[s.aes[other]] = i;
+      o2[s.aes[direction]] = range[1];
+      return [o1, o2];
+    });
   }
+  return data;
 
 };
 
