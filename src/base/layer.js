@@ -121,6 +121,7 @@ Layer.prototype.setStat = function() {
 Layer.prototype.data = function(data, fromPlot) {
   if(!arguments.length) { return this.attributes.data; }
   if(fromPlot){
+    // what?
     this.attributes.data = data;
   } else {
     data = this.unNest(data);

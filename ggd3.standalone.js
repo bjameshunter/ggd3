@@ -832,6 +832,7 @@ Layer.prototype.setStat = function() {
 Layer.prototype.data = function(data, fromPlot) {
   if(!arguments.length) { return this.attributes.data; }
   if(fromPlot){
+    // what?
     this.attributes.data = data;
   } else {
     data = this.unNest(data);
@@ -2084,6 +2085,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     width = {s: "width", p: 'x'};
   } else {
     // horizontal bars
+    
     o = scales.y.scale();
     n = scales.x.scale();
     size = {s: "width", p:'x'};
@@ -2339,10 +2341,8 @@ Line.prototype.prepareData = function(data, s) {
   return data;
 };
 
-Line.prototype.draw = function draw(sel, data, i, layerNum){
-// data should be passed in in order
-// missing data should be allowed somehow
-// the 
+Line.prototype.draw = function(sel, data, i, layerNum){
+
   var s     = this.setup(),
       scales = this.scalesAxes(sel, s, data.selector, layerNum,
                                  this.drawX(), this.drawY());
@@ -3042,39 +3042,51 @@ Hline.prototype = new Line();
 
 Hline.prototype.constructor = Hline;
 
-Hline.prototype.generator = function(aes) {
+Hline.prototype.generator = function(aes, x, y) {
   // get list of intercepts and translate them
   // in the data to the actual coordinates
-  var s = this.setup(),
-  x = d3.scale.linear()
-        .range([0, s.dim.x])
-        .domain([0, s.dim.x]),
-  y = d3.scale.linear()
-          .range([0, s.dim.y])
-          .domain([0, s.dim.y]);
-  return d3.svg.line()
-          .x(function(d) { return x(d.x); })
-          .y(function(d) { return y(d.y); })
-          .interpolate(this.interpolate());
+  var s = this.setup();
+  if(this.grid()){
+    x = d3.scale.linear()
+          .range([0, s.dim.x])
+          .domain([0, s.dim.x]);
+    y = d3.scale.linear()
+            .range([0, s.dim.y])
+            .domain([0, s.dim.y]);
+    return d3.svg.line()
+            .x(function(d) { return x(d.x); })
+            .y(function(d) { return y(d.y); })
+            .interpolate(this.interpolate());
+  } else {
+    return Line.prototype.generator.call(this, aes, x, y);
+  }
 };
 
 Hline.prototype.prepareData = function(data, s, scales) {
-  var direction = this.name() === "hline" ? "y":"x",
+  // hline and vline accept two forms of data
+  // an array of intercepts to be drawn on every facet
+  // or an array of objects.
+  // objects will be nested according to the grouping 
+  // variables and a summary function will be 
+  // executed
+  var direction = this.direction(),
       other = direction === "x" ? 'y': 'x',
       scale = scales[direction],
+      otherScale = scales[other],
+      range = scale.domain(),
       p;
-  if(!_.contains(linearScales, scale.scaleType())){
-    p =  _.map(scale.scale().domain(),
-              function(i) {
-                return scale.scale()(i) + scale.scale().rangeBand()/2;
-              });
-  } else {
-    p = _.map(scales[direction].scale().ticks(4),
-              function(i) {
-                return scale.scale()(i);
-              });
-  } 
   if(this.grid()) {
+    if(!_.contains(linearScales, scale.scaleType())){
+      p =  _.map(scale.scale().domain(),
+                function(i) {
+                  return scale.scale()(i) + scale.scale().rangeBand()/2;
+                });
+    } else {
+      p = _.map(scales[direction].scale().ticks(4),
+                function(i) {
+                  return scale.scale()(i);
+                });
+    } 
     // disregard data grab intercepts from axis and
     // create new dataset.
     data = [];
@@ -3086,11 +3098,24 @@ Hline.prototype.prepareData = function(data, s, scales) {
       o2[other] = s.dim[other];
       data.push([o1, o2]);
     });
-  } else {
-    // do something else with the data
-    // data = 
+    return data;
   }
-  return data;
+  if(_.all(_.map(data.data, _.isObject))){
+    data = _.flatten(Line.prototype.prepareData.call(this, data, s));
+    
+    data = _.map(data, function(d) {
+      var o1 = _.clone(d),
+          o2 = _.clone(d);
+      o1[s.aes[direction]] = range[0];
+      o2[s.aes[direction]] = range[1];
+      return [o1, o2];
+    });
+    return data;
+  } else {
+    // there should be an array of intercepts on s.aes.yints or s.aes.xints
+
+  }
+
 };
 
 
@@ -3535,7 +3560,7 @@ var specialStats = [
 Stat.prototype.agg = function(data, aes) {
   var out = {};
   for(var a in aes){
-    out[aes[a]] = this[a]()(_.pluck(data, aes[a]));
+    out[aes[a]] = this[a]()(_.pluck(_.flatten([data]), aes[a]));
   }
   return out;
 };

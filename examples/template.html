@@ -7,14 +7,14 @@
 <body>
 <div>
   <select id="dataset" class='btn btn-primary'>
-  <option value="mtcars.csv" id='cars' >cars</option>
+  <option value="mtcars.csv" id='cars' selected>cars</option>
   <option value="iris.csv" id='iris'>iris</option>
   <option value="diamonds.csv" id='diamonds' >diamonds</option>
   <option value="baseball.csv" id='baseball' >baseball</option>
   <option value="nelplo.csv" id='nelplo'>nelplo</option>
   <option value="wells.csv" id='wells' >wells</option>
   <option value="ustimeseries.csv" id='ustimeseries' >ustimeseries</option>
-  <option value="movies.csv" id='movies' selected>movies</option>
+  <option value="movies.csv" id='movies' >movies</option>
 </select>
 <!-- <select id="xVar" class='btn btn-primary'>
 </select>    
@@ -50,7 +50,7 @@ $("#dataset").on('change', function() {
 $("#facet-scales").on('change', function() {
   redraw();
 });
-var facets = {'mtcars.csv': null,
+var facets = {'mtcars.csv': {x: 'am', nrows:1},
             "iris.csv" : null, //{y: "Species", nrows:1},
             "diamonds.csv":  {y: 'clarity', x:'cut'},
             "baseball.csv": {x: 'team', ncols:3},
@@ -59,7 +59,7 @@ var facets = {'mtcars.csv': null,
             "wells.csv":{x:'switch', y: "assoc"},
             "movies.csv": {x: "Comedy", y: "Short"}, 
           };
-var aes = {'mtcars.csv': {x: "cyl", fill: "gear"},
+var aes = {'mtcars.csv': {x: "mpg", fill: "cyl", color: "cyl", y: "hp"},
             "iris.csv" : {x: "Sepal.Length", fill: "Species",
             color:"Species"
           },
@@ -117,9 +117,8 @@ var FacetType = {'mtcars.csv': "wrap",
 var square = ggd3.geoms.point();
 var text = ggd3.geoms.text();
 var line = ggd3.geoms.line().interpolate('step')
-var layers = {'mtcars.csv': [ggd3.layer()
-                                .position('stack')
-                                .geom(ggd3.geoms.bar().offset('silhouette'))],
+var layers = {'mtcars.csv': ["point", 
+                            ggd3.layer().geom("vline"), "hline"],
             "iris.csv" : [ggd3.geoms.histogram()
                             .frequency(false),
                           ggd3.geoms.density()
@@ -150,14 +149,13 @@ var layers = {'mtcars.csv': [ggd3.layer()
                                       .tail(0.01))]
           };
 var charts = {'mtcars.csv': ggd3.plot()
-                    .width(300)
-                    .height(300)
+                    .width(400)
+                    .height(400)
                     .yScale({axis:{ position:'left', 
                             orient:'left'}})
                     .xScale({axis: {position: 'top',
                             orient: 'bottom',
                             ticks: 4}})
-                    .color('black')
                     .margins({top: 5, bottom:10, left:35, right:10})
                     .layers(layers["mtcars.csv"]),
             "iris.csv" : ggd3.plot()

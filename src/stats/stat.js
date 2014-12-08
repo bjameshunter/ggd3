@@ -53,7 +53,7 @@ var specialStats = [
 Stat.prototype.agg = function(data, aes) {
   var out = {};
   for(var a in aes){
-    out[aes[a]] = this[a]()(_.pluck(data, aes[a]));
+    out[aes[a]] = this[a]()(_.pluck(_.flatten([data]), aes[a]));
   }
   return out;
 };

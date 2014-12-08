@@ -183,6 +183,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     width = {s: "width", p: 'x'};
   } else {
     // horizontal bars
+    
     o = scales.y.scale();
     n = scales.x.scale();
     size = {s: "width", p:'x'};
