@@ -51,10 +51,23 @@ var specialStats = [
 ];
 
 Stat.prototype.agg = function(data, aes) {
-  var out = {};
-  for(var a in aes){
-    out[aes[a]] = this[a]()(_.pluck(_.flatten([data]), aes[a]));
-  }
+  var out = [{}];
+  _.each(_.keys(aes), function (a) {
+    if(this[a]()._name === "range"){
+      var r = this[a]()(_.pluck(_.flatten([data]), aes[a])),
+        o1 = _.clone(out[0]);
+        o2 = _.clone(out[0]);
+        o1[aes[a]] = r[0];
+        o2[aes[a]] = r[1];
+        out = [o1, o2];
+    } else {
+      out = _.map(out, function(o) {
+        o[aes[a]] = this[a]()(_.pluck(_.flatten([data]), aes[a]));
+        return o;
+      }, this);
+    }
+  }, this);
+  console.log(out);
   return out;
 };
 
@@ -71,7 +84,7 @@ Stat.prototype.compute = function(data) {
   if(id){
     return data;
   }
-  out = this.agg(data, aes);
+  out = _.flatten(this.agg(data, aes));
   return out;
 };
 
@@ -108,6 +121,11 @@ Stat.prototype.label = function() {
     return arr[0];
   };
 };
+
+Stat.prototype.range = function(arr) {
+  return d3.extent(arr);
+};
+Stat.prototype.range._name = "range";
 
 Stat.prototype.median = function(arr) {
   if(arr.length > 100000) { 

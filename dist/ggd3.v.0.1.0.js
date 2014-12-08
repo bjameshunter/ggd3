@@ -788,6 +788,7 @@ Layer.prototype.setStat = function() {
       stat = this.stat(),
       plot = this.plot(),
       scaleType, dtype;
+      console.log("setting stat for " + this.geom().name());
   for(var a in aes){
     dtype = dtypes[aes[a]];
     if(!stat[a]() && _.contains(measureScales, a)){
@@ -801,7 +802,7 @@ Layer.prototype.setStat = function() {
     }
   }
   // if a stat has not been set, it is x or y
-  // and should be set to count if geom is not density/hist.
+  // and should be set
   _.each(['x', 'y'], function(a) {
     if(!stat[a]() ){
       stat[a](stat.linearAgg());
@@ -3090,15 +3091,19 @@ Hline.prototype.prepareData = function(data, s, scales) {
     return data;
   }
   if(_.all(_.map(data.data, _.isObject))){
-    data = _.flatten(Line.prototype.prepareData.call(this, data, s));
-    
+    data = Line.prototype.prepareData.call(this, data, s);
+
     data = _.map(data, function(d) {
-      var o1 = _.clone(d),
-          o2 = _.clone(d);
-      o1[s.aes[direction]] = range[0];
-      o2[s.aes[direction]] = range[1];
-      return [o1, o2];
+      return _.map(d, function(r) {
+        var o1 = _.clone(r),
+            o2 = _.clone(r);
+
+        o1[s.aes[direction]] = range[0];
+        o2[s.aes[direction]] = range[1];
+        return [o1, o2];
+      });
     });
+    data = _.flatten(data, true);
     return data;
   } else {
     // there should be an array of intercepts on s.aes.yints or s.aes.xints
@@ -3547,10 +3552,23 @@ var specialStats = [
 ];
 
 Stat.prototype.agg = function(data, aes) {
-  var out = {};
-  for(var a in aes){
-    out[aes[a]] = this[a]()(_.pluck(_.flatten([data]), aes[a]));
-  }
+  var out = [{}];
+  _.each(_.keys(aes), function (a) {
+    if(this[a]()._name === "range"){
+      var r = this[a]()(_.pluck(_.flatten([data]), aes[a])),
+        o1 = _.clone(out[0]);
+        o2 = _.clone(out[0]);
+        o1[aes[a]] = r[0];
+        o2[aes[a]] = r[1];
+        out = [o1, o2];
+    } else {
+      out = _.map(out, function(o) {
+        o[aes[a]] = this[a]()(_.pluck(_.flatten([data]), aes[a]));
+        return o;
+      }, this);
+    }
+  }, this);
+  console.log(out);
   return out;
 };
 
@@ -3567,7 +3585,7 @@ Stat.prototype.compute = function(data) {
   if(id){
     return data;
   }
-  out = this.agg(data, aes);
+  out = _.flatten(this.agg(data, aes));
   return out;
 };
 
@@ -3604,6 +3622,11 @@ Stat.prototype.label = function() {
     return arr[0];
   };
 };
+
+Stat.prototype.range = function(arr) {
+  return d3.extent(arr);
+};
+Stat.prototype.range._name = "range";
 
 Stat.prototype.median = function(arr) {
   if(arr.length > 100000) { 

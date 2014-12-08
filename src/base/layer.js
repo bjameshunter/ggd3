@@ -88,6 +88,7 @@ Layer.prototype.setStat = function() {
       stat = this.stat(),
       plot = this.plot(),
       scaleType, dtype;
+      console.log("setting stat for " + this.geom().name());
   for(var a in aes){
     dtype = dtypes[aes[a]];
     if(!stat[a]() && _.contains(measureScales, a)){
@@ -101,7 +102,7 @@ Layer.prototype.setStat = function() {
     }
   }
   // if a stat has not been set, it is x or y
-  // and should be set to count if geom is not density/hist.
+  // and should be set
   _.each(['x', 'y'], function(a) {
     if(!stat[a]() ){
       stat[a](stat.linearAgg());

@@ -81,15 +81,19 @@ Hline.prototype.prepareData = function(data, s, scales) {
     return data;
   }
   if(_.all(_.map(data.data, _.isObject))){
-    data = _.flatten(Line.prototype.prepareData.call(this, data, s));
-    
+    data = Line.prototype.prepareData.call(this, data, s);
+
     data = _.map(data, function(d) {
-      var o1 = _.clone(d),
-          o2 = _.clone(d);
-      o1[s.aes[direction]] = range[0];
-      o2[s.aes[direction]] = range[1];
-      return [o1, o2];
+      return _.map(d, function(r) {
+        var o1 = _.clone(r),
+            o2 = _.clone(r);
+
+        o1[s.aes[direction]] = range[0];
+        o2[s.aes[direction]] = range[1];
+        return [o1, o2];
+      });
     });
+    data = _.flatten(data, true);
     return data;
   } else {
     // there should be an array of intercepts on s.aes.yints or s.aes.xints
