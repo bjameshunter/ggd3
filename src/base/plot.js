@@ -1,8 +1,12 @@
 // 1. Fix tooltip details with 'identity' and special stats.
+   // who cares about inheriting for this. Just write custom per geom
 // 2. Label facets better and provide option to label with function.
 // 3. Better details on boxplot tooltip
 // 4. Consider annotation object
-// 5. Calculate scale domains at last second. If fixed, as each facet is calculated, keep track of extremes. After last facet, reset all facet scales and draw but do not calculate. Duh. 
+// 5. Delete relevant scale when aes changes so they'll be recreated.
+// 6. Always update subscale so fixed/free scales work
+// 7. Add 5 number option to boxplot
+// 8. update numeric scale domains, they get bigger but not smaller.
 
 function Plot() {
   if(!(this instanceof Plot)){
@@ -30,11 +34,11 @@ function Plot() {
     shapeScale: {single: ggd3.scale()},
     strokeScale: {single: ggd3.scale()},
     subScale: null,
-    subRangeBand: 0.3,
-    subRangePadding: 0.1,
+    subRangeBand: 0,
+    subRangePadding: 0,
     alpha: d3.functor(0.7),
     fill: d3.functor('steelblue'),
-    color: d3.functor(null),
+    color: d3.functor('black'),
     size: d3.functor(3), 
     shape: d3.functor('circle'),
     lineType: d3.functor('2,2'),

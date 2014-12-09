@@ -806,18 +806,22 @@ Layer.prototype.setStat = function() {
     scaleType = plot[a + "Scale"]().single.scaleType();
       if(_.contains(linearScales, scaleType) && 
          _.contains(['x', 'y'], a)){
-        if(this.geom() instanceof ggd3.geoms.line){
+        if(this.geom() instanceof ggd3.geoms.hline){
           stat[a]('range');
         } else {
           stat[a](stat.linearAgg());
         }
       } else {
-        if(this.geom() instanceof ggd3.geoms.line){
+        if(this.geom() instanceof ggd3.geoms.hline){
           stat[a]('unique');
         } else {
           stat[a](dtype);
         }
       }
+    }
+    if(a === "group") {
+      // group always get's the "first" function
+      stat[a]('first');
     }
   }, this);
   // if a stat has not been set, it is x or y
@@ -873,8 +877,10 @@ Layer.prototype.compute = function(sel, layerNum) {
         d = dlist.filter(function(d) {
           return d.selector === id;
         })[0];
+    // don't bother looking at scales if drawing grid.
     if(d && !(this.geom().grid && this.geom().grid())) {
       plot.setScale(d.selector, this.aes());
+      // add a jitter if not present
       if(this.position() === "jitter" && 
          !plot.hasJitter) {
         _.each(d.data, function(r) { r._jitter = _.random(-1,1,1); });        
@@ -917,10 +923,14 @@ Layer.prototype.recurseNest = recurseNest;
 ggd3.layer = Layer;
 
 // 1. Fix tooltip details with 'identity' and special stats.
+   // who cares about inheriting for this. Just write custom per geom
 // 2. Label facets better and provide option to label with function.
 // 3. Better details on boxplot tooltip
 // 4. Consider annotation object
-// 5. Calculate scale domains at last second. If fixed, as each facet is calculated, keep track of extremes. After last facet, reset all facet scales and draw but do not calculate. Duh. 
+// 5. Delete relevant scale when aes changes so they'll be recreated.
+// 6. Always update subscale so fixed/free scales work
+// 7. Add 5 number option to boxplot
+// 8. update numeric scale domains, they get bigger but not smaller.
 
 function Plot() {
   if(!(this instanceof Plot)){
@@ -948,11 +958,11 @@ function Plot() {
     shapeScale: {single: ggd3.scale()},
     strokeScale: {single: ggd3.scale()},
     subScale: null,
-    subRangeBand: 0.3,
-    subRangePadding: 0.1,
+    subRangeBand: 0,
+    subRangePadding: 0,
     alpha: d3.functor(0.7),
     fill: d3.functor('steelblue'),
-    color: d3.functor(null),
+    color: d3.functor('black'),
     size: d3.functor(3), 
     shape: d3.functor('circle'),
     lineType: d3.functor('2,2'),
@@ -1493,6 +1503,7 @@ function setScale(selector, aes) {
       }, this)),
       scales = _.intersection(measureScales, _.keys(aes));
 
+  // must reset this if aes changes
   _.each(scales, function(a) {
     if(_.isUndefined(this[a + "Scale"]()[selector]) ||
       _.isNull(this[a + "Scale"]()[selector].scale())){
@@ -1541,7 +1552,13 @@ function makeScale(selector, a, opts, vname) {
 }
 
 function setDomain(data, layer) {
-
+  if(_.any(_.map(data.data, function(d) {
+    var pass = ['yintercept', 'xintercept', 'slope'];
+    return _.intersection(pass, _.keys(d)).length > 0;
+  }))){
+    console.log("unnecessary data, skipping setDomain");
+    return data;
+  }
   var geom = layer.geom(),
       s = geom.setup(),
       domain,
@@ -1550,6 +1567,7 @@ function setDomain(data, layer) {
   this.globalScales = globalScales.filter(function(sc) {
     return _.contains(_.keys(s.aes), sc);
   });
+
   this.freeScales = [];
   _.each(['x', 'y'], function(a) {
     // do not cycle through scales declared null.
@@ -1709,7 +1727,6 @@ function Geom(aes) {
     color: null,
     size: null,
     position: null,
-    lineWidth: null,
     drawX: true,
     drawY: true,
     data: [],
@@ -1754,7 +1771,7 @@ Geom.prototype.defaultPosition = function() {
 Geom.prototype._otherAesthetics = function(sel, d, s, omit){
   _.each(_.difference(_.keys(s.aes), omit), function(k) {
     var stat = s.stat[k]()._name || "identity";
-    stat = stat === "identity" ? "": " (" + stat + ")";
+    stat = _.contains(["identity", "first"], stat) ? "": " (" + stat + ")";
     sel.append('h4')
       .text(s.aes[k] + stat + ": ")
       .append('span').text('(' + k + ') ' + d[s.aes[k]]);
@@ -1805,13 +1822,15 @@ Geom.prototype.setup = function() {
       s.grouped = true;
       s.group = s.aes.group;
     }
-    if(_.contains([s.facet.x(), s.facet.y(), 
-                  s.aes.x, s.aes.y], 
+    if(_.contains([s.facet.x(), s.facet.y()], 
                   s.group)) {
       // uninteresting grouping, get rid of it.
       s.grouped = false;
       s.group = null;
       s.groups = null;
+      // must get all groups from layer to do this
+      // meaningfully. Facets without a group 
+      // are throwing it off.
     }
   }
 
@@ -2291,7 +2310,6 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
 
 ggd3.geoms.bar = Bar;
 
-// 
 function Line(spec) {
   if(!(this instanceof ggd3.geom)){
     return new Line(spec);
@@ -2318,6 +2336,7 @@ function Line(spec) {
 
 
 Line.prototype = new Geom();
+
 Line.prototype.constructor = Line;
 
 Line.prototype.lineType = function(l) {
@@ -2368,6 +2387,7 @@ Line.prototype.drawLines = function (path, line, s, layerNum) {
     .attr('d', line)
     .attr('stroke-dasharray', this.lineType());
   if(!this.grid()){
+    // grid style defined in css.
     path
       .attr('stroke-opacity', function(d) { return s.alpha(d[1]) ;})
       .attr('stroke', function(d) { return s.color(d[1]);})
@@ -2385,7 +2405,8 @@ Line.prototype.prepareData = function(data, s) {
 };
 
 Line.prototype.draw = function(sel, data, i, layerNum){
-
+  // console.log('first line of line.draw');
+  // console.log(data);
   var s     = this.setup(),
       scales = this.scalesAxes(sel, s, data.selector, layerNum,
                                  this.drawX(), this.drawY()),
@@ -2394,17 +2415,15 @@ Line.prototype.draw = function(sel, data, i, layerNum){
       sub = function() { return 0; };
       sub.rangeBand = function() { return 0; };
 
-  if(x.hasOwnProperty('rangeBand') || 
+  if(x.hasOwnProperty('rangeBand') ||
      y.hasOwnProperty('rangeBand')){
     if(s.grouped) {
       s.groups = _.pluck(data.data, s.group);
       if(_.isNull(s.plot.subScale())){
         var sc = x.hasOwnProperty('rangeBand') ? x: y;
         sub = s.plot.makeSubScale(sc, s.groups);
-        console.log('created subscale');
       } else {
         sub = s.plot.subScale();
-        console.log('already has subscale');
       }
     } else {
       s.groups = [];
@@ -2620,8 +2639,9 @@ Abline.prototype.domain = function(data, a) {
 };
 
 Abline.prototype.prepareData = function(d, s, scales) {
-  if(!_.contains(_.keys(s.aes), "yint")){
-    throw "geom abline requires aesthetic 'yint' and an optional slope.";
+
+  if(!_.contains(_.keys(s.aes), "yintercept")){
+    throw "geom abline requires aesthetic 'yintercept' and an optional slope.";
   }
   if(!_.contains(linearScales, scales.x.scaleType() )){
     throw "use geom hline or vline to draw lines on an ordinal x axis y yaxis";
@@ -2631,12 +2651,12 @@ Abline.prototype.prepareData = function(d, s, scales) {
   }
   var xdomain = scales.x.scale().domain(),
       data;
-  if(_.isNumber(s.aes.yint)){
-    s.aes.yint = [s.aes.yint];
+  if(_.isNumber(s.aes.yintercept)){
+    s.aes.yintercept = [s.aes.yintercept];
   }
-  if(_.isArray(s.aes.yint)){
+  if(_.isArray(s.aes.yintercept)){
     // yints and slopes are drawn on every facet.
-    data = _.map(s.aes.yint, function(y) {
+    data = _.map(s.aes.yintercept, function(y) {
       return _.map(xdomain, function(x, i) {
         var o = {};
         o[s.aes.x] = x;
@@ -2645,13 +2665,13 @@ Abline.prototype.prepareData = function(d, s, scales) {
       });
     });
   }
-  if(_.isString(s.aes.yint)){
+  if(_.isString(s.aes.yintercept)){
     data = [];
     _.each(d.data, function(row) {
       data.push(_.map(xdomain, function(x) {
         var o = {};
         o[s.aes.x] = x;
-        o[s.aes.y] = row[s.aes.yint] + row[s.aes.slope] * x;
+        o[s.aes.y] = row[s.aes.yintercept] + row[s.aes.slope] * x;
         o = _.merge(_.clone(row), o);
         return o;
       }));
@@ -2778,10 +2798,7 @@ function Boxplot(spec) {
 
 Boxplot.prototype = new Geom();
 
-
 Boxplot.prototype.constructor = Boxplot;
-
-// Boxplot.prototype.tooltip = 
 
 Boxplot.prototype.determineOrdinal = function(s) {
   // this is dumb, this logic needs to happen when scales are created;
@@ -2814,17 +2831,14 @@ Boxplot.prototype.domain = function(data, a) {
   return domain;
 };
 
-Boxplot.prototype.positionBar = function() {
-
-};
-
 Boxplot.prototype.draw = function(sel, data, i, layerNum) {
+
   var s = this.setup(),
       that = this,
       o, n, o2, rb,
       size, width,
       line,
-      scales = that.scalesAxes(sel, s, data.selector, layerNum,
+      scales = this.scalesAxes(sel, s, data.selector, layerNum,
                                this.drawX(), this.drawY()),
       vertical = scales.x.scaleType() === "ordinal",
       factor = vertical ? "x": "y",
@@ -2867,7 +2881,7 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
       return (n(d.quantiles["75th percentile"]) - 
               n(d.quantiles["25th percentile"])); };
   }
-  if(s.grouped) {
+  if(s.grouped && !_.contains([s.aes.x, s.aes.y], s.group)) {
     s.groups = _.sortBy(_.unique(_.flatten(_.map(data, function(d) {
       return _.compact(_.pluck(d.data, s.group));
     }))));
@@ -2953,8 +2967,9 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
                 .data(data);
 
   boxes.each(function(d) {
-    d3.select(this).call(draw);
+    d3.select(this).call(_.bind(draw, this));
   });
+
   boxes.enter().append('g').each(function(d) {
     var b = d3.select(this);
     b.attr('class', 'geom g' + layerNum + ' geom-' + that.name());
@@ -2985,6 +3000,7 @@ function Density(spec) {
     fill: false, // fill with same color?
     alpha: 0.4,
     lineType: null,
+    lineWidth: null
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -3180,12 +3196,10 @@ Hline.prototype.prepareData = function(data, s, scales) {
       });
       data = _.flatten(data, true);
     } else {
-      console.log(data);
       data = _.map(_.flatten(data), function(d) {
         return [d, d];
       });
     }
-    console.log(data);
   } else {
     // there should be an array of intercepts on 
     // s.aes.yintercept or s.aes.xintercept
@@ -3625,7 +3639,7 @@ function Stat(setting) {
   } else if(_.isString(setting)){
     attributes.linearAgg = setting;
   }
-  this.exclude = ["xintercept", "yintercept"];
+  this.exclude = ["xintercept", "yintercept", "slope"];
 
   this.attributes = attributes;
   var getSet = ["layer", "linearAgg"];
@@ -3704,16 +3718,16 @@ Stat.prototype.x = aggSetter('x');
 Stat.prototype.y = aggSetter('y');
 Stat.prototype.fill = aggSetter('fill');
 Stat.prototype.color = aggSetter('color');
+Stat.prototype.group = aggSetter('group');
 Stat.prototype.alpha = aggSetter('alpha');
 Stat.prototype.size = aggSetter('size');
 Stat.prototype.size = aggSetter('size');
-Stat.prototype.yint = aggSetter('yint');
-Stat.prototype.slope = d3.functor(null);
 Stat.prototype.label = function() {
   return function(arr) {
     return arr[0];
   };
 };
+Stat.prototype.label._name = "label";
 Stat.prototype.unique = function(arr) {
   return _.unique(arr);
 };  
@@ -3767,7 +3781,7 @@ Stat.prototype.iqr._name = "iqr";
 Stat.prototype.first = function(arr) {
   return arr[0];
 };
-Stat.prototype.first._name = "";
+Stat.prototype.first._name = "first";
 
 Stat.prototype.mode = function(arr) {
   return "nuthing yet for mode.";
@@ -3797,9 +3811,11 @@ Stat.prototype.bin = function() {
 Stat.prototype.bin._name = "bin";
 
 Stat.prototype.compute_boxplot = function(data) {
-  console.log(data);
   var aes = this.layer().aes(),
       g = this.layer().geom(),
+      // come up with better test to 
+      // choose which is factor. Number unique, or a 
+      // special marker on dtypes
       factor = this.layer().dtypes()[aes.x][1] === "few" ? 'x': 'y',
       number = factor === 'x' ? 'y': 'x',
       arr = _.sortBy(_.pluck(data, aes[number])),
@@ -3810,7 +3826,7 @@ Stat.prototype.compute_boxplot = function(data) {
         "quantiles": iqr,
         "upper": upper,
         "lower": lower,
-      }, this.agg(data, aes));
+      }, this.agg(data, aes)[0]);
       out["n. observations"] = data.length;
       out.data = data.filter(function(d) {
         return ((d[aes[number]] < lower) || 

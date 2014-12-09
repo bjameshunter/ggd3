@@ -11,7 +11,6 @@ function Geom(aes) {
     color: null,
     size: null,
     position: null,
-    lineWidth: null,
     drawX: true,
     drawY: true,
     data: [],
@@ -56,7 +55,7 @@ Geom.prototype.defaultPosition = function() {
 Geom.prototype._otherAesthetics = function(sel, d, s, omit){
   _.each(_.difference(_.keys(s.aes), omit), function(k) {
     var stat = s.stat[k]()._name || "identity";
-    stat = stat === "identity" ? "": " (" + stat + ")";
+    stat = _.contains(["identity", "first"], stat) ? "": " (" + stat + ")";
     sel.append('h4')
       .text(s.aes[k] + stat + ": ")
       .append('span').text('(' + k + ') ' + d[s.aes[k]]);
@@ -107,13 +106,15 @@ Geom.prototype.setup = function() {
       s.grouped = true;
       s.group = s.aes.group;
     }
-    if(_.contains([s.facet.x(), s.facet.y(), 
-                  s.aes.x, s.aes.y], 
+    if(_.contains([s.facet.x(), s.facet.y()], 
                   s.group)) {
       // uninteresting grouping, get rid of it.
       s.grouped = false;
       s.group = null;
       s.groups = null;
+      // must get all groups from layer to do this
+      // meaningfully. Facets without a group 
+      // are throwing it off.
     }
   }
 

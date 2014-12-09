@@ -22,6 +22,7 @@ function setScale(selector, aes) {
       }, this)),
       scales = _.intersection(measureScales, _.keys(aes));
 
+  // must reset this if aes changes
   _.each(scales, function(a) {
     if(_.isUndefined(this[a + "Scale"]()[selector]) ||
       _.isNull(this[a + "Scale"]()[selector].scale())){
@@ -70,7 +71,13 @@ function makeScale(selector, a, opts, vname) {
 }
 
 function setDomain(data, layer) {
-
+  if(_.any(_.map(data.data, function(d) {
+    var pass = ['yintercept', 'xintercept', 'slope'];
+    return _.intersection(pass, _.keys(d)).length > 0;
+  }))){
+    console.log("unnecessary data, skipping setDomain");
+    return data;
+  }
   var geom = layer.geom(),
       s = geom.setup(),
       domain,
@@ -79,6 +86,7 @@ function setDomain(data, layer) {
   this.globalScales = globalScales.filter(function(sc) {
     return _.contains(_.keys(s.aes), sc);
   });
+
   this.freeScales = [];
   _.each(['x', 'y'], function(a) {
     // do not cycle through scales declared null.

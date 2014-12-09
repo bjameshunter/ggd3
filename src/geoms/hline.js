@@ -96,12 +96,10 @@ Hline.prototype.prepareData = function(data, s, scales) {
       });
       data = _.flatten(data, true);
     } else {
-      console.log(data);
       data = _.map(_.flatten(data), function(d) {
         return [d, d];
       });
     }
-    console.log(data);
   } else {
     // there should be an array of intercepts on 
     // s.aes.yintercept or s.aes.xintercept

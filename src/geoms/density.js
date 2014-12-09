@@ -14,6 +14,7 @@ function Density(spec) {
     fill: false, // fill with same color?
     alpha: 0.4,
     lineType: null,
+    lineWidth: null
   };
 
   this.attributes = _.merge(this.attributes, attributes);

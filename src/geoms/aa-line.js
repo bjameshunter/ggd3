@@ -1,4 +1,3 @@
-// 
 function Line(spec) {
   if(!(this instanceof ggd3.geom)){
     return new Line(spec);
@@ -25,6 +24,7 @@ function Line(spec) {
 
 
 Line.prototype = new Geom();
+
 Line.prototype.constructor = Line;
 
 Line.prototype.lineType = function(l) {
@@ -75,6 +75,7 @@ Line.prototype.drawLines = function (path, line, s, layerNum) {
     .attr('d', line)
     .attr('stroke-dasharray', this.lineType());
   if(!this.grid()){
+    // grid style defined in css.
     path
       .attr('stroke-opacity', function(d) { return s.alpha(d[1]) ;})
       .attr('stroke', function(d) { return s.color(d[1]);})
@@ -92,7 +93,8 @@ Line.prototype.prepareData = function(data, s) {
 };
 
 Line.prototype.draw = function(sel, data, i, layerNum){
-
+  // console.log('first line of line.draw');
+  // console.log(data);
   var s     = this.setup(),
       scales = this.scalesAxes(sel, s, data.selector, layerNum,
                                  this.drawX(), this.drawY()),
@@ -101,17 +103,15 @@ Line.prototype.draw = function(sel, data, i, layerNum){
       sub = function() { return 0; };
       sub.rangeBand = function() { return 0; };
 
-  if(x.hasOwnProperty('rangeBand') || 
+  if(x.hasOwnProperty('rangeBand') ||
      y.hasOwnProperty('rangeBand')){
     if(s.grouped) {
       s.groups = _.pluck(data.data, s.group);
       if(_.isNull(s.plot.subScale())){
         var sc = x.hasOwnProperty('rangeBand') ? x: y;
         sub = s.plot.makeSubScale(sc, s.groups);
-        console.log('created subscale');
       } else {
         sub = s.plot.subScale();
-        console.log('already has subscale');
       }
     } else {
       s.groups = [];

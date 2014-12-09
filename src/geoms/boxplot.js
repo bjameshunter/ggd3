@@ -39,10 +39,7 @@ function Boxplot(spec) {
 
 Boxplot.prototype = new Geom();
 
-
 Boxplot.prototype.constructor = Boxplot;
-
-// Boxplot.prototype.tooltip = 
 
 Boxplot.prototype.determineOrdinal = function(s) {
   // this is dumb, this logic needs to happen when scales are created;
@@ -75,17 +72,14 @@ Boxplot.prototype.domain = function(data, a) {
   return domain;
 };
 
-Boxplot.prototype.positionBar = function() {
-
-};
-
 Boxplot.prototype.draw = function(sel, data, i, layerNum) {
+
   var s = this.setup(),
       that = this,
       o, n, o2, rb,
       size, width,
       line,
-      scales = that.scalesAxes(sel, s, data.selector, layerNum,
+      scales = this.scalesAxes(sel, s, data.selector, layerNum,
                                this.drawX(), this.drawY()),
       vertical = scales.x.scaleType() === "ordinal",
       factor = vertical ? "x": "y",
@@ -128,7 +122,7 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
       return (n(d.quantiles["75th percentile"]) - 
               n(d.quantiles["25th percentile"])); };
   }
-  if(s.grouped) {
+  if(s.grouped && !_.contains([s.aes.x, s.aes.y], s.group)) {
     s.groups = _.sortBy(_.unique(_.flatten(_.map(data, function(d) {
       return _.compact(_.pluck(d.data, s.group));
     }))));
@@ -214,8 +208,9 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
                 .data(data);
 
   boxes.each(function(d) {
-    d3.select(this).call(draw);
+    d3.select(this).call(_.bind(draw, this));
   });
+
   boxes.enter().append('g').each(function(d) {
     var b = d3.select(this);
     b.attr('class', 'geom g' + layerNum + ' geom-' + that.name());

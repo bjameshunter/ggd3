@@ -35,7 +35,7 @@ function Stat(setting) {
   } else if(_.isString(setting)){
     attributes.linearAgg = setting;
   }
-  this.exclude = ["xintercept", "yintercept"];
+  this.exclude = ["xintercept", "yintercept", "slope"];
 
   this.attributes = attributes;
   var getSet = ["layer", "linearAgg"];
@@ -114,16 +114,16 @@ Stat.prototype.x = aggSetter('x');
 Stat.prototype.y = aggSetter('y');
 Stat.prototype.fill = aggSetter('fill');
 Stat.prototype.color = aggSetter('color');
+Stat.prototype.group = aggSetter('group');
 Stat.prototype.alpha = aggSetter('alpha');
 Stat.prototype.size = aggSetter('size');
 Stat.prototype.size = aggSetter('size');
-Stat.prototype.yint = aggSetter('yint');
-Stat.prototype.slope = d3.functor(null);
 Stat.prototype.label = function() {
   return function(arr) {
     return arr[0];
   };
 };
+Stat.prototype.label._name = "label";
 Stat.prototype.unique = function(arr) {
   return _.unique(arr);
 };  
@@ -177,7 +177,7 @@ Stat.prototype.iqr._name = "iqr";
 Stat.prototype.first = function(arr) {
   return arr[0];
 };
-Stat.prototype.first._name = "";
+Stat.prototype.first._name = "first";
 
 Stat.prototype.mode = function(arr) {
   return "nuthing yet for mode.";
@@ -207,9 +207,11 @@ Stat.prototype.bin = function() {
 Stat.prototype.bin._name = "bin";
 
 Stat.prototype.compute_boxplot = function(data) {
-  console.log(data);
   var aes = this.layer().aes(),
       g = this.layer().geom(),
+      // come up with better test to 
+      // choose which is factor. Number unique, or a 
+      // special marker on dtypes
       factor = this.layer().dtypes()[aes.x][1] === "few" ? 'x': 'y',
       number = factor === 'x' ? 'y': 'x',
       arr = _.sortBy(_.pluck(data, aes[number])),
@@ -220,7 +222,7 @@ Stat.prototype.compute_boxplot = function(data) {
         "quantiles": iqr,
         "upper": upper,
         "lower": lower,
-      }, this.agg(data, aes));
+      }, this.agg(data, aes)[0]);
       out["n. observations"] = data.length;
       out.data = data.filter(function(d) {
         return ((d[aes[number]] < lower) || 

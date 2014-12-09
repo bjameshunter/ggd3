@@ -30,8 +30,9 @@ Abline.prototype.domain = function(data, a) {
 };
 
 Abline.prototype.prepareData = function(d, s, scales) {
-  if(!_.contains(_.keys(s.aes), "yint")){
-    throw "geom abline requires aesthetic 'yint' and an optional slope.";
+
+  if(!_.contains(_.keys(s.aes), "yintercept")){
+    throw "geom abline requires aesthetic 'yintercept' and an optional slope.";
   }
   if(!_.contains(linearScales, scales.x.scaleType() )){
     throw "use geom hline or vline to draw lines on an ordinal x axis y yaxis";
@@ -41,12 +42,12 @@ Abline.prototype.prepareData = function(d, s, scales) {
   }
   var xdomain = scales.x.scale().domain(),
       data;
-  if(_.isNumber(s.aes.yint)){
-    s.aes.yint = [s.aes.yint];
+  if(_.isNumber(s.aes.yintercept)){
+    s.aes.yintercept = [s.aes.yintercept];
   }
-  if(_.isArray(s.aes.yint)){
+  if(_.isArray(s.aes.yintercept)){
     // yints and slopes are drawn on every facet.
-    data = _.map(s.aes.yint, function(y) {
+    data = _.map(s.aes.yintercept, function(y) {
       return _.map(xdomain, function(x, i) {
         var o = {};
         o[s.aes.x] = x;
@@ -55,13 +56,13 @@ Abline.prototype.prepareData = function(d, s, scales) {
       });
     });
   }
-  if(_.isString(s.aes.yint)){
+  if(_.isString(s.aes.yintercept)){
     data = [];
     _.each(d.data, function(row) {
       data.push(_.map(xdomain, function(x) {
         var o = {};
         o[s.aes.x] = x;
-        o[s.aes.y] = row[s.aes.yint] + row[s.aes.slope] * x;
+        o[s.aes.y] = row[s.aes.yintercept] + row[s.aes.slope] * x;
         o = _.merge(_.clone(row), o);
         return o;
       }));

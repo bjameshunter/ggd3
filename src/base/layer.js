@@ -95,18 +95,22 @@ Layer.prototype.setStat = function() {
     scaleType = plot[a + "Scale"]().single.scaleType();
       if(_.contains(linearScales, scaleType) && 
          _.contains(['x', 'y'], a)){
-        if(this.geom() instanceof ggd3.geoms.line){
+        if(this.geom() instanceof ggd3.geoms.hline){
           stat[a]('range');
         } else {
           stat[a](stat.linearAgg());
         }
       } else {
-        if(this.geom() instanceof ggd3.geoms.line){
+        if(this.geom() instanceof ggd3.geoms.hline){
           stat[a]('unique');
         } else {
           stat[a](dtype);
         }
       }
+    }
+    if(a === "group") {
+      // group always get's the "first" function
+      stat[a]('first');
     }
   }, this);
   // if a stat has not been set, it is x or y
@@ -162,8 +166,10 @@ Layer.prototype.compute = function(sel, layerNum) {
         d = dlist.filter(function(d) {
           return d.selector === id;
         })[0];
+    // don't bother looking at scales if drawing grid.
     if(d && !(this.geom().grid && this.geom().grid())) {
       plot.setScale(d.selector, this.aes());
+      // add a jitter if not present
       if(this.position() === "jitter" && 
          !plot.hasJitter) {
         _.each(d.data, function(r) { r._jitter = _.random(-1,1,1); });        
