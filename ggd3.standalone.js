@@ -238,12 +238,13 @@ ggd3.tools.categoryDomain = function(data, variable) {
   return _.sortBy(_.compact(_.unique(_.pluck(data, variable))));
 };
 
-ggd3.tools.removeElements = function(sel, layerNum, element) {
-  var remove = sel.select('.plot')
-                    .selectAll('.geom.g' + layerNum)
-                    .filter(function() {
-                      return d3.select(this)[0][0].nodeName !== element;
-                    });
+ggd3.tools.removeElements = function(sel, layerNum, clss) {
+  var remove = sel
+                .select('.plot')
+                .selectAll('.geom.g' + layerNum)
+                .filter(function() {
+                  return d3.select(this)[0][0].classList !== clss;
+                });
   remove.transition()
     .style('opacity', 0)
     .remove();
@@ -890,6 +891,7 @@ Layer.prototype.compute = function(sel, layerNum) {
     if(_.isEmpty(d)) { d = {selector: id, data: []}; }
     this.geom().data().push(d);
   }, this);
+  
 
 };
 Layer.prototype.draw = function(sel, layerNum) {
@@ -905,6 +907,7 @@ Layer.prototype.draw = function(sel, layerNum) {
         d = this.geom().data().filter(function(d) {
           return d.selector === id;
         })[0];
+    ggd3.tools.removeElements(s, layerNum, "geom-" + this.geom().name());
     this.geom().draw(s, d, i, layerNum);
   }, this);
 };
@@ -932,6 +935,12 @@ ggd3.layer = Layer;
 // 7. Add 5 number option to boxplot
 // 8. update numeric scale domains, they get bigger but not smaller.
 
+
+// for much later:
+// Zoom behaviors: fixed scales get global zoom on linear axes
+    // free scales get their own zoom;
+
+
 function Plot() {
   if(!(this instanceof Plot)){
     return new Plot();
@@ -957,9 +966,12 @@ function Plot() {
     sizeScale: {single: ggd3.scale()},
     shapeScale: {single: ggd3.scale()},
     strokeScale: {single: ggd3.scale()},
-    subScale: null,
-    subRangeBand: 0,
-    subRangePadding: 0,
+    subScale: {single:  ggd3.scale()},
+    subRangeBand: 0.1,
+    subRangePadding: 0.1,
+    rangeBand: 0.1,
+    rangePadding: 0.1,
+    subDomain: null,
     alpha: d3.functor(0.7),
     fill: d3.functor('steelblue'),
     color: d3.functor('black'),
@@ -982,8 +994,6 @@ function Plot() {
   // aesthetics I might like to support:
 // ["alpha", "angle", "color", "fill", "group", "height", "label", "linetype", "lower", "order", "radius", "shape", "size", "slope", "width", "x", "xmax", "xmin", "xintercept", "y", "ymax", "ymin", "yintercept"] 
   this.attributes = attributes;
-  // doing more cleaning than necessary, counting it.
-  this.timesCleaned = 0;
   this.gridsAdded = false;
   // if the data method has been handed a new dataset, 
   // newData will be true, after the plot is drawn the
@@ -994,7 +1004,7 @@ function Plot() {
   this.hasJitter = false;
   // when cycling through data, need to know if 
   // data are nested or not.
-  this.nested = false;
+  // this.nested = false;
   this.hgrid = ggd3.layer()
                 .geom(ggd3.geoms.hline().grid(true)
                       .lineType("2,2"))
@@ -1009,8 +1019,9 @@ function Plot() {
     "width", "height", "xAdjust", "yAdjust", 
     "xDomain", "yDomain",
     'colorRange', 'sizeRange',
-    'fillRange', "lineType",
-    'subScale', 'subRangeBand', 'subRangePadding',
+    'fillRange', "lineType", "subScale",
+    'rangeBand', 'rangePadding', 
+    'subRangeBand', 'subRangePadding', 'subDomain',
     "alphaRange", "lineWidth",
     "xGrid", "yGrid"];
 
@@ -1099,17 +1110,6 @@ Plot.prototype.margins = function(margins) {
   this.attributes.margins = _.merge(this.attributes.margins, margins);
   return this;
 };
-
-Plot.prototype.makeSubScale = function(scale, groups) {
-  var sub = d3.scale.ordinal()
-              .rangeBands([0, scale.scale().rangeBand()], 
-                               this.subRangeBand(), 
-                               this.subRangePadding())
-              .domain(groups);
-  this.subScale(sub);
-  return sub;
-};
-
 
 Plot.prototype.layers = function(layers) {
   if(!arguments.length) { return this.attributes.layers; }
@@ -1221,6 +1221,7 @@ Plot.prototype.aes = function(aes) {
 Plot.prototype.setFixedScale = function(a) {
   var scale = this[a + "Scale"]().single;
   var domain = [];
+  // don't bother if no facets.
   if(_.keys(this[a + "Scale"]()).length === 1) { return scale; }
   if(_.contains(linearScales, scale.scaleType())){
     domain[0] = _.min(this[a + "Scale"](), function(v, k) {
@@ -1252,6 +1253,45 @@ Plot.prototype.plotDim = function() {
   return {x: this.width() - margins.left - margins.right,
    y: this.height() - margins.top - margins.bottom};
 };
+Plot.prototype.makeSubScale = function(scale, groups) {
+  var sub = d3.scale.ordinal()
+              .rangeBands([0, scale.scale().rangeBand()], 
+                               this.subRangeBand(), 
+                               this.subRangePadding())
+              .domain(groups);
+  return sub;
+};
+
+// possible ordering rule as arg?
+Plot.prototype.setSubScale = function(order) {
+  // do nuthin if no ordinal
+  var xord = this.xScale().single.scaleType(),
+      ord,
+      direction, 
+      domain;
+  if(xord !== "ordinal" &&
+     this.yScale().single.scaleType() !== "ordinal"){
+    return false;
+  }
+  if(xord === "ordinal"){
+    ord = this.xScale().single.scale();
+    direction = 'x';
+  } else {
+    ord = this.yScale().single.scale();
+    direction = 'y';
+  }
+  // the first layer is special, it should be the layer with all
+  // relevent categorical info. Subsequent layers should only, 
+  // if necessary, expand numerical scales.
+  domain = this.layers()[0].geom().collectGroups();
+  this.subDomain(domain);
+  this.subScale({single: ggd3.scale({type:'ordinal'})
+                              .scale({domain: domain})
+                              .range([0, ord.rangeBand()],
+                                     [this.subRangeBand(), 
+                                      this.subRangePadding()])});
+
+};
 
 
 Plot.prototype.draw = function(sel) {
@@ -1273,14 +1313,18 @@ Plot.prototype.draw = function(sel) {
   _.each(this.layers(), function(l, layerNum) {
     l.compute(sel, layerNum);
   });
-  // make single scales
+  // make global scales
   this.setFixedScale('x'); 
   this.setFixedScale('y'); 
   this.setFixedScale('alpha'); 
   this.setFixedScale('size'); 
   this.setFixedScale('stroke'); 
   this.setFixedScale('fill'); 
-  this.setFixedScale('color'); 
+  this.setFixedScale('color');
+  // should set a global sub scale to start
+  // at this point, all layers are computed
+  // and all groups should be known.
+  this.setSubScale();
   _.each(this.layers(), function(l, layerNum) {
     l.draw(sel, layerNum);
   });
@@ -1368,7 +1412,6 @@ function Scale(opts) {
     this._userOpts = opts;
     this.scaleType(opts.type ? opts.type:null);
   }
-
 }
 
 Scale.prototype.scaleType = function(scaleType) {
@@ -1416,12 +1459,13 @@ Scale.prototype.scale = function(settings){
   return this;
 };
 
-Scale.prototype.range = function(range) {
+Scale.prototype.range = function(range, rb) {
   if(!arguments.length) { return this.attributes.range; }
   if(this.scaleType() === "ordinal"){
+    if(_.isUndefined(rb)) { rb = this.rangeBands(); }
     this.attributes.scale.rangeRoundBands(range, 
-                                          this.rangeBands()[0],
-                                          this.rangeBands()[1]);
+                                          rb[0],
+                                          rb[1]);
   } else {
     this.attributes.scale.range(range);
   }
@@ -1525,15 +1569,17 @@ function makeScale(selector, a, opts, vname) {
     dtype = this.dtypes()[vname] || ['number', 'many'];
     settings = _.merge(ggd3.tools.defaultScaleSettings(dtype, a),
                        opts);
-    var scale = new ggd3.scale(settings)
+    var scale = ggd3.scale(settings)
                         .plot(this)
                         .aesthetic(a);
     if(_.contains(['x', 'y'], a)){
       if(a === "x"){
-        scale.range([0, this.plotDim().x]);
+        scale.range([0, this.plotDim().x], 
+                    [this.rangeBand(), this.rangePadding()]);
       }
       if(a === "y") {
-        scale.range([this.plotDim().y, 0]);
+        scale.range([this.plotDim().y, 0],
+                    [this.rangeBand(), this.rangePadding()]);
       }
       scale.axis = d3.svg.axis().scale(scale.scale());
       for(var ax in settings.axis){
@@ -1676,14 +1722,15 @@ Tooltip.prototype.find = function(el) {
 Tooltip.prototype.tooltip = function(selection, s) {
   var that = this;
   if(_.isUndefined(s)){
+    console.log("s is undefined");
     s = this.geom().setup();
   }
   selection.each(function(data) {
     var tooltipdiv = that.find(this);
     d3.select(this)
-      .on('mouseover', function(d) {that.show(d, tooltipdiv, s); })
-      .on('mousemove', function(d) {that.move(d, tooltipdiv); })
-      .on('mouseout', function(d) {that.hide(d, tooltipdiv); });
+      .on('mouseover.tooltip', function(d) {that.show(d, tooltipdiv, s); })
+      .on('mousemove.tooltip', function(d) {that.move(d, tooltipdiv); })
+      .on('mouseout.tooltip', function(d) {that.hide(d, tooltipdiv); });
   });
 };
 
@@ -1698,8 +1745,8 @@ Tooltip.prototype.show = function(data, sel, s) {
 
 Tooltip.prototype.move = function(data, sel) {
   sel
-    .style('left', d3.event.offsetX + this.offset().x + "px")
-    .style('top', d3.event.offsetY + this.offset().y + "px");
+    .style('left', d3.event.layerX + this.offset().x + "px")
+    .style('top', d3.event.layerY + this.offset().y + "px");
 };
 
 Tooltip.prototype.hide = function(data, sel) {
@@ -1732,6 +1779,7 @@ function Geom(aes) {
     data: [],
     style: "", // optional class attributes for css 
     tooltip: null,
+    groups: null, 
   };
   var r = function(d) { return ggd3.tools.round(d, 2);};
   // default tooltip
@@ -1747,7 +1795,6 @@ function Geom(aes) {
   this.attributes = attributes;
 
   this.attributes.tooltip = _.bind(tooltip, this);
-
 }
 Geom.prototype.defaultPosition = function() {
   var n = this.name();
@@ -1795,6 +1842,8 @@ Geom.prototype.setup = function() {
   var s = {
       layer     : this.layer(),
     };
+  // sometimes a geom doesn't have a layer as in 
+  // compound geoms - boxplot is box and point.
   if(s.layer){
     s.plot      = s.layer.plot();
     s.stat      = s.layer.stat();
@@ -1822,20 +1871,44 @@ Geom.prototype.setup = function() {
       s.grouped = true;
       s.group = s.aes.group;
     }
-    if(_.contains([s.facet.x(), s.facet.y()], 
-                  s.group)) {
-      // uninteresting grouping, get rid of it.
-      s.grouped = false;
-      s.group = null;
-      s.groups = null;
-      // must get all groups from layer to do this
-      // meaningfully. Facets without a group 
-      // are throwing it off.
-    }
+    // not convinced this is a good idea.
+    // if(_.contains([s.facet.x(), s.facet.y()], 
+    //               s.group)) {
+    //   // uninteresting grouping, get rid of it.
+    //   s.grouped = false;
+    //   s.group = null;
+    //   s.groups = null;
+    //   // must get all groups from layer to do this
+    //   // meaningfully. Facets without a group 
+    //   // are throwing it off.
+    // }
   }
-
   return s;
 };
+
+Geom.prototype.collectGroups = function() {
+  var groups, grouped,
+      aes = this.layer().aes();
+  if(aes.fill) {
+    grouped = true;
+    group = aes.fill;
+  } else if(aes.color){
+    grouped = true;
+    group = aes.color;
+  } else if(aes.group){
+    grouped = true;
+    group = aes.group;
+  }
+  if(grouped) {
+    groups = _.unique(
+                _.pluck(
+                  _.flatten(
+                    _.map(this.data(), 'data')), group));
+    this.groups(groups);
+  }
+  return groups;
+};
+
 Geom.prototype.compute = function(data, s) {
   return s.nest.entries(data);
 };
@@ -1856,7 +1929,10 @@ Geom.prototype.domain = function(data, a) {
   }
   // done if date
   // and not a calculated aesthetic
-  if(!_.contains(['binHeight', 'density', 'n. observations'], aes[a])){
+  var skip = ['binHeight', 'density', 'n. observations', undefined],
+      skip2 = ['yintercept', 'xintercept', 'slope'];
+
+  if(!_.contains(skip, aes[a]) && !_.contains(skip2, a)){
     if(_.contains(["date", "time"], plot.dtypes()[aes[a]][0]) ){
       return extent;
     }
@@ -2107,7 +2183,6 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
                                layerNum,
                                drawX, drawY);
   // scales are drawn by now. return if no data.
-  ggd3.tools.removeElements(sel, layerNum, "rect");
   if(!data.data.length){ return false; }
 
   data = data.data;
@@ -2345,12 +2420,12 @@ Line.prototype.lineType = function(l) {
   return this;
 };
 
-Line.prototype.generator = function(aes, x, y, sub, group) {
+Line.prototype.generator = function(aes, x, y, o2, group) {
   if(x.hasOwnProperty('rangeBand')) {
     return d3.svg.line()
             .x(function(d, i) { 
-              return (x(d[aes.x]) + sub(d[group]) + 
-                            sub.rangeBand() * i); 
+              return (x(d[aes.x]) + o2(d[group]) + 
+                            o2.rangeBand() * i); 
             })
             .y(function(d) { return y(d[aes.y]); })
             .interpolate(this.interpolate());
@@ -2359,8 +2434,8 @@ Line.prototype.generator = function(aes, x, y, sub, group) {
     return d3.svg.line()
             .x(function(d) { return x(d[aes.x]); })
             .y(function(d, i) { 
-              return (y(d[aes.y]) + sub(d[group]) +
-                            sub.rangeBand()*i); 
+              return (y(d[aes.y]) + o2(d[group]) +
+                            o2.rangeBand()*i); 
             })
             .interpolate(this.interpolate());
   }
@@ -2399,7 +2474,6 @@ Line.prototype.drawLines = function (path, line, s, layerNum) {
 Line.prototype.prepareData = function(data, s) {
   data = s.nest
           .entries(data.data) ;
-
   data = _.map(data, function(d) { return this.recurseNest(d);}, this);
   return data;
 };
@@ -2412,31 +2486,22 @@ Line.prototype.draw = function(sel, data, i, layerNum){
                                  this.drawX(), this.drawY()),
       x = scales.x.scale(),
       y = scales.y.scale(),
-      sub = function() { return 0; };
-      sub.rangeBand = function() { return 0; };
+      o2 = function() { return 0; };
+      o2.rangeBand = function() { return 0; };
 
   if(x.hasOwnProperty('rangeBand') ||
      y.hasOwnProperty('rangeBand')){
     if(s.grouped) {
-      s.groups = _.pluck(data.data, s.group);
-      if(_.isNull(s.plot.subScale())){
-        var sc = x.hasOwnProperty('rangeBand') ? x: y;
-        sub = s.plot.makeSubScale(sc, s.groups);
-      } else {
-        sub = s.plot.subScale();
-      }
-    } else {
-      s.groups = [];
+      o2 = s.plot.subScale().single.scale();
     }
   }
 
-  ggd3.tools.removeElements(sel, layerNum, "geom-" + this.name());
   data = this.prepareData(data, s, scales);
   sel = this.grid() ? sel.select("." + this.direction() + 'grid'): sel.select('.plot');
   var lines = sel
               .selectAll("." + this.selector(layerNum).replace(/ /g, '.'))
               .data(data),
-  line = this.generator(s.aes, x, y, sub, s.group);
+  line = this.generator(s.aes, x, y, o2, s.group);
   lines.transition().call(_.bind(this.drawLines, this), line, s, layerNum);
   lines.enter().append(this.geom())
     .call(_.bind(this.drawLines, this), line, s, layerNum);
@@ -2844,8 +2909,6 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
       factor = vertical ? "x": "y",
       number = vertical ? "y": "x";
 
-  ggd3.tools.removeElements(sel, layerNum, "geom-" + this.name());
-
   data = this.unNest(data.data);
   o = scales[factor].scale();
   rb = o.rangeBand();
@@ -2885,9 +2948,7 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
     s.groups = _.sortBy(_.unique(_.flatten(_.map(data, function(d) {
       return _.compact(_.pluck(d.data, s.group));
     }))));
-    o2 = d3.scale.ordinal()
-            .rangeBands([0, o.rangeBand()], 0.1, 0)
-            .domain(s.groups);
+    o2 = s.plot.subScale().single.scale();
     rb = o2.rangeBand();
   } else {
     o2 = function() {
@@ -3273,33 +3334,29 @@ Point.prototype = new Geom();
 
 Point.prototype.constructor = Point;
 
-Point.prototype.positionPoint = function(s, group, groups) {
+Point.prototype.positionPoint = function(s, grouped) {
 
-  var sub,
+  var o2,
       rb = 0,
       a = s.aesthetic(),
       shift = 0,
       aes = this.layer().aes();
-  if(s.scaleType() === "ordinal" && groups){
-    if(_.isNull(this.layer().plot().subScale())){
-      sub = this.layer().plot().makeSubScale(s, groups);
-    } else {
-      sub = this.layer().plot().subScale();
-    }
-    rb = sub.rangeBand()/2;
+  if(s.scaleType() === "ordinal" && grouped){
+    o2 = this.layer().plot().subScale().single.scale();
+    rb = o2.rangeBand()/2;
     shift = d3.sum(s.rangeBands(), function(r) {
       return r*s.scale().rangeBand();});
   } else if(s.scaleType() === "ordinal") {
-    sub = function() { 
+    o2 = function() { 
       return s.scale().rangeBand() / 2; 
     };
     rb = s.scale().rangeBand() / 2;
   } else {
-    sub = function() { return 0;};
+    o2 = function() { return 0;};
   }
   return function(d) {
     return (s.scale()(d[aes[a]]) +
-          sub(d[group]) + shift + 
+          o2(d[group]) + shift + 
           (d._jitter || 0) * rb);
   };
 };
@@ -3309,22 +3366,21 @@ Point.prototype.draw = function(sel, data, i, layerNum, s) {
   // should be able to pass a setup object from a different geom
   // if a different geom wants to create a point object.
   var x, y, scales, points;
+  // other functions that call geom point will supply an "s" object
   if(_.isUndefined(s)) {
     s     = this.setup();
     scales = this.scalesAxes(sel, s, data.selector, layerNum,
                                  true, true);
-    s.groups = _.unique(_.pluck(data.data, s.group));
-    // poing should have both canvas and svg functions.
-    x = this.positionPoint(scales.x, s.group, s.groups);
-    y = this.positionPoint(scales.y, s.group, s.groups);
+    // point should have both canvas and svg functions.
+    x = this.positionPoint(scales.x, s.grouped);
+    y = this.positionPoint(scales.y, s.grouped);
     data = this.unNest(data.data);
     // get rid of wrong elements if they exist.
-    ggd3.tools.removeElements(sel, layerNum, this.geom());
     points = sel.select('.plot')
-                .selectAll(this.geom() + '.geom.g' + layerNum)
+                .selectAll('.geom.g' + layerNum + ".geom-" + this.name())
                 .data(data);
   } else {
-    points = sel.selectAll(this.geom() + '.geom.g' + layerNum)
+    points = sel.selectAll('.geom.g' + layerNum + ".geom-" + this.name())
                 .data(data);
     x = s.x;
     y = s.y;
@@ -3335,19 +3391,16 @@ Point.prototype.draw = function(sel, data, i, layerNum, s) {
             .geom(this);
 
 
-  points.transition().call(this.drawGeom, x, y, s, layerNum)
-    .each(function() {
-      tt.tooltip(d3.select(this), s);
-    });
+  points.transition().call(this.drawGeom, x, y, s, layerNum);
   points.enter().append(this.geom())
-    .call(this.drawGeom, x, y, s, layerNum)
-    .each(function() {
-      tt.tooltip(d3.select(this), s);
-    });
+    .call(this.drawGeom, x, y, s, layerNum);
   points.exit()
     .transition()
     .style('opacity', 0)
     .remove();
+  points.each(function() {
+      tt.tooltip(d3.select(this), s);
+    });
 };
 
 Point.prototype.drawGeom = function (point, x, y, s, layerNum) {
@@ -3516,6 +3569,7 @@ function Text(spec) {
   Point.apply(this);
   var attributes = {
     name: "text",
+    geom: 'text', 
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -3530,47 +3584,48 @@ Text.prototype = new Point();
 
 Text.prototype.constructor = Text;
 
-Text.prototype.draw = function() {
+Text.prototype.draw = function (sel, data, i, layerNum) {
 
   var s     = this.setup(),
-      that  = this;
-
-  function draw(sel, data, i, layerNum) {
-
-    var scales = that.scalesAxes(sel, s, data.selector, layerNum,
-                                 true, true);
+      scales = this.scalesAxes(sel, s, data.selector, layerNum,
+                               this.drawX(), this.drawY());
 
 
-    var positionX = that.positionPoint(scales.x, s.group, s.groups),
-        positionY = that.positionPoint(scales.y, s.group, s.groups);
+  var positionX = this.positionPoint(scales.x, s.grouped),
+      positionY = this.positionPoint(scales.y, s.grouped);
 
-    ggd3.tools.removeElements(sel, layerNum, "text");
+  ggd3.tools.removeElements(sel, layerNum, "geom-text");
 
-    function drawText(text) {
-      text
-        .attr('class', 'geom g' + layerNum + " geom-text")
-        .text(function(d) { return d[s.aes.label]; })
-        .attr('x', positionX)
-        .attr('y', positionY)
-        .style('font-size', s.size)
-        .attr('fill-opacity', s.alpha)
-        .style('stroke', s.color)
-        .style('stroke-width', 1)
-        .attr('text-anchor', 'middle')
-        .attr('fill', s.fill);
-    }
-
-    var text = sel.select('.plot')
-                  .selectAll('text.geom.g' + layerNum)
-                  .data(s.  stat.compute(data.data));
-    text.transition().call(drawText);
-    text.enter().append('text').call(drawText);
-    text.exit()
-      .transition()
-      .style('opacity', 0)
-      .remove();
+  function drawText(text) {
+    text
+      .attr('class', 'geom g' + layerNum + " geom-text")
+      .text(function(d) { return d[s.aes.label]; })
+      .attr('x', positionX)
+      .attr('y', positionY)
+      .style('font-size', s.size)
+      .attr('fill-opacity', s.alpha)
+      .style('stroke', s.color)
+      .style('stroke-width', 1)
+      .attr('text-anchor', 'middle')
+      .attr('fill', s.fill);
   }
-  return draw;
+
+  var tt = ggd3.tooltip()
+            .content(this.tooltip())
+            .geom(this);
+
+  var text = sel.select('.plot')
+                .selectAll('text.geom.g' + layerNum)
+                .data(data.data);
+  text.transition().call(drawText);
+  text.enter().append('text').call(drawText);
+  text.exit()
+    .transition()
+    .style('opacity', 0)
+    .remove();
+  text.each(function() {
+      tt.tooltip(d3.select(this), s);
+    });
 };
 
 ggd3.geoms.text = Text;

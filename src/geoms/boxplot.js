@@ -85,8 +85,6 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
       factor = vertical ? "x": "y",
       number = vertical ? "y": "x";
 
-  ggd3.tools.removeElements(sel, layerNum, "geom-" + this.name());
-
   data = this.unNest(data.data);
   o = scales[factor].scale();
   rb = o.rangeBand();
@@ -126,9 +124,7 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
     s.groups = _.sortBy(_.unique(_.flatten(_.map(data, function(d) {
       return _.compact(_.pluck(d.data, s.group));
     }))));
-    o2 = d3.scale.ordinal()
-            .rangeBands([0, o.rangeBand()], 0.1, 0)
-            .domain(s.groups);
+    o2 = s.plot.subScale().single.scale();
     rb = o2.rangeBand();
   } else {
     o2 = function() {

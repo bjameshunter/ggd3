@@ -8,6 +8,12 @@
 // 7. Add 5 number option to boxplot
 // 8. update numeric scale domains, they get bigger but not smaller.
 
+
+// for much later:
+// Zoom behaviors: fixed scales get global zoom on linear axes
+    // free scales get their own zoom;
+
+
 function Plot() {
   if(!(this instanceof Plot)){
     return new Plot();
@@ -33,9 +39,12 @@ function Plot() {
     sizeScale: {single: ggd3.scale()},
     shapeScale: {single: ggd3.scale()},
     strokeScale: {single: ggd3.scale()},
-    subScale: null,
-    subRangeBand: 0,
-    subRangePadding: 0,
+    subScale: {single:  ggd3.scale()},
+    subRangeBand: 0.1,
+    subRangePadding: 0.1,
+    rangeBand: 0.1,
+    rangePadding: 0.1,
+    subDomain: null,
     alpha: d3.functor(0.7),
     fill: d3.functor('steelblue'),
     color: d3.functor('black'),
@@ -58,8 +67,6 @@ function Plot() {
   // aesthetics I might like to support:
 // ["alpha", "angle", "color", "fill", "group", "height", "label", "linetype", "lower", "order", "radius", "shape", "size", "slope", "width", "x", "xmax", "xmin", "xintercept", "y", "ymax", "ymin", "yintercept"] 
   this.attributes = attributes;
-  // doing more cleaning than necessary, counting it.
-  this.timesCleaned = 0;
   this.gridsAdded = false;
   // if the data method has been handed a new dataset, 
   // newData will be true, after the plot is drawn the
@@ -70,7 +77,7 @@ function Plot() {
   this.hasJitter = false;
   // when cycling through data, need to know if 
   // data are nested or not.
-  this.nested = false;
+  // this.nested = false;
   this.hgrid = ggd3.layer()
                 .geom(ggd3.geoms.hline().grid(true)
                       .lineType("2,2"))
@@ -85,8 +92,9 @@ function Plot() {
     "width", "height", "xAdjust", "yAdjust", 
     "xDomain", "yDomain",
     'colorRange', 'sizeRange',
-    'fillRange', "lineType",
-    'subScale', 'subRangeBand', 'subRangePadding',
+    'fillRange', "lineType", "subScale",
+    'rangeBand', 'rangePadding', 
+    'subRangeBand', 'subRangePadding', 'subDomain',
     "alphaRange", "lineWidth",
     "xGrid", "yGrid"];
 
@@ -175,17 +183,6 @@ Plot.prototype.margins = function(margins) {
   this.attributes.margins = _.merge(this.attributes.margins, margins);
   return this;
 };
-
-Plot.prototype.makeSubScale = function(scale, groups) {
-  var sub = d3.scale.ordinal()
-              .rangeBands([0, scale.scale().rangeBand()], 
-                               this.subRangeBand(), 
-                               this.subRangePadding())
-              .domain(groups);
-  this.subScale(sub);
-  return sub;
-};
-
 
 Plot.prototype.layers = function(layers) {
   if(!arguments.length) { return this.attributes.layers; }
@@ -297,6 +294,7 @@ Plot.prototype.aes = function(aes) {
 Plot.prototype.setFixedScale = function(a) {
   var scale = this[a + "Scale"]().single;
   var domain = [];
+  // don't bother if no facets.
   if(_.keys(this[a + "Scale"]()).length === 1) { return scale; }
   if(_.contains(linearScales, scale.scaleType())){
     domain[0] = _.min(this[a + "Scale"](), function(v, k) {
@@ -328,6 +326,45 @@ Plot.prototype.plotDim = function() {
   return {x: this.width() - margins.left - margins.right,
    y: this.height() - margins.top - margins.bottom};
 };
+Plot.prototype.makeSubScale = function(scale, groups) {
+  var sub = d3.scale.ordinal()
+              .rangeBands([0, scale.scale().rangeBand()], 
+                               this.subRangeBand(), 
+                               this.subRangePadding())
+              .domain(groups);
+  return sub;
+};
+
+// possible ordering rule as arg?
+Plot.prototype.setSubScale = function(order) {
+  // do nuthin if no ordinal
+  var xord = this.xScale().single.scaleType(),
+      ord,
+      direction, 
+      domain;
+  if(xord !== "ordinal" &&
+     this.yScale().single.scaleType() !== "ordinal"){
+    return false;
+  }
+  if(xord === "ordinal"){
+    ord = this.xScale().single.scale();
+    direction = 'x';
+  } else {
+    ord = this.yScale().single.scale();
+    direction = 'y';
+  }
+  // the first layer is special, it should be the layer with all
+  // relevent categorical info. Subsequent layers should only, 
+  // if necessary, expand numerical scales.
+  domain = this.layers()[0].geom().collectGroups();
+  this.subDomain(domain);
+  this.subScale({single: ggd3.scale({type:'ordinal'})
+                              .scale({domain: domain})
+                              .range([0, ord.rangeBand()],
+                                     [this.subRangeBand(), 
+                                      this.subRangePadding()])});
+
+};
 
 
 Plot.prototype.draw = function(sel) {
@@ -349,14 +386,18 @@ Plot.prototype.draw = function(sel) {
   _.each(this.layers(), function(l, layerNum) {
     l.compute(sel, layerNum);
   });
-  // make single scales
+  // make global scales
   this.setFixedScale('x'); 
   this.setFixedScale('y'); 
   this.setFixedScale('alpha'); 
   this.setFixedScale('size'); 
   this.setFixedScale('stroke'); 
   this.setFixedScale('fill'); 
-  this.setFixedScale('color'); 
+  this.setFixedScale('color');
+  // should set a global sub scale to start
+  // at this point, all layers are computed
+  // and all groups should be known.
+  this.setSubScale();
   _.each(this.layers(), function(l, layerNum) {
     l.draw(sel, layerNum);
   });

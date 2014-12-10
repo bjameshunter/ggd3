@@ -44,15 +44,17 @@ function makeScale(selector, a, opts, vname) {
     dtype = this.dtypes()[vname] || ['number', 'many'];
     settings = _.merge(ggd3.tools.defaultScaleSettings(dtype, a),
                        opts);
-    var scale = new ggd3.scale(settings)
+    var scale = ggd3.scale(settings)
                         .plot(this)
                         .aesthetic(a);
     if(_.contains(['x', 'y'], a)){
       if(a === "x"){
-        scale.range([0, this.plotDim().x]);
+        scale.range([0, this.plotDim().x], 
+                    [this.rangeBand(), this.rangePadding()]);
       }
       if(a === "y") {
-        scale.range([this.plotDim().y, 0]);
+        scale.range([this.plotDim().y, 0],
+                    [this.rangeBand(), this.rangePadding()]);
       }
       scale.axis = d3.svg.axis().scale(scale.scale());
       for(var ax in settings.axis){

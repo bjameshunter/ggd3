@@ -33,12 +33,12 @@ Line.prototype.lineType = function(l) {
   return this;
 };
 
-Line.prototype.generator = function(aes, x, y, sub, group) {
+Line.prototype.generator = function(aes, x, y, o2, group) {
   if(x.hasOwnProperty('rangeBand')) {
     return d3.svg.line()
             .x(function(d, i) { 
-              return (x(d[aes.x]) + sub(d[group]) + 
-                            sub.rangeBand() * i); 
+              return (x(d[aes.x]) + o2(d[group]) + 
+                            o2.rangeBand() * i); 
             })
             .y(function(d) { return y(d[aes.y]); })
             .interpolate(this.interpolate());
@@ -47,8 +47,8 @@ Line.prototype.generator = function(aes, x, y, sub, group) {
     return d3.svg.line()
             .x(function(d) { return x(d[aes.x]); })
             .y(function(d, i) { 
-              return (y(d[aes.y]) + sub(d[group]) +
-                            sub.rangeBand()*i); 
+              return (y(d[aes.y]) + o2(d[group]) +
+                            o2.rangeBand()*i); 
             })
             .interpolate(this.interpolate());
   }
@@ -87,7 +87,6 @@ Line.prototype.drawLines = function (path, line, s, layerNum) {
 Line.prototype.prepareData = function(data, s) {
   data = s.nest
           .entries(data.data) ;
-
   data = _.map(data, function(d) { return this.recurseNest(d);}, this);
   return data;
 };
@@ -100,31 +99,22 @@ Line.prototype.draw = function(sel, data, i, layerNum){
                                  this.drawX(), this.drawY()),
       x = scales.x.scale(),
       y = scales.y.scale(),
-      sub = function() { return 0; };
-      sub.rangeBand = function() { return 0; };
+      o2 = function() { return 0; };
+      o2.rangeBand = function() { return 0; };
 
   if(x.hasOwnProperty('rangeBand') ||
      y.hasOwnProperty('rangeBand')){
     if(s.grouped) {
-      s.groups = _.pluck(data.data, s.group);
-      if(_.isNull(s.plot.subScale())){
-        var sc = x.hasOwnProperty('rangeBand') ? x: y;
-        sub = s.plot.makeSubScale(sc, s.groups);
-      } else {
-        sub = s.plot.subScale();
-      }
-    } else {
-      s.groups = [];
+      o2 = s.plot.subScale().single.scale();
     }
   }
 
-  ggd3.tools.removeElements(sel, layerNum, "geom-" + this.name());
   data = this.prepareData(data, s, scales);
   sel = this.grid() ? sel.select("." + this.direction() + 'grid'): sel.select('.plot');
   var lines = sel
               .selectAll("." + this.selector(layerNum).replace(/ /g, '.'))
               .data(data),
-  line = this.generator(s.aes, x, y, sub, s.group);
+  line = this.generator(s.aes, x, y, o2, s.group);
   lines.transition().call(_.bind(this.drawLines, this), line, s, layerNum);
   lines.enter().append(this.geom())
     .call(_.bind(this.drawLines, this), line, s, layerNum);

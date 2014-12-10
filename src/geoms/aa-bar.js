@@ -162,7 +162,6 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
                                layerNum,
                                drawX, drawY);
   // scales are drawn by now. return if no data.
-  ggd3.tools.removeElements(sel, layerNum, "rect");
   if(!data.data.length){ return false; }
 
   data = data.data;

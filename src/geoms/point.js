@@ -25,33 +25,29 @@ Point.prototype = new Geom();
 
 Point.prototype.constructor = Point;
 
-Point.prototype.positionPoint = function(s, group, groups) {
+Point.prototype.positionPoint = function(s, grouped) {
 
-  var sub,
+  var o2,
       rb = 0,
       a = s.aesthetic(),
       shift = 0,
       aes = this.layer().aes();
-  if(s.scaleType() === "ordinal" && groups){
-    if(_.isNull(this.layer().plot().subScale())){
-      sub = this.layer().plot().makeSubScale(s, groups);
-    } else {
-      sub = this.layer().plot().subScale();
-    }
-    rb = sub.rangeBand()/2;
+  if(s.scaleType() === "ordinal" && grouped){
+    o2 = this.layer().plot().subScale().single.scale();
+    rb = o2.rangeBand()/2;
     shift = d3.sum(s.rangeBands(), function(r) {
       return r*s.scale().rangeBand();});
   } else if(s.scaleType() === "ordinal") {
-    sub = function() { 
+    o2 = function() { 
       return s.scale().rangeBand() / 2; 
     };
     rb = s.scale().rangeBand() / 2;
   } else {
-    sub = function() { return 0;};
+    o2 = function() { return 0;};
   }
   return function(d) {
     return (s.scale()(d[aes[a]]) +
-          sub(d[group]) + shift + 
+          o2(d[group]) + shift + 
           (d._jitter || 0) * rb);
   };
 };
@@ -61,22 +57,21 @@ Point.prototype.draw = function(sel, data, i, layerNum, s) {
   // should be able to pass a setup object from a different geom
   // if a different geom wants to create a point object.
   var x, y, scales, points;
+  // other functions that call geom point will supply an "s" object
   if(_.isUndefined(s)) {
     s     = this.setup();
     scales = this.scalesAxes(sel, s, data.selector, layerNum,
                                  true, true);
-    s.groups = _.unique(_.pluck(data.data, s.group));
-    // poing should have both canvas and svg functions.
-    x = this.positionPoint(scales.x, s.group, s.groups);
-    y = this.positionPoint(scales.y, s.group, s.groups);
+    // point should have both canvas and svg functions.
+    x = this.positionPoint(scales.x, s.grouped);
+    y = this.positionPoint(scales.y, s.grouped);
     data = this.unNest(data.data);
     // get rid of wrong elements if they exist.
-    ggd3.tools.removeElements(sel, layerNum, this.geom());
     points = sel.select('.plot')
-                .selectAll(this.geom() + '.geom.g' + layerNum)
+                .selectAll('.geom.g' + layerNum + ".geom-" + this.name())
                 .data(data);
   } else {
-    points = sel.selectAll(this.geom() + '.geom.g' + layerNum)
+    points = sel.selectAll('.geom.g' + layerNum + ".geom-" + this.name())
                 .data(data);
     x = s.x;
     y = s.y;
@@ -87,19 +82,16 @@ Point.prototype.draw = function(sel, data, i, layerNum, s) {
             .geom(this);
 
 
-  points.transition().call(this.drawGeom, x, y, s, layerNum)
-    .each(function() {
-      tt.tooltip(d3.select(this), s);
-    });
+  points.transition().call(this.drawGeom, x, y, s, layerNum);
   points.enter().append(this.geom())
-    .call(this.drawGeom, x, y, s, layerNum)
-    .each(function() {
-      tt.tooltip(d3.select(this), s);
-    });
+    .call(this.drawGeom, x, y, s, layerNum);
   points.exit()
     .transition()
     .style('opacity', 0)
     .remove();
+  points.each(function() {
+      tt.tooltip(d3.select(this), s);
+    });
 };
 
 Point.prototype.drawGeom = function (point, x, y, s, layerNum) {

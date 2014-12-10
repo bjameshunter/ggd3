@@ -1,3 +1,9 @@
+.tick text {
+  font-size: 10pt;
+  stroke: grey;
+  font-family: verdana;
+}
+
 .x.axis path, .y.axis path, line,
 .grid-y, .grid-x {
   fill:none;

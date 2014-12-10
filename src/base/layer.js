@@ -179,6 +179,7 @@ Layer.prototype.compute = function(sel, layerNum) {
     if(_.isEmpty(d)) { d = {selector: id, data: []}; }
     this.geom().data().push(d);
   }, this);
+  
 
 };
 Layer.prototype.draw = function(sel, layerNum) {
@@ -194,6 +195,7 @@ Layer.prototype.draw = function(sel, layerNum) {
         d = this.geom().data().filter(function(d) {
           return d.selector === id;
         })[0];
+    ggd3.tools.removeElements(s, layerNum, "geom-" + this.geom().name());
     this.geom().draw(s, d, i, layerNum);
   }, this);
 };

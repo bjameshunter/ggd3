@@ -43,7 +43,6 @@ function Scale(opts) {
     this._userOpts = opts;
     this.scaleType(opts.type ? opts.type:null);
   }
-
 }
 
 Scale.prototype.scaleType = function(scaleType) {
@@ -91,12 +90,13 @@ Scale.prototype.scale = function(settings){
   return this;
 };
 
-Scale.prototype.range = function(range) {
+Scale.prototype.range = function(range, rb) {
   if(!arguments.length) { return this.attributes.range; }
   if(this.scaleType() === "ordinal"){
+    if(_.isUndefined(rb)) { rb = this.rangeBands(); }
     this.attributes.scale.rangeRoundBands(range, 
-                                          this.rangeBands()[0],
-                                          this.rangeBands()[1]);
+                                          rb[0],
+                                          rb[1]);
   } else {
     this.attributes.scale.range(range);
   }

@@ -28,14 +28,15 @@ Tooltip.prototype.find = function(el) {
 Tooltip.prototype.tooltip = function(selection, s) {
   var that = this;
   if(_.isUndefined(s)){
+    console.log("s is undefined");
     s = this.geom().setup();
   }
   selection.each(function(data) {
     var tooltipdiv = that.find(this);
     d3.select(this)
-      .on('mouseover', function(d) {that.show(d, tooltipdiv, s); })
-      .on('mousemove', function(d) {that.move(d, tooltipdiv); })
-      .on('mouseout', function(d) {that.hide(d, tooltipdiv); });
+      .on('mouseover.tooltip', function(d) {that.show(d, tooltipdiv, s); })
+      .on('mousemove.tooltip', function(d) {that.move(d, tooltipdiv); })
+      .on('mouseout.tooltip', function(d) {that.hide(d, tooltipdiv); });
   });
 };
 
@@ -50,8 +51,8 @@ Tooltip.prototype.show = function(data, sel, s) {
 
 Tooltip.prototype.move = function(data, sel) {
   sel
-    .style('left', d3.event.offsetX + this.offset().x + "px")
-    .style('top', d3.event.offsetY + this.offset().y + "px");
+    .style('left', d3.event.layerX + this.offset().x + "px")
+    .style('top', d3.event.layerY + this.offset().y + "px");
 };
 
 Tooltip.prototype.hide = function(data, sel) {

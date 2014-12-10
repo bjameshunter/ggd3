@@ -16,6 +16,7 @@ function Geom(aes) {
     data: [],
     style: "", // optional class attributes for css 
     tooltip: null,
+    groups: null, 
   };
   var r = function(d) { return ggd3.tools.round(d, 2);};
   // default tooltip
@@ -31,7 +32,6 @@ function Geom(aes) {
   this.attributes = attributes;
 
   this.attributes.tooltip = _.bind(tooltip, this);
-
 }
 Geom.prototype.defaultPosition = function() {
   var n = this.name();
@@ -79,6 +79,8 @@ Geom.prototype.setup = function() {
   var s = {
       layer     : this.layer(),
     };
+  // sometimes a geom doesn't have a layer as in 
+  // compound geoms - boxplot is box and point.
   if(s.layer){
     s.plot      = s.layer.plot();
     s.stat      = s.layer.stat();
@@ -106,20 +108,44 @@ Geom.prototype.setup = function() {
       s.grouped = true;
       s.group = s.aes.group;
     }
-    if(_.contains([s.facet.x(), s.facet.y()], 
-                  s.group)) {
-      // uninteresting grouping, get rid of it.
-      s.grouped = false;
-      s.group = null;
-      s.groups = null;
-      // must get all groups from layer to do this
-      // meaningfully. Facets without a group 
-      // are throwing it off.
-    }
+    // not convinced this is a good idea.
+    // if(_.contains([s.facet.x(), s.facet.y()], 
+    //               s.group)) {
+    //   // uninteresting grouping, get rid of it.
+    //   s.grouped = false;
+    //   s.group = null;
+    //   s.groups = null;
+    //   // must get all groups from layer to do this
+    //   // meaningfully. Facets without a group 
+    //   // are throwing it off.
+    // }
   }
-
   return s;
 };
+
+Geom.prototype.collectGroups = function() {
+  var groups, grouped,
+      aes = this.layer().aes();
+  if(aes.fill) {
+    grouped = true;
+    group = aes.fill;
+  } else if(aes.color){
+    grouped = true;
+    group = aes.color;
+  } else if(aes.group){
+    grouped = true;
+    group = aes.group;
+  }
+  if(grouped) {
+    groups = _.unique(
+                _.pluck(
+                  _.flatten(
+                    _.map(this.data(), 'data')), group));
+    this.groups(groups);
+  }
+  return groups;
+};
+
 Geom.prototype.compute = function(data, s) {
   return s.nest.entries(data);
 };
@@ -140,7 +166,10 @@ Geom.prototype.domain = function(data, a) {
   }
   // done if date
   // and not a calculated aesthetic
-  if(!_.contains(['binHeight', 'density', 'n. observations'], aes[a])){
+  var skip = ['binHeight', 'density', 'n. observations', undefined],
+      skip2 = ['yintercept', 'xintercept', 'slope'];
+
+  if(!_.contains(skip, aes[a]) && !_.contains(skip2, a)){
     if(_.contains(["date", "time"], plot.dtypes()[aes[a]][0]) ){
       return extent;
     }
