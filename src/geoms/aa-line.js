@@ -34,28 +34,28 @@ Line.prototype.lineType = function(l) {
 };
 
 Line.prototype.generator = function(aes, x, y, o2, group) {
+  var line = d3.svg.line()
+              .interpolate(this.interpolate())
+              .defined(function(d) { return !isNaN(d[aes.y]); });
   if(x.hasOwnProperty('rangeBand')) {
-    return d3.svg.line()
+    return line
             .x(function(d, i) { 
               return (x(d[aes.x]) + o2(d[group]) + 
                             o2.rangeBand() * i); 
             })
-            .y(function(d) { return y(d[aes.y]); })
-            .interpolate(this.interpolate());
+            .y(function(d) { return y(d[aes.y]); });
   }
   if(y.hasOwnProperty('rangeBand')) {
-    return d3.svg.line()
+    return line
             .x(function(d) { return x(d[aes.x]); })
             .y(function(d, i) { 
               return (y(d[aes.y]) + o2(d[group]) +
                             o2.rangeBand()*i); 
-            })
-            .interpolate(this.interpolate());
+            });
   }
-  return d3.svg.line()
+  return line
           .x(function(d, i) { return x(d[aes.x]); })
-          .y(function(d, i) { return y(d[aes.y]); })
-          .interpolate(this.interpolate());
+          .y(function(d, i) { return y(d[aes.y]); });
 };
 
 Line.prototype.selector = function(layerNum) {
@@ -88,7 +88,7 @@ Line.prototype.prepareData = function(data, s) {
   data = s.nest
           .entries(data.data) ;
   data = _.map(data, function(d) { return this.recurseNest(d);}, this);
-  return data;
+  return _.isArray(data[0]) ? data: [data];
 };
 
 Line.prototype.draw = function(sel, data, i, layerNum){
@@ -110,6 +110,7 @@ Line.prototype.draw = function(sel, data, i, layerNum){
   }
 
   data = this.prepareData(data, s, scales);
+  console.log(data);
   sel = this.grid() ? sel.select("." + this.direction() + 'grid'): sel.select('.plot');
   var lines = sel
               .selectAll("." + this.selector(layerNum).replace(/ /g, '.'))

@@ -12,6 +12,7 @@
   <option value="diamonds.csv" id='diamonds' >diamonds</option>
   <option value="baseball.csv" id='baseball' >baseball</option>
   <option value="nelplo.csv" id='nelplo'>nelplo</option>
+  <option value="nelplo_columns.csv" id='nelplo2'>nelplo colwise</option>
   <option value="wells.csv" id='wells' >wells</option>
   <option value="ustimeseries.csv" id='ustimeseries' >ustimeseries</option>
   <option value="movies.csv" id='movies'>movies</option>
@@ -57,7 +58,8 @@ var facets = {'mtcars.csv': {x: 'am', nrows:1},
             "nelplo.csv": {x: 'group', ncols: 3},
             "ustimeseries.csv": {x: 'group', nrows:3},
             "wells.csv":{x:'switch', y: "assoc"},
-            "movies.csv": {x: "Comedy", y: "Short"}, 
+            "movies.csv": {x: "Comedy", y: "Short"},
+            "nelplo_columns.csv": {x:"decade", ncols: 2} ,
           };
 var aes = {'mtcars.csv': {y: "mpg", fill: "gear", color: "gear",
                       x: "cyl", label:"mm"}, 
@@ -84,7 +86,9 @@ var aes = {'mtcars.csv': {y: "mpg", fill: "gear", color: "gear",
             "movies.csv": {
               y:"rating", x: "Documentary", 
               fill: "Romance"
-            }
+            },
+            "nelplo_columns.csv": {x:"real.wages", y: "unemp",
+            label: "date"}
           };
 var dtypes = {'mtcars.csv': {"gear": ["string"], "cyl": ["string"], "mm": ["string"]},
             "iris.csv" : {},
@@ -161,7 +165,13 @@ var layers = {'mtcars.csv': [ggd3.geoms.text().size(10).position('jitter'),
                               .alpha(d3.functor(0))
                               .size(4)
                               ],
-            "ustimeseries.csv": [line],
+            "nelplo_columns.csv": [ggd3.geoms.path()
+                                      .lineWidth(4)
+                                      .lineType(null),
+                                  ggd3.geoms.point()
+                                    .alpha(d3.functor(0)).color('none')
+                                    .size(4)],
+            "ustimeseries.csv": [line.lineWidth(3)],
             "wells.csv": [ggd3.layer()
                             .geom(ggd3.geoms.point().color(null)),
                           ggd3.layer()
@@ -229,6 +239,17 @@ var charts = {'mtcars.csv': ggd3.plot()
                   .yScale({axis: {ticks: 4, position:'left',
                           orient: "left"}})
                   .margins({top: 15, bottom:20, left:20, right:5})
+                  .xScale({axis: {ticks: 4, position: "bottom",
+                          orient: "bottom"}})
+,
+            "nelplo_columns.csv": ggd3.plot()
+                  .layers(layers["nelplo_columns.csv"])
+                  .width(300)
+                  .facet(facets["nelplo_columns.csv"])
+                  .height(300)
+                  .yScale({axis: {ticks: 4, position:'left',
+                          orient: "left"}})
+                  .margins({top: 15, bottom:20, left:30, right:5})
                   .xScale({axis: {ticks: 4, position: "bottom",
                           orient: "bottom"}})
 ,

@@ -2421,28 +2421,28 @@ Line.prototype.lineType = function(l) {
 };
 
 Line.prototype.generator = function(aes, x, y, o2, group) {
+  var line = d3.svg.line()
+              .interpolate(this.interpolate())
+              .defined(function(d) { return !isNaN(d[aes.y]); });
   if(x.hasOwnProperty('rangeBand')) {
-    return d3.svg.line()
+    return line
             .x(function(d, i) { 
               return (x(d[aes.x]) + o2(d[group]) + 
                             o2.rangeBand() * i); 
             })
-            .y(function(d) { return y(d[aes.y]); })
-            .interpolate(this.interpolate());
+            .y(function(d) { return y(d[aes.y]); });
   }
   if(y.hasOwnProperty('rangeBand')) {
-    return d3.svg.line()
+    return line
             .x(function(d) { return x(d[aes.x]); })
             .y(function(d, i) { 
               return (y(d[aes.y]) + o2(d[group]) +
                             o2.rangeBand()*i); 
-            })
-            .interpolate(this.interpolate());
+            });
   }
-  return d3.svg.line()
+  return line
           .x(function(d, i) { return x(d[aes.x]); })
-          .y(function(d, i) { return y(d[aes.y]); })
-          .interpolate(this.interpolate());
+          .y(function(d, i) { return y(d[aes.y]); });
 };
 
 Line.prototype.selector = function(layerNum) {
@@ -2475,7 +2475,7 @@ Line.prototype.prepareData = function(data, s) {
   data = s.nest
           .entries(data.data) ;
   data = _.map(data, function(d) { return this.recurseNest(d);}, this);
-  return data;
+  return _.isArray(data[0]) ? data: [data];
 };
 
 Line.prototype.draw = function(sel, data, i, layerNum){
@@ -2497,6 +2497,7 @@ Line.prototype.draw = function(sel, data, i, layerNum){
   }
 
   data = this.prepareData(data, s, scales);
+  console.log(data);
   sel = this.grid() ? sel.select("." + this.direction() + 'grid'): sel.select('.plot');
   var lines = sel
               .selectAll("." + this.selector(layerNum).replace(/ /g, '.'))
@@ -3286,11 +3287,12 @@ function Path(spec) {
   if(!(this instanceof Geom)){
     return new Path(aes);
   }
-  Geom.apply(this);
+  Line.apply(this);
   var attributes = {
     name: "path",
     stat: "identity",
     position: null,
+    interpolate: "linear",
     lineWidth: 1,
   };
   // path is just line drawn in order, so probably doesn't need anything.
@@ -3304,9 +3306,12 @@ function Path(spec) {
   }
 }
 
+Path.prototype = new Line();
+
 Path.prototype.constructor = Path;
 
 ggd3.geoms.path = Path;
+
 // allow layer level specifying of size, fill,
 // color, alpha and shape variables/scales
 // but inherit from layer/plot if 

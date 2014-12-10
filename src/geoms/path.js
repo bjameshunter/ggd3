@@ -3,11 +3,12 @@ function Path(spec) {
   if(!(this instanceof Geom)){
     return new Path(aes);
   }
-  Geom.apply(this);
+  Line.apply(this);
   var attributes = {
     name: "path",
     stat: "identity",
     position: null,
+    interpolate: "linear",
     lineWidth: 1,
   };
   // path is just line drawn in order, so probably doesn't need anything.
@@ -20,6 +21,8 @@ function Path(spec) {
     }
   }
 }
+
+Path.prototype = new Line();
 
 Path.prototype.constructor = Path;
 
