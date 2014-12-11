@@ -239,7 +239,6 @@ Line.prototype.lineIntersect = function(a, b, c, d) {
 Line.prototype.perp = function(p0, p1) {
   var u01x = p0[1] - p1[1], u01y = p1[0] - p0[0],
       u01d = Math.sqrt(u01x * u01x + u01y * u01y);
-  if(u01d === 0) { console.log('divided by zero');}
   return [u01x / u01d, u01y / u01d];
 };
 

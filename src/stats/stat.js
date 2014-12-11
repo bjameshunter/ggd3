@@ -112,6 +112,8 @@ function aggSetter(a) {
 }
 Stat.prototype.x = aggSetter('x');
 Stat.prototype.y = aggSetter('y');
+Stat.prototype.ymax = aggSetter('ymax');
+Stat.prototype.ymin = aggSetter('ymin');
 Stat.prototype.fill = aggSetter('fill');
 Stat.prototype.color = aggSetter('color');
 Stat.prototype.group = aggSetter('group');
