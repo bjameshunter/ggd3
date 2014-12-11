@@ -10,6 +10,7 @@ function Path(spec) {
     position: null,
     interpolate: "linear",
     lineWidth: 1,
+    tension: 1,
   };
   // path is just line drawn in order, so probably doesn't need anything.
 

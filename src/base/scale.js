@@ -94,9 +94,8 @@ Scale.prototype.range = function(range, rb) {
   if(!arguments.length) { return this.attributes.range; }
   if(this.scaleType() === "ordinal"){
     if(_.isUndefined(rb)) { rb = this.rangeBands(); }
-    this.attributes.scale.rangeRoundBands(range, 
-                                          rb[0],
-                                          rb[1]);
+    this.attributes.scale
+        .rangeRoundBands(range, rb[0], rb[1]);
   } else {
     this.attributes.scale.range(range);
   }

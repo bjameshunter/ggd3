@@ -25,14 +25,14 @@ Point.prototype = new Geom();
 
 Point.prototype.constructor = Point;
 
-Point.prototype.positionPoint = function(s, grouped) {
+Point.prototype.positionPoint = function(s, group) {
 
   var o2,
       rb = 0,
       a = s.aesthetic(),
       shift = 0,
       aes = this.layer().aes();
-  if(s.scaleType() === "ordinal" && grouped){
+  if(s.scaleType() === "ordinal" && group){
     o2 = this.layer().plot().subScale().single.scale();
     rb = o2.rangeBand()/2;
     shift = d3.sum(s.rangeBands(), function(r) {
@@ -63,8 +63,8 @@ Point.prototype.draw = function(sel, data, i, layerNum, s) {
     scales = this.scalesAxes(sel, s, data.selector, layerNum,
                                  true, true);
     // point should have both canvas and svg functions.
-    x = this.positionPoint(scales.x, s.grouped);
-    y = this.positionPoint(scales.y, s.grouped);
+    x = this.positionPoint(scales.x, s.group);
+    y = this.positionPoint(scales.y, s.group);
     data = this.unNest(data.data);
     // get rid of wrong elements if they exist.
     points = sel.select('.plot')

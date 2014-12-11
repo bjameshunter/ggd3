@@ -54,6 +54,7 @@ Geom.prototype.defaultPosition = function() {
 
 Geom.prototype._otherAesthetics = function(sel, d, s, omit){
   _.each(_.difference(_.keys(s.aes), omit), function(k) {
+    if(_.isNull(s.stat[k]) || _.isNull(s.stat[k]())){ return null; }
     var stat = s.stat[k]()._name || "identity";
     stat = _.contains(["identity", "first"], stat) ? "": " (" + stat + ")";
     sel.append('h4')
@@ -85,7 +86,7 @@ Geom.prototype.setup = function() {
     s.plot      = s.layer.plot();
     s.stat      = s.layer.stat();
     s.nest      = this.nest();
-    s.dtypes    = s.layer.dtypes();
+    s.dtypes    = s.plot.dtypes();
     s.position  = s.layer.position();
     s.dim       = s.plot.plotDim();
     s.facet     = s.plot.facet();

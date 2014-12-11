@@ -1,6 +1,6 @@
 // 
 function Ribbon(spec) {
-  Geom.apply(this);
+  Area.apply(this);
   var attributes = {
     name: "ribbon",
     stat: "identity",
@@ -15,6 +15,8 @@ function Ribbon(spec) {
     }
   }
 }
+
+Ribbon.prototype = new Area();
 
 Ribbon.prototype.constructor = Ribbon;
 

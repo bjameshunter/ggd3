@@ -27,8 +27,8 @@ Text.prototype.draw = function (sel, data, i, layerNum) {
                                this.drawX(), this.drawY());
 
 
-  var positionX = this.positionPoint(scales.x, s.grouped),
-      positionY = this.positionPoint(scales.y, s.grouped);
+  var positionX = this.positionPoint(scales.x, s.group),
+      positionY = this.positionPoint(scales.y, s.group);
 
   ggd3.tools.removeElements(sel, layerNum, "geom-text");
 

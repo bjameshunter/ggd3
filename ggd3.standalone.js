@@ -1463,9 +1463,8 @@ Scale.prototype.range = function(range, rb) {
   if(!arguments.length) { return this.attributes.range; }
   if(this.scaleType() === "ordinal"){
     if(_.isUndefined(rb)) { rb = this.rangeBands(); }
-    this.attributes.scale.rangeRoundBands(range, 
-                                          rb[0],
-                                          rb[1]);
+    this.attributes.scale
+        .rangeRoundBands(range, rb[0], rb[1]);
   } else {
     this.attributes.scale.range(range);
   }
@@ -1648,6 +1647,8 @@ function setDomain(data, layer) {
     if(!_.isNull(s.aes[g])){
       if(_.contains(globalScales, g)){
         scale = this[g + "Scale"]().single;
+        console.log(g);
+        console.log(scale.scaleType());
         // scale is fill, color, alpha, etc.
         // with no padding on either side of domain.
         if(_.contains(linearScales, scale.scaleType())){
@@ -1817,6 +1818,7 @@ Geom.prototype.defaultPosition = function() {
 
 Geom.prototype._otherAesthetics = function(sel, d, s, omit){
   _.each(_.difference(_.keys(s.aes), omit), function(k) {
+    if(_.isNull(s.stat[k]) || _.isNull(s.stat[k]())){ return null; }
     var stat = s.stat[k]()._name || "identity";
     stat = _.contains(["identity", "first"], stat) ? "": " (" + stat + ")";
     sel.append('h4')
@@ -1848,7 +1850,7 @@ Geom.prototype.setup = function() {
     s.plot      = s.layer.plot();
     s.stat      = s.layer.stat();
     s.nest      = this.nest();
-    s.dtypes    = s.layer.dtypes();
+    s.dtypes    = s.plot.dtypes();
     s.position  = s.layer.position();
     s.dim       = s.plot.plotDim();
     s.facet     = s.plot.facet();
@@ -2398,8 +2400,13 @@ function Line(spec) {
     interpolate: 'basis',
     lineType: null,
     lineWidth: null,
+    tension: 0.7,
+    freeColor: false, 
   };
-
+  // freeColor is confusing. Most global aesthetics should be 
+  // that way. 
+  // My example is faceted by decade, meaning the color variable
+  // "date", doesn't change much within a facet. With "freeColor" it does.
   this.attributes = _.merge(this.attributes, attributes);
 
   for(var attr in this.attributes){
@@ -2423,7 +2430,10 @@ Line.prototype.lineType = function(l) {
 Line.prototype.generator = function(aes, x, y, o2, group) {
   var line = d3.svg.line()
               .interpolate(this.interpolate())
-              .defined(function(d) { return !isNaN(d[aes.y]); });
+              .defined(function(d) { 
+                return (!isNaN(y(d[aes.y]))); 
+              })
+              .tension(this.tension());
   if(x.hasOwnProperty('rangeBand')) {
     return line
             .x(function(d, i) { 
@@ -2464,10 +2474,11 @@ Line.prototype.drawLines = function (path, line, s, layerNum) {
   if(!this.grid()){
     // grid style defined in css.
     path
-      .attr('stroke-opacity', function(d) { return s.alpha(d[1]) ;})
-      .attr('stroke', function(d) { return s.color(d[1]);})
-      .attr('stroke-width', this.lineWidth())
-      .attr('fill', 'none'); // must explicitly declare no grid.
+      .attr('opacity', function(d) { return s.alpha(d[1]) ;})
+      .attr('stroke', function(d) { return s.lcolor(d[1]);})
+      .attr('stroke-width', 1)
+      .attr('fill',  function(d) { 
+        return s.gradient ? s.lcolor(d[1]): 'none';});
   }
 };
 
@@ -2488,6 +2499,7 @@ Line.prototype.draw = function(sel, data, i, layerNum){
       y = scales.y.scale(),
       o2 = function() { return 0; };
       o2.rangeBand = function() { return 0; };
+      s.gradient = false;
 
   if(x.hasOwnProperty('rangeBand') ||
      y.hasOwnProperty('rangeBand')){
@@ -2496,13 +2508,39 @@ Line.prototype.draw = function(sel, data, i, layerNum){
     }
   }
 
+  var l1 = this.generator(s.aes, x, y, o2, s.group),
+      selector = data.selector;
   data = this.prepareData(data, s, scales);
-  console.log(data);
+  // overwriting the color function messes up tooltip labeling,
+  // if needed.
+  s.lcolor = s.color;
+
+  // if color gradient
+  if(s.aes.color && _.contains(['number', 'date', 'time'], s.dtypes[s.aes.color][0]) && s.dtypes[s.aes.color][1] === "many"){
+    s.gradient = true;
+    if(this.freeColor()){
+      var color = d3.scale.linear()
+                .range(s.plot.colorRange())
+                .domain(d3.extent(_.pluck(_.flatten(data), s.aes.color)));
+      s.lcolor = function(d) { return color(d[s.aes.color]); };
+    }
+    data = _.map(data, function(d) { 
+      return this.quad(this.sample(d, l1, x, y, s.color, s.aes ), 
+                       s.aes); }, this);
+    data = _.flatten(data, true);
+    // alpha must be constant
+    var lw = this.lineWidth();
+    s.alpha = s.plot.alpha();
+    line = _.bind(function(d) {
+      return this.lineJoin(d[0], d[1], d[2], d[3], lw);
+    }, this);
+  } else {
+    line = l1;
+  }
   sel = this.grid() ? sel.select("." + this.direction() + 'grid'): sel.select('.plot');
   var lines = sel
               .selectAll("." + this.selector(layerNum).replace(/ /g, '.'))
-              .data(data),
-  line = this.generator(s.aes, x, y, o2, s.group);
+              .data(data);
   lines.transition().call(_.bind(this.drawLines, this), line, s, layerNum);
   lines.enter().append(this.geom())
     .call(_.bind(this.drawLines, this), line, s, layerNum);
@@ -2511,7 +2549,88 @@ Line.prototype.draw = function(sel, data, i, layerNum){
     .style('opacity', 0)
     .remove();
 };
+// next four functions copied verbatim from http://bl.ocks.org/mbostock/4163057
+// used to add linear gradient to line.
+// Sample the SVG path string "d" uniformly with the specified precision.
+// gonna use this for discrete change of colors for a few points and
+// continuous change of color for many
+Line.prototype.sample = function(d, l, x, y, color, aes) {
+  var n = d.length;
+  d = _.map(d, function(r, i) {
+        var o = [];
+        o[aes.color] = r[aes.color];
+        o[0] = x(r[aes.x]);
+        o[1] = y(r[aes.y]);
+        return o;
+      });
+  return d;
+  // use this code for continuous gradient legends, for example.
+  // var path = document.createElementNS(d3.ns.prefix.svg, "path");
+  // path.setAttribute("d", l(d);
+  // var n = path.getTotalLength(), t = [0], i = 0, 
+  //     dt = Math.floor(n/precision);
+  //     console.log(n);
+  // while ((i += dt) < n) { t.push(i); }
+  // t.push(n);
 
+  // return t.map(function(t) {
+  //   var p = path.getPointAtLength(t), a = [p.x, p.y];
+  //   a.t = t / n;
+  //   return a;
+  // });
+};
+
+// Compute quads of adjacent points [p0, p1, p2, p3].
+Line.prototype.quad = function(points) {
+  return d3.range(points.length - 1).map(function(i) {
+    var a = [points[i - 1], points[i], points[i + 1], points[i + 2]];
+    a[aes.color] = (points[i][aes.color] + points[i + 1][aes.color]) / 2;
+    return a;
+  });
+};
+
+// Compute stroke outline for segment p12.
+Line.prototype.lineJoin = function(p0, p1, p2, p3, width) {
+  var u12 = this.perp(p1, p2),
+      r = width / 2,
+      a = [p1[0] + u12[0] * r, p1[1] + u12[1] * r],
+      b = [p2[0] + u12[0] * r, p2[1] + u12[1] * r],
+      c = [p2[0] - u12[0] * r, p2[1] - u12[1] * r],
+      d = [p1[0] - u12[0] * r, p1[1] - u12[1] * r],
+      e, u23, u01;
+
+  // this section is causing very large numbers in y vector.
+  // if (p0) { // clip ad and dc using average of u01 and u12
+  //   u01 = this.perp(p0, p1);
+  //   e = [p1[0] + u01[0] + u12[0], p1[1] + u01[1] + u12[1]];
+  //   a = this.lineIntersect(p1, e, a, b);
+  //   d = this.lineIntersect(p1, e, d, c);
+  // }
+
+  // if (p3) { // clip ab and dc using average of u12 and u23
+  //   u23 = this.perp(p2, p3);
+  //   e = [p2[0] + u23[0] + u12[0], p2[1] + u23[1] + u12[1]];
+  //   b = this.lineIntersect(p2, e, a, b);
+  //   c = this.lineIntersect(p2, e, d, c);
+  // }
+  return "M" + a + "L" + b + " " + c + " " + d + "Z";
+};
+
+// Compute intersection of two infinite lines ab and cd.
+Line.prototype.lineIntersect = function(a, b, c, d) {
+  var x1 = c[0], x3 = a[0], x21 = d[0] - x1, x43 = b[0] - x3,
+      y1 = c[1], y3 = a[1], y21 = d[1] - y1, y43 = b[1] - y3,
+      ua = (x43 * (y1 - y3) - y43 * (x1 - x3)) / (y43 * x21 - x43 * y21);
+  return [x1 + ua * x21, y1 + ua * y21];
+};
+
+// Compute unit vector perpendicular to p01.
+Line.prototype.perp = function(p0, p1) {
+  var u01x = p0[1] - p1[1], u01y = p1[0] - p0[0],
+      u01d = Math.sqrt(u01x * u01x + u01y * u01y);
+  if(u01d === 0) { console.log('divided by zero');}
+  return [u01x / u01d, u01y / u01d];
+};
 
 ggd3.geoms.line = Line;
 // 
@@ -2748,6 +2867,44 @@ Abline.prototype.prepareData = function(d, s, scales) {
 
 
 ggd3.geoms.abline = Abline;
+// 
+function Area(spec) {
+  Geom.apply(this);
+  var attributes = {
+    name: "area",
+    stat: "identity",
+    position: null,
+  };
+
+  this.attributes = _.merge(this.attributes, attributes);
+
+  for(var attr in this.attributes){
+    if((!this[attr] && this.attributes.hasOwnProperty(attr))){
+      this[attr] = createAccessor(attr);
+    }
+  }
+}
+
+Area.prototype = new Area();
+
+Area.prototype.constructor = Area;
+
+Area.prototype.prepareData = function(data, s) {
+  data = s.nest
+          .entries(data.data) ;
+  data = _.map(data, function(d) { return this.recurseNest(d);}, this);
+  return _.isArray(data[0]) ? data: [data];
+};
+
+Area.prototype.draw = function(sel, data, i, layerNum) {
+  var s = this.setup(),
+      scales = this.scalesAxes(sel, s, data.selector, layerNum,
+                                this.drawX(), this.drawY()),
+      x = scales.x.scale(),
+      y = scales.y.scale();
+};
+
+ggd3.geoms.area = Area;
 // 
 function Box(spec) {
   if(!(this instanceof Geom)){
@@ -3294,6 +3451,7 @@ function Path(spec) {
     position: null,
     interpolate: "linear",
     lineWidth: 1,
+    tension: 1,
   };
   // path is just line drawn in order, so probably doesn't need anything.
 
@@ -3339,14 +3497,14 @@ Point.prototype = new Geom();
 
 Point.prototype.constructor = Point;
 
-Point.prototype.positionPoint = function(s, grouped) {
+Point.prototype.positionPoint = function(s, group) {
 
   var o2,
       rb = 0,
       a = s.aesthetic(),
       shift = 0,
       aes = this.layer().aes();
-  if(s.scaleType() === "ordinal" && grouped){
+  if(s.scaleType() === "ordinal" && group){
     o2 = this.layer().plot().subScale().single.scale();
     rb = o2.rangeBand()/2;
     shift = d3.sum(s.rangeBands(), function(r) {
@@ -3377,8 +3535,8 @@ Point.prototype.draw = function(sel, data, i, layerNum, s) {
     scales = this.scalesAxes(sel, s, data.selector, layerNum,
                                  true, true);
     // point should have both canvas and svg functions.
-    x = this.positionPoint(scales.x, s.grouped);
-    y = this.positionPoint(scales.y, s.grouped);
+    x = this.positionPoint(scales.x, s.group);
+    y = this.positionPoint(scales.y, s.group);
     data = this.unNest(data.data);
     // get rid of wrong elements if they exist.
     points = sel.select('.plot')
@@ -3428,7 +3586,7 @@ ggd3.geoms.point = Point;
 
 // 
 function Ribbon(spec) {
-  Geom.apply(this);
+  Area.apply(this);
   var attributes = {
     name: "ribbon",
     stat: "identity",
@@ -3443,6 +3601,8 @@ function Ribbon(spec) {
     }
   }
 }
+
+Ribbon.prototype = new Area();
 
 Ribbon.prototype.constructor = Ribbon;
 
@@ -3596,8 +3756,8 @@ Text.prototype.draw = function (sel, data, i, layerNum) {
                                this.drawX(), this.drawY());
 
 
-  var positionX = this.positionPoint(scales.x, s.grouped),
-      positionY = this.positionPoint(scales.y, s.grouped);
+  var positionX = this.positionPoint(scales.x, s.group),
+      positionY = this.positionPoint(scales.y, s.group);
 
   ggd3.tools.removeElements(sel, layerNum, "geom-text");
 

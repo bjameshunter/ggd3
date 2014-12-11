@@ -123,6 +123,8 @@ function setDomain(data, layer) {
     if(!_.isNull(s.aes[g])){
       if(_.contains(globalScales, g)){
         scale = this[g + "Scale"]().single;
+        console.log(g);
+        console.log(scale.scaleType());
         // scale is fill, color, alpha, etc.
         // with no padding on either side of domain.
         if(_.contains(linearScales, scale.scaleType())){
