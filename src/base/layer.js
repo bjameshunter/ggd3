@@ -118,7 +118,6 @@ Layer.prototype.setStat = function() {
   _.each(['x', 'y'], function(a) {
     if(!stat[a]() ){
       stat[a](stat.linearAgg());
-      // what is this? 
       if(stat.linearAgg() === "bin"){
         aes[a] = "binHeight";
       } else if(stat.linearAgg() === "count") {

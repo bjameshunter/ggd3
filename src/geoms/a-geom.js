@@ -53,6 +53,7 @@ Geom.prototype.defaultPosition = function() {
 };
 
 Geom.prototype._otherAesthetics = function(sel, d, s, omit){
+  omit = _.flatten([omit, s.stat.exclude]);
   _.each(_.difference(_.keys(s.aes), omit), function(k) {
     if(_.isNull(s.stat[k]) || _.isNull(s.stat[k]())){ return null; }
     var stat = s.stat[k]()._name || "identity";

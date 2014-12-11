@@ -7,11 +7,11 @@
 <body>
 <div>
   <select id="dataset" class='btn btn-primary'>
-  <option value="mtcars.csv" id='cars'>cars</option>
+  <option value="mtcars.csv" id='cars' selected>cars</option>
   <option value="iris.csv" id='iris'>iris</option>
   <option value="diamonds.csv" id='diamonds' >diamonds</option>
   <option value="baseball.csv" id='baseball' >baseball</option>
-  <option value="nelplo.csv" id='nelplo' selected>nelplo</option>
+  <option value="nelplo.csv" id='nelplo'>nelplo</option>
   <option value="nelplo_columns.csv" id='nelplo2'>nelplo colwise</option>
   <option value="wells.csv" id='wells' >wells</option>
   <option value="ustimeseries.csv" id='ustimeseries' >ustimeseries</option>
@@ -62,7 +62,7 @@ var facets = {'mtcars.csv': {x: 'am', nrows:1},
             "nelplo_columns.csv": {x:"decade", ncols: 2} ,
           };
 var aes = {'mtcars.csv': {y: "mpg", fill: "gear", color: "gear",
-                      x: "cyl", label:"mm"}, 
+                      x: "hp", label:"mm"}, 
             "iris.csv" : {x: "Sepal.Length", fill: "Species",
             color:"Species"
           },
@@ -128,16 +128,24 @@ var l1 = ggd3.geoms.hline().color('blue').lineType('10,4');
 var l2 = ggd3.geoms.hline().color('red').lineType('5,5');
 var p75 = function(d) { return d3.quantile(d, 0.75); }
 var p25 = function(d) { return d3.quantile(d, 0.25); }
+var sd = function(arr) {
+  var m = d3.mean(arr);
+  return Math.sqrt(d3.mean(arr.map(function(d) { 
+    return Math.pow(d - m, 2); })));
+};
+var areaData = [{am: 1, carb: 4, cyl: "6", disp: 160, drat: 3.9, gear: "4", hp: 110, mm: "Mazda RX4", mpg: 21, qsec: 16.46, vs: 0, wt: 2.62},
+{am: 0,carb: 2,cyl: "4",disp: 140.8,drat: 3.92,gear: "4",hp: 95,mm: "Merc 230",mpg: 22.8,qsec: 22.9,vs: 1,wt: 3.15}
+];
 var text = ggd3.geoms.text();
 var line = ggd3.geoms.line().interpolate('linear')
-var layers = {'mtcars.csv': [ggd3.geoms.text().size(10).position('jitter'), 
+var layers = {'mtcars.csv': [ggd3.geoms.text().size(10), 
                             ggd3.layer().geom(ggd3.geoms.hline()
                                               .lineType(d3.functor('none'))
                                               .lineWidth(3)
                                               )
                               .stat({y: "median"}),
-                            ggd3.layer().geom(ggd3.geoms.vline()
-                                                .color('purple'))],
+                            ggd3.layer().geom('area').data(areaData)
+                              .aes({xmin:100, xmax:200, ymin:24, ymax:30})],
             "iris.csv" : [ggd3.geoms.histogram()
                             .frequency(false),
                           ggd3.geoms.density()
@@ -168,11 +176,10 @@ var layers = {'mtcars.csv': [ggd3.geoms.text().size(10).position('jitter'),
                               .color(d3.functor(null))
                               .alpha(d3.functor(0))
                               .size(4),
-                            ggd3.layer().geom(ggd3.geoms.area()
-                                                .alpha(0.1)
-                                                .fill('grey')
+                            ggd3.layer().geom(ggd3.geoms.ribbon()
+                                                .alpha(0.05)
                                                 .color('black'))
-                              .aes({ymin: -2, ymax: 2})
+                              .aes({ymin: sd, ymax: sd, fill: 'variable'})
                               ],
             "nelplo_columns.csv": [ggd3.geoms.path()
                                       .lineWidth(4)

@@ -35,7 +35,10 @@ function Stat(setting) {
   } else if(_.isString(setting)){
     attributes.linearAgg = setting;
   }
-  this.exclude = ["xintercept", "yintercept", "slope"];
+  this.exclude = ["xintercept", "yintercept", "slope",
+  // maybe we do want to calculate mins and maxs
+    "ymax", "ymin", "xmax", "xmin"
+    ];
 
   this.attributes = attributes;
   var getSet = ["layer", "linearAgg"];
