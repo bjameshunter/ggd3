@@ -2,31 +2,23 @@
 ---
 <html>
 <head>
-    <link rel="shortcut icon" href="favicon.ico">  
-    <link href='http://fonts.googleapis.com/css?family=Lato:300,400,300italic,400italic' rel='stylesheet' type='text/css'>
-    <link href='http://fonts.googleapis.com/css?family=Montserrat:400,700' rel='stylesheet' type='text/css'> 
-    <!-- Global CSS -->
     <link rel="stylesheet" href="assets/plugins/bootstrap/css/bootstrap.min.css">
-    <!-- Plugins CSS -->    
-    <link rel="stylesheet" href="assets/plugins/font-awesome/css/font-awesome.css">
-    <link rel="stylesheet" href="assets/plugins/prism/prism.css">
-    <!-- Theme CSS -->  
     <link rel="stylesheet" href="assets/css/ggd3style.css">
-
-
     <script type="text/javascript" src="assets/js/ggd3.standalone.js"></script>
+    <script type="text/javascript" src="assets/plugins/bootstrap/js/bootstrap.min.js"></script>     
 </head>
 <body>
 <div>
   <select id="dataset" class='btn btn-primary'>
   <option value="mtcars.csv" id='cars' selected>cars</option>
-  <option value="iris.csv" id='iris' >iris</option>
+  <option value="iris.csv" id='iris'>iris</option>
   <option value="diamonds.csv" id='diamonds' >diamonds</option>
   <option value="baseball.csv" id='baseball' >baseball</option>
-  <option value="nelplo.csv" id='nelplo' >nelplo</option>
+  <option value="nelplo.csv" id='nelplo'>nelplo</option>
+  <option value="nelplo_columns.csv" id='nelplo2'>nelplo colwise</option>
   <option value="wells.csv" id='wells' >wells</option>
   <option value="ustimeseries.csv" id='ustimeseries' >ustimeseries</option>
-  <option value="movies.csv" id='movies' >movies</option>
+  <option value="movies.csv" id='movies'>movies</option>
 </select>
 <!-- <select id="xVar" class='btn btn-primary'>
 </select>    
@@ -51,6 +43,9 @@
 </div>
 <div id='chart01' class='chart-frame'></div>
 <script>
+function collectData(layer) {
+  return d3.selectAll('.geom.' + layer).data();
+}
 var ch;
 var div = d3.select('#chart01');
 $("#dataset").on('change', function() {
@@ -59,39 +54,46 @@ $("#dataset").on('change', function() {
 $("#facet-scales").on('change', function() {
   redraw();
 });
-var facets = {'mtcars.csv': null,
+var facets = {'mtcars.csv': {x: 'am', nrows:1},
             "iris.csv" : null, //{y: "Species", nrows:1},
-            "diamonds.csv":  {y: 'clarity', x:'cut'},
-            "baseball.csv": {x: 'team', ncols:3},
+            "diamonds.csv":  {y: 'clarity', ncols:8},
+            "baseball.csv": null,
             "nelplo.csv": {x: 'group', ncols: 3},
             "ustimeseries.csv": {x: 'group', nrows:3},
             "wells.csv":{x:'switch', y: "assoc"},
-            "movies.csv": {x: "Comedy", y: "Short"}, 
+            "movies.csv": {x: "Comedy", y: "Short"},
+            "nelplo_columns.csv": {x:"decade", ncols: 2} ,
           };
-var aes = {'mtcars.csv': {x: "cyl", fill: "gear"},
-            "iris.csv" : {y: "Sepal.Length", fill: "Species",
+var aes = {'mtcars.csv': {y: "mpg", fill: "gear", color: "gear",
+                      x: "cyl", label:"mm"}, 
+            "iris.csv" : {x: "Sepal.Length", fill: "Species",
             color:"Species"
           },
             "diamonds.csv": { 
               y: 'color',
               x: 'price',
-            fill: "color",
+            alpha: "carat", 
+            fill: "cut",
+            color: "cut",
           },
-            "baseball.csv": {x: "ab", y:"batting",
+            "baseball.csv": {x: "team", y:"batting",
             fill: "decade",
             alpha: "hr"},
             "nelplo.csv": {x: 'date', y: 'value', 
-            label: "variable", color:'variable'},
+            label: "variable", color: 'variable'},
             "ustimeseries.csv": {x: 'date', y: 'value', 
-            color:'variable'},
-            "wells.csv": {x: "arsenic", y: 'dist', fill:'switch', alpha:'dist',
+            color:'value', group:'variable'},
+            "wells.csv": {x: "arsenic", y: 'dist', 
+            fill:'switch', alpha:'dist',
             color:"switch"},
             "movies.csv": {
               y:"rating", x: "Documentary", 
               fill: "Romance"
-            }
+            },
+            "nelplo_columns.csv": {x:"real.wages", y: "unemp",
+            label: "date", color: "date"}
           };
-var dtypes = {'mtcars.csv': {"gear": ["string"], "cyl": ["string"]},
+var dtypes = {'mtcars.csv': {"gear": ["string"], "cyl": ["string"], "mm": ["string"]},
             "iris.csv" : {},
             "diamonds.csv": {},
             "baseball.csv": {"year": ['date', 'many', "%Y"],
@@ -99,6 +101,7 @@ var dtypes = {'mtcars.csv': {"gear": ["string"], "cyl": ["string"]},
             "stint": ['string'],
             "batting": ["number", "many"]},
             "nelplo.csv": {"date": ['date', 'many', "%Y-%m"]},
+            "nelplo_columns.csv": {"date": ['date', 'many', "%Y-%m"]},
             "ustimeseries.csv": {"date": ['date', 'many', "%Y-%m"]},
             "wells.csv": {},
             "movies.csv": {
@@ -113,21 +116,47 @@ var dtypes = {'mtcars.csv': {"gear": ["string"], "cyl": ["string"]},
           };
 var FacetType = {'mtcars.csv': "wrap",
             "iris.csv" : "wrap",
-            "diamonds.csv": "wrap",
+            "diamonds.csv": "grid",
             "baseball.csv": "wrap",
             "nelplo.csv": "wrap",
+            "nelplo_columns.csv": "wrap",
             "ustimeseries.csv": "wrap",
             "wells.csv": "wrap",
             "movies.csv": "grid",
           };
 // I don't understand why setting scales (alpha, fill, etc.)
 // here sets them for all future geoms of that type.
-var square = ggd3.geoms.point();
+var point = ggd3.geoms.point();
+var l1 = ggd3.geoms.hline().color('blue').lineType('10,4');
+var l2 = ggd3.geoms.hline().color('red').lineType('5,5');
+var p75 = function(d) { return d3.quantile(d, 0.75); }
+var p25 = function(d) { return d3.quantile(d, 0.25); }
+var sd = function(arr) {
+  var m = d3.mean(arr);
+  return Math.sqrt(d3.mean(arr.map(function(d) { 
+    return Math.pow(d - m, 2); })));
+};
+// is there an easier way to do this?
+var areaData = [
+{am: 1, carb: 4, cyl: "4", disp: 160, drat: 3.9, gear: "4", hp: 110, mm: "Mazda RX4", mpg: 0, qsec: 16.46, vs: 0, wt: 2.62},
+{am: 1, carb: 4, cyl: "4", disp: 160, drat: 3.9, gear: "4", hp: 200, mm: "Mazda RX4", mpg: 30, qsec: 16.46, vs: 0, wt: 2.62},
+{am: 0,carb: 2,cyl: "4",disp: 140.8,drat: 3.92,gear: "4",hp: 95,mm: "Merc 230",mpg: 0,qsec: 22.9,vs: 1,wt: 3.15},
+{am: 0,carb: 2,cyl: "4",disp: 140.8,drat: 3.92,gear: "4",hp: 150,mm: "Merc 230",mpg: 30,qsec: 22.9,vs: 1,wt: 3.15},
+{am: 1,carb: 2,cyl: "4",disp: 140.8,drat: 3.92,gear: "5",hp: 95,mm: "Merc 230",mpg: 0,qsec: 22.9,vs: 1,wt: 3.15},
+{am: 1,carb: 2,cyl: "4",disp: 140.8,drat: 3.92,gear: "5",hp: 150,mm: "Merc 230",mpg: 30,qsec: 22.9,vs: 1,wt: 3.15},
+{am: 0,carb: 2,cyl: "4",disp: 140.8,drat: 3.92,gear: "4",hp: 95,mm: "Merc 230",mpg: 0,qsec: 22.9,vs: 1,wt: 3.15},
+{am: 0,carb: 2,cyl: "4",disp: 140.8,drat: 3.92,gear: "4",hp: 150,mm: "Merc 230",mpg: 30,qsec: 22.9,vs: 1,wt: 3.15}
+
+];
 var text = ggd3.geoms.text();
-var line = ggd3.geoms.line().interpolate('step')
-var layers = {'mtcars.csv': [ggd3.layer()
-                                .position('stack')
-                                .geom(ggd3.geoms.bar().offset('silhouette'))],
+var line = ggd3.geoms.line().interpolate('linear')
+var layers = {'mtcars.csv': [ggd3.geoms.text().size(10).position('jitter'), 
+                            ggd3.layer().geom(ggd3.geoms.hline()
+                                              .lineType(d3.functor('none'))
+                                              .lineWidth(3)
+                                              )
+                              .stat({y: "median"}),
+                            ggd3.layer().geom('area').data(areaData)],
             "iris.csv" : [ggd3.geoms.histogram()
                             .frequency(false),
                           ggd3.geoms.density()
@@ -137,35 +166,65 @@ var layers = {'mtcars.csv': [ggd3.layer()
                             .kernel('gaussianKernel')
                             .color('black'))
                             .aes({fill:null,
-                                  color:null })
+                                  color:null }),
+                          ggd3.layer().geom(ggd3.geoms.vline().color('orange')
+                                            .lineWidth(3).lineType('10,4'))
+                            .aes({xintercept: [5.6]})
                           ],
             "diamonds.csv": [ggd3.geoms.boxplot()] ,
-            "baseball.csv": [ggd3.layer()
-                                .geom('point')],
-            "nelplo.csv": [line],
-            "ustimeseries.csv": [line],
+            "baseball.csv": [ggd3.layer().geom(ggd3.geoms.bar()
+                                                  .offset('expand'))
+                                  .position('stack')
+                                  .stat({y:'mean', alpha: 'max'})],
+            "nelplo.csv": [ggd3.layer().geom(line.lineWidth(2)
+                                              .lineType(null)
+                                              .alpha(0.8)), 
+                            // ggd3.layer().geom(l1)
+                            //   .stat({y: p75}),
+                            // ggd3.layer().geom(l2)
+                            // .stat({y: p25}),
+                            ggd3.geoms.point()
+                              .color(d3.functor(null))
+                              .alpha(d3.functor(0))
+                              .size(4),
+                            ggd3.layer().geom(ggd3.geoms.ribbon()
+                                                .alpha(0.05)
+                                                .color('black'))
+                              .aes({ymin: sd, ymax: sd, fill: 'variable'})
+                              ],
+            "nelplo_columns.csv": [ggd3.geoms.path()
+                                      .lineWidth(4)
+                                      .freeColor(true)
+                                      .lineType("1,1"),
+                                  ggd3.geoms.point()
+                                    .alpha(d3.functor(0))
+                                    .size(10)],
+            "ustimeseries.csv": [line.lineWidth(2)
+                                    .freeColor(true)],
             "wells.csv": [ggd3.layer()
                             .geom(ggd3.geoms.point().color(null)),
-                          ggd3.layer()
+                            ggd3.layer()
                             .data([{int: 100, slope: 20, assoc: 0, switch: 1}, 
                                   {int: 120, slope:-10, assoc: 1, switch: 1},
                                   {int: 150, slope: 0, assoc: 1, switch: 0}])
                             .geom(ggd3.geoms.abline().lineType("5,3")
                                     .color('darkseagreen').alpha(1))
-                            .aes({yint: "int", slope: "slope"})],
+                            .aes({yintercept: "int", slope: "slope"})],
             "movies.csv": [ggd3.layer()
                               .geom(ggd3.geoms.boxplot()
                                       .tail(0.01))]
           };
 var charts = {'mtcars.csv': ggd3.plot()
-                    .width(300)
-                    .height(300)
+                    .width(400)
+                    .height(400)
                     .yScale({axis:{ position:'left', 
                             orient:'left'}})
-                    .xScale({axis: {position: 'top',
-                            orient: 'bottom',
-                            ticks: 4}})
-                    .color('black')
+                    .rangePadding(0.9)
+                    .xScale({axis: {ticks: 4, position: "top"}})
+                    .rangeBand(0.1)
+                    .rangePadding(0.5)
+                    .subRangeBand(0.3)
+                    .subRangePadding(0.2)
                     .margins({top: 5, bottom:10, left:35, right:10})
                     .layers(layers["mtcars.csv"]),
             "iris.csv" : ggd3.plot()
@@ -173,56 +232,73 @@ var charts = {'mtcars.csv': ggd3.plot()
                     .height(700)
                     .yScale({axis: {ticks: 4, position:'left',
                       orient: "left"}})
+                    .xScale({axis: {ticks: 4, position:'top'}})
                     .sizeRange([5, 50])
-                    .margins({top: 5, bottom:20, left:25, right:5})
+                    .margins({top: 5, bottom:20, left:40, right:5})
                     .xScale({axis: {ticks: 4, position: "bottom",
                             orient: "bottom"}})
                     .layers(layers["iris.csv"]),
             "diamonds.csv": ggd3.plot()
                   .layers(layers["diamonds.csv"])
-                  .width(200)
-                  .height(200)
+                  .width(150)
+                  .height(800)
                   .yScale({axis: {ticks: 4, position:'right',
-                          orient: "left"}})
-                  .margins({top: 5, bottom:2, left:2, right:2})
+                          orient: "right"}})
+                  .margins({top: 5, bottom:2, left:2, right:40})
                   .xScale({axis: {ticks: 4, position: "top",
                           orient: "bottom"}}) 
 ,
             "baseball.csv": ggd3.plot()
                   .layers(layers["baseball.csv"])
-                  .width(200)
-                  .height(200)
+                  .width(1300)
+                  .height(300)
+                  .color(null)
                   .size(3)
                   .yScale({axis: {ticks: 4, 
                           position:'right',
-                          orient: "left"}})
-                  .margins({top: 0, bottom:5, left:0, right:10})
+                          orient: "right"}})
+                  .margins({top: 0, bottom:25, left:0, right:40})
                   .xScale({axis: {ticks: 4, 
-                          position: "top",
+                          position: "bottom",
                           orient: "bottom"}})
 ,
             "nelplo.csv": ggd3.plot()
                   .layers(layers["nelplo.csv"])
                   .width(300)
+                  .colorRange(['green', 'blue'])
                   .facet(facets["nelplo.csv"])
                   .height(150)
+                  .colorScale({type: 'category20'})
+                  .fillScale({type: 'category20'})
                   .yScale({axis: {ticks: 4, position:'left',
                           orient: "left"}})
                   .margins({top: 15, bottom:20, left:20, right:5})
                   .xScale({axis: {ticks: 4, position: "bottom",
                           orient: "bottom"}})
 ,
+            "nelplo_columns.csv": ggd3.plot()
+                  .layers(layers["nelplo_columns.csv"])
+                  .width(300)
+                  .facet(facets["nelplo_columns.csv"])
+                  .height(300)
+                  .alpha(0.6)
+                  .yScale({axis: {ticks: 4, position:'left',
+                          orient: "left"}})
+                  .colorRange(['orange', 'darkblue'])
+                  .margins({top: 15, bottom:20, left:30, right:5})
+                  .xScale({axis: {ticks: 4, position: "bottom",
+                          orient: "bottom"}}),
             "ustimeseries.csv": ggd3.plot()
                   .layers(layers["ustimeseries.csv"])
                   .width(500)
                   .facet(facets["ustimeseries.csv"])
                   .height(300)
+                  .colorRange(['orange', 'blue'])
                   .yScale({axis: {ticks: 4, position:'left',
                           orient: "left"}})
                   .margins({top: 5, bottom:10, left:30, right:2})
                   .xScale({axis: {ticks: 4, position: "top",
-                          orient: "bottom"}})
-,
+                          orient: "bottom"}}),
             "wells.csv": ggd3.plot()
                   .width(300)
                   .height(300)
