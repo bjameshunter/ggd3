@@ -1,0 +1,90 @@
+---
+layout: example
+title: Time Series 2
+---
+<style>
+.ygrid path, .xgrid path {
+  stroke-opacity: 0.2;
+}
+.axis .tick line, .x.axis path.domain {
+  stroke-opacity: 0 !important;
+} 
+</style>
+
+<!--
+<select id="facet-scales" class='btn btn-primary'>
+  <option value="fixed" id="fixed" >fixed</option>
+  <option value="free" id="free" selected>free</option>
+  <option value="free_x" id="free_x" >free x</option>
+  <option value="free_y" id="free_y" >free y</option>
+</select>    
+-->
+<script>
+var div = d3.select('#chart01'),
+    chart, data;
+
+$("#facet-scales").on('change', function() {
+  redraw();
+});
+var facet = {x: 'group', nrows: 3, scales: 'free'};
+var p75 = function(d) { return d3.quantile(d, 0.75); }
+var p25 = function(d) { return d3.quantile(d, 0.25); }
+var l1 = ggd3.geoms.hline()
+            .lineType('3,1')
+            .lineWidth(1)
+            .alpha(1);
+var l2 = ggd3.geoms.hline()
+            .lineType('3,1')
+            .lineWidth(1)
+            .alpha(1);
+var sd = function(arr) {
+  var m = d3.mean(arr);
+  return Math.sqrt(d3.mean(arr.map(function(d) { 
+    return Math.pow(d - m, 2); })));
+};
+
+var layers = [ggd3.geoms.line()
+                .lineWidth(1)
+                .lineType(null)
+                .alpha(0.8)
+                .interpolate('step'), 
+              ggd3.layer().geom(l1)
+                .stat({y: p75}),
+              ggd3.layer().geom(l2)
+              .stat({y: p25}),
+              ggd3.geoms.point()
+                .color(d3.functor(null))
+                .alpha(d3.functor(0))
+                .size(4),
+              ggd3.layer()
+                .geom(ggd3.geoms.ribbon()
+                      .color('black'))
+                .aes({ymin: sd, ymax: sd, fill: 'variable'})
+                ];
+
+var chart = ggd3.plot()
+              .layers(layers)
+              .width(300)
+              .dtypes({date: ['date', 'many', "%Y-%m"]})
+              .facet(facet)
+              .height(150)
+              .colorScale({type:'category20'})
+              .fillScale({type:'category20'})
+              .yScale({axis: {ticks: 4, position:'left',
+                      orient: "left"}})
+              .margins({top: 5, bottom:20, left:35, right:5})
+              .xScale({axis: {ticks: 4, position: "bottom",
+                      orient: "bottom"}})
+              .aes({x:'date', y:'value', color:'variable', fill: 'variable'})
+d3.csv("/assets/data/nelplo.csv", function(error, d) {
+  data = d;
+  chart.data(data).draw(div);
+})
+
+function redraw() {
+  chart.facet()
+    .scales($("#facet-scales")[0].value);
+  chart.draw(div);
+}
+
+</script>

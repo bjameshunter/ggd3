@@ -1,3 +1,5 @@
+---
+---
 <!DOCTYPE html>
 <!--[if IE 8]> <html lang="en" class="ie8"> <![endif]-->  
 <!--[if IE 9]> <html lang="en" class="ie9"> <![endif]-->  
@@ -14,16 +16,16 @@
     <link href='http://fonts.googleapis.com/css?family=Lato:300,400,300italic,400italic' rel='stylesheet' type='text/css'>
     <link href='http://fonts.googleapis.com/css?family=Montserrat:400,700' rel='stylesheet' type='text/css'> 
     <!-- Global CSS -->
-    <link rel="stylesheet" href="assets/plugins/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/assets/plugins/bootstrap/css/bootstrap.min.css">
     <!-- Plugins CSS -->    
-    <link rel="stylesheet" href="assets/plugins/font-awesome/css/font-awesome.css">
-    <link rel="stylesheet" href="assets/plugins/prism/prism.css">
+    <link rel="stylesheet" href="/assets/plugins/font-awesome/css/font-awesome.css">
+    <link rel="stylesheet" href="/assets/plugins/prism/prism.css">
     <!-- Theme CSS -->  
-    <link id="theme-style" rel="stylesheet" href="assets/css/styles-2.css">
-    <link rel="stylesheet" href="assets/css/ggd3style.css">
+    <link rel="stylesheet" href="/assets/css/ggd3style.css">
+    <link id="theme-style" rel="stylesheet" href="/assets/css/styles-2.css">
 
 
-    <script type="text/javascript" src="assets/js/ggd3.standalone.js"></script>
+    <script type="text/javascript" src="/assets/js/ggd3.standalone.js"></script>
     <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
     <!--[if lt IE 9]>
       <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
@@ -49,14 +51,17 @@
                         <span class="icon-bar"></span>
                         <span class="icon-bar"></span>
                     </button><!--//nav-toggle-->
-                </div><!--//navbar-header-->            
-                <div class="navbar-collapse collapse" id="navbar-collapse">
+                </div>
+                <!--//navbar-header-->            
+                <div class="collapse navbar-collapse" id="navbar-collapse">
                     <ul class="nav navbar-nav">
                         <li class="active nav-item sr-only"><a class="scrollto" href="#promo">top</a></li>
                         <li class="nav-item"><a class="scrollto" href="#plan">the plan</a></li>
                         <li class="nav-item"><a class="scrollto" href="#start">start</a></li>
-                        <li class="nav-item"><a href="examples.html">examples</a></li>
-<!--                         <li class="nav-item"><a class="scrollto" href="#license">License</a></li>                        
+                        <li class="nav-item"><a href="" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Examples<span class="caret"></span></a>
+                        </li>
+        </li>
+        <!--                         <li class="nav-item"><a class="scrollto" href="#license">License</a></li>                        
  -->                    </ul><!--//nav-->
                 </div><!--//navabr-collapse-->
             </nav><!--//main-nav-->
@@ -212,6 +217,15 @@ carChart.draw(d3.select('#cars'));
             </div><!--//block-->   
             <div class="block">
                 <p>And yes, there are no axis labels yet. Those'll happen in due time. Check out the examples, they're still a little rough, but they make sense. Thanks for reading. Hit me up on github.</p>
+<ul>
+{% for example in site.data.examples %}
+  <li>
+    <a href="{{ example.url }}">
+      {{ example.name }}
+    </a>
+  </li>
+{% endfor %}
+</ul>
             </div>    
 <!--             <div class="block">
                 <h3 class="sub-title text-center">Full Documentation</h3>
@@ -265,14 +279,14 @@ carChart.draw(d3.select('#cars'));
     </footer><!--//footer-->
      
     <!-- Javascript -->          
-    <script type="text/javascript" src="assets/plugins/jquery-1.11.1.min.js"></script>
-    <script type="text/javascript" src="assets/plugins/jquery-migrate-1.2.1.min.js"></script>    
-    <script type="text/javascript" src="assets/plugins/jquery.easing.1.3.js"></script>   
-    <script type="text/javascript" src="assets/plugins/bootstrap/js/bootstrap.min.js"></script>     
-    <script type="text/javascript" src="assets/plugins/jquery-scrollTo/jquery.scrollTo.min.js"></script> 
-    <script type="text/javascript" src="assets/plugins/prism/prism.js"></script>    
-    <script type="text/javascript" src="assets/js/main.js"></script>       
-    <script type="text/javascript" src="assets/js/homepage.js"></script>
+    <script type="text/javascript" src="/assets/plugins/jquery-1.11.1.min.js"></script>
+    <script type="text/javascript" src="/assets/plugins/jquery-migrate-1.2.1.min.js"></script>    
+    <script type="text/javascript" src="/assets/plugins/jquery.easing.1.3.js"></script>   
+    <script type="text/javascript" src="/assets/plugins/bootstrap/js/bootstrap.min.js"></script>     
+    <script type="text/javascript" src="/assets/plugins/jquery-scrollTo/jquery.scrollTo.min.js"></script> 
+    <script type="text/javascript" src="/assets/plugins/prism/prism.js"></script>    
+    <script type="text/javascript" src="/assets/js/main.js"></script>       
+    <script type="text/javascript" src="/assets/js/homepage.js"></script>
 </body>
 </html> 
 

@@ -1,0 +1,26 @@
+- name: stacked bar
+  url: baseball
+
+- name: histogram
+  url: iris
+
+- name: boxplot1
+  url: movies
+
+- name: line gradient
+  url: ustimeseries
+
+- name: boxplot2
+  url: diamonds
+
+- name: ribbon
+  url: nelplo
+
+- name: path
+  url: nelplocolumns
+
+- name: bullet
+  url: bullet
+
+- name: text with bar
+  url: cars

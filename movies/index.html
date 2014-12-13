@@ -1,0 +1,52 @@
+---
+layout: example
+title: Movies
+---
+<!-- <select id="xVar" class='btn btn-primary'>
+</select>    
+<select id="yVar" class='btn btn-primary'>
+</select>    
+ -->
+<!-- <select id="xAxisPos" class='btn btn-primary'>
+  <option value="bottom" selected>x axis bottom</option>
+  <option value="top">x axis top</option>
+</select>    
+<select id="yAxisPos" class='btn btn-primary'>
+  <option value="left" selected>y axis left</option>
+  <option value="right">y axis right</option>
+</select>    
+ -->
+</div>
+<div id='chart01' class='chart-frame'></div>
+<script>
+function collectData(layer) {
+  return d3.selectAll('.geom.' + layer).data();
+}
+var div = d3.select('#chart01'),
+    chart, data;
+
+var layers = [ggd3.geoms.boxplot()];
+
+var facet = ggd3.facet({x:'Romance', y: "Comedy",
+                          type:'grid'});
+
+var chart = ggd3.plot()
+              .facet(facet)
+              .layers(layers)
+              .width(300)
+              .height(300)
+              .margins({top:0, bottom:0, left:0, right:0})
+              .yScale({axis:{orient:'right', position:'left'}})
+              .xScale({axis:{orient:'bottom', position:'top'}})
+              .aes({x:"Drama", y:"rating", fill: 'Action'})
+
+d3.csv("/assets/data/movies.csv", function(error, d) {
+  data = d;
+  chart.data(data).draw(div);
+})
+
+function redraw() {
+  chart.draw(div);
+}
+
+</script>
