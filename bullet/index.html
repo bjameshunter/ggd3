@@ -70,7 +70,7 @@ function makeOneZero(o, v) {
   o2[v] = 0;
   return [o, o2];
 }
-d3.csv("/assets/data/mtcars.csv", function(error, d) {
+d3.csv("../assets/data/mtcars.csv", function(error, d) {
   data = d;
   var d2 = _.clone(d)
   areaData = d3.nest()

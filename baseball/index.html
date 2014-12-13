@@ -64,7 +64,7 @@ var chart = ggd3.plot()
                   "stint": ['string'],
                   "batting": ["number", "many"]})
 
-d3.csv("/assets/data/baseball.csv", function(error, d) {
+d3.csv("../assets/data/baseball.csv", function(error, d) {
   data = d;
   chart.data(data).draw(div);
 })

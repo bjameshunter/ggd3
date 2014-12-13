@@ -62,7 +62,7 @@ var chart = ggd3.plot()
                     .margins({top: 5, bottom:10, left:50, right:10})
                     .layers(layers);
 
-d3.csv("/assets/data/mtcars.csv", function(error, d) {
+d3.csv("../assets/data/mtcars.csv", function(error, d) {
   data = d;
   chart.data(data)
       .draw(div);
