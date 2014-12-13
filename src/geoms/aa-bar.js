@@ -120,10 +120,12 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       o2, // used to calculate rangeband if histogram
       valueVar, // holds aggregated name
       categoryVar, // name of bar positions
+      // original subscale
+      pSub = s.plot.subScale().single.scale(),
       // secondary ordinal scale to calc dodged rangebands
-      groupOrd  = d3.scale.ordinal(),
-      drawX     = true,
-      drawY     = true,
+      sub,
+      drawX     = this.drawX(),
+      drawY     = this.drawY(),
       vertical = this.vertical(s);
 
   if(_.contains(['wiggle', 'silhouette'], that.offset()) ){
@@ -149,11 +151,11 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
   if(that.offset() === "expand"){
     if(vertical){
       _.mapValues(s.plot.yScale(), function(v, k) {
-        v.domain([-0.05,1.05]);
+        v.domain([-0.02,1.02]);
       });
     } else {
       _.mapValues(s.plot.xScale(), function(v, k) {
-        v.domain([-0.05,1.05]);
+        v.domain([-0.02,1.02]);
       });  
     }
   }
@@ -238,12 +240,16 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
                    that.name() === "histogram" ? true:false);
   if(s.position === 'dodge') {
     // make ordinal scale for group
-    groupOrd.rangeBands([0, rb], 0, 0)
-            .domain(s.groups);
-    rb = groupOrd.rangeBand();
-  }
-  if(s.position !== "dodge"){
-    groupOrd = function(d) {
+    sub = d3.scale.ordinal()
+            .domain(pSub.domain());
+    var rrb = pSub.rangeExtent();
+    rb = [];
+    rb[0] = _.isNumber(this.subRangeBand()) ? this.subRangeBand(): s.plot.subRangeBand();
+    rb[1] = _.isNumber(this.subRangePadding()) ? this.subRangePadding(): s.plot.subRangePadding();
+    sub.rangeRoundBands(rrb, rb[0], rb[1]);
+    rb = sub.rangeBand();
+  } else {
+    sub = function(d) {
       return 0;
     };
   }
@@ -252,12 +258,12 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     if(that.name() === "bar" || vertical){
       return function(d) {
         var p = o(d[s.aes[width.p]]);
-        p += groupOrd(d[s.group]) || 0;
+        p += sub(d[s.group]) || 0;
         return p || 0;};
     } else {
       return function(d) {
         var p = o(d[s.aes[width.p]]) - rb;
-        p += groupOrd(d[s.group]) || 0;
+        p += sub(d[s.group]) || 0;
         return p || 0;
         };
     }

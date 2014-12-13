@@ -1,0 +1,70 @@
+<html>
+<head>
+<link rel='stylesheet' href='../css/ggd3style.css'>
+<link rel='stylesheet' href='../node_modules/bootstrap/dist/css/bootstrap.css'>
+<script type='text/javascript' src='../ggd3.standalone.js'></script></head>
+</head>
+<style>
+.ygrid path, .xgrid path {
+  stroke-opacity: 0.2;
+}
+.axis .tick line, .axis path.domain {
+  stroke-opacity: 0 !important;
+} 
+</style>
+<body>
+<!-- <select id="xVar" class='btn btn-primary'>
+</select>    
+<select id="yVar" class='btn btn-primary'>
+</select>    
+ -->
+<!-- <select id="xAxisPos" class='btn btn-primary'>
+  <option value="bottom" selected>x axis bottom</option>
+  <option value="top">x axis top</option>
+</select>    
+<select id="yAxisPos" class='btn btn-primary'>
+  <option value="left" selected>y axis left</option>
+  <option value="right">y axis right</option>
+</select>    
+ -->
+</div>
+<div id='chart01' class='chart-frame' style="padding:30px"></div>
+<script>
+function collectData(layer) {
+  return d3.selectAll('.geom.' + layer).data();
+}
+var div = d3.select('#chart01'),
+    chart, data;
+
+var facet = ggd3.facet({x:"assoc", y:"switch", type:'grid',
+                      titleSize: [30,30]});
+
+var chart = ggd3.plot()
+              .facet(facet)
+              .layers([ggd3.layer().geom('bar')])
+              .dtypes({educ: ['number', 'few']})
+              .height(300)
+              .width(300)
+              .rangePadding(0.8)
+              .rangeBand(0.05)
+              .yScale({axis:{position:'right',
+                      orient: 'right'}})
+              .xScale({axis:{position:'top',
+                      orient: 'bottom'}})
+              .fillScale({type:'category20b'})
+              .margins({right: 35, left:5, top:5, bottom:0})
+              .color('none')
+              .aes({x:'dist', y:'educ'})
+
+d3.csv("../data/wells.csv", function(error, d) {
+  data = d;
+  chart.data(data).draw(div);
+})
+
+function redraw() {
+  chart.draw(div);
+}
+
+</script>
+</body>
+</html>

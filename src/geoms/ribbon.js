@@ -60,13 +60,6 @@ Ribbon.prototype.generator = function(aes, x, y, o2, group, n) {
           .y1(function(d, i) { return y('ymax', n)(d); });
 };
 
-Ribbon.prototype.check = function(aes, d) {
-  if(!aes[d + 'min'] || !aes[d + 'max']){
-    throw "You must specify, as a function, variable, or constant" +
-      " a " + d + "min and " + d + "max";
-  }
-};
-
 // ribbon is always an operation on ymin, ymax, and x
 Ribbon.prototype.draw = function(sel, data, i, layerNum) {
   var s = this.setup(),

@@ -4,14 +4,18 @@
 // 3. Better details on boxplot tooltip
 // 4. Consider annotation object
 // 5. Delete relevant scale when aes changes so they'll be recreated.
-// 6. Always update subscale so fixed/free scales work
+// 6. Sorting method for ordinal domains
 // 7. Add 5 number option to boxplot
 // 8. update numeric scale domains, they get bigger but not smaller.
-
+      // - resetting a scale with null also works
+// 9. Add rangeBand, subRangeBand, rangePadding and subRangePadding
+//    to all geoms that can be mounted on ordinal axes.
 
 // for much later:
 // Zoom behaviors: fixed scales get global zoom on linear axes
     // free scales get their own zoom;
+// A single context brush should be mountable as a seperate object
+// somewhere close to the plot
 
 
 function Plot() {
@@ -25,7 +29,7 @@ function Plot() {
     aes: {},
     legends: null, // strings corresponding to scales
     // that need legends or legend objects
-    facet: ggd3.facet(),
+    facet: ggd3.facet().plot(this),
     width: 400,
     height: 400,
     margins: {left:20, right:20, top:20, bottom:20},
@@ -186,7 +190,8 @@ Plot.prototype.margins = function(margins) {
 
 Plot.prototype.layers = function(layers) {
   if(!arguments.length) { return this.attributes.layers; }
-  var aes;
+  var aes,
+      origAes = _.clone(this.aes());
   if(_.isArray(layers)) {
     // allow reseting of layers by passing empty array
     if(layers.length === 0){
@@ -198,7 +203,7 @@ Plot.prototype.layers = function(layers) {
       if(_.isString(l)){
         // passed string to get geom with default settings
         l = ggd3.layer()
-              .aes(_.clone(this.aes()))
+              .aes(_.clone(origAes))
               .data(this.data(), true)
               .geom(l);
       } else if ( l instanceof ggd3.layer ){
@@ -209,17 +214,20 @@ Plot.prototype.layers = function(layers) {
         } else {
           l.ownData(true);
         }
-        l.aes(_.merge(_.clone(this.aes()), aes));
+        // inherit plot level aesthetics and override 
+        // w/ explicitly declared aesthetics.
+        l.aes(_.merge(_.clone(origAes), _.clone(aes)));
       } else if (l instanceof ggd3.geom){
+
         var g = l;
         l = ggd3.layer()
-                .aes(_.clone(this.aes()))
+                .aes(_.clone(origAes))
                 .data(this.data(), true)
                 .geom(g);
       }
       l.plot(this).dtypes(this.dtypes());
       this.attributes.layers.push(l);
-      this.aes(_.merge(l.aes(), this.aes()));
+      // this.aes(_.merge(_.clone(l.aes()), _.clone(origAes)));
     }, this);
   } else if (layers instanceof ggd3.layer) {
     if(!layers.data()) { 
@@ -227,12 +235,12 @@ Plot.prototype.layers = function(layers) {
     } else {
       layers.ownData(true);
     }
-    aes = layers.aes();
-    layers.aes(_.merge(_.clone(this.aes()), aes))
+    aes = _.clone(layers.aes());
+    layers.aes(_.merge(_.clone(origAes), _.clone(aes)))
       .dtypes(this.dtypes())
       .plot(this);
     this.attributes.layers.push(layers);
-    this.aes(_.merge(layers.aes(), this.aes()));
+    // this.aes(_.merge(_.clone(aes), _.clone(origAes)));
   } 
   return this;
 };
@@ -264,7 +272,8 @@ Plot.prototype.updateLayers = function() {
 
   _.each(this.layers(), function(l) {
     l.dtypes(this.dtypes());
-    if(!l.ownData()) { l.data(this.data(), true); }
+    if(!l.ownData()) { 
+      l.data(this.data(), true); }
     // plot level aes never override layer level.
     l.aes(_.merge(_.clone(this.aes()), l.aes()));
   }, this);
@@ -308,12 +317,15 @@ Plot.prototype.setFixedScale = function(a) {
                   return v.domain()[1];
                 }).domain()[1];
   } else {
-    domain = _.compact(_.sortBy(_.unique(
+    domain = _.sortBy(_.unique(
                   _.flatten(
                     _.map(this[a + "Scale"](), function(v, k){
                   if(k === "single") { return undefined; }
                       return v.domain();
-                    }, this) ))));
+                    }, this) )));
+    domain = _.filter(domain, function(d) {
+      return !_.isUndefined(d) && !_.isNull(d);
+    });
   }
   // scale.scale().domain(domain);
   return scale.domain(domain);
@@ -328,16 +340,10 @@ Plot.prototype.plotDim = function() {
   return {x: this.width() - margins.left - margins.right,
    y: this.height() - margins.top - margins.bottom};
 };
-Plot.prototype.makeSubScale = function(scale, groups) {
-  var sub = d3.scale.ordinal()
-              .rangeBands([0, scale.scale().rangeBand()], 
-                               this.subRangeBand(), 
-                               this.subRangePadding())
-              .domain(groups);
-  return sub;
-};
 
-// possible ordering rule as arg?
+// subScale holds default settings, but
+// geoms just copy those settings and make an 
+// entirely new scale.
 Plot.prototype.setSubScale = function(order) {
   // do nuthin if no ordinal
   var xord = this.xScale().single.scaleType(),
@@ -358,14 +364,20 @@ Plot.prototype.setSubScale = function(order) {
   // the first layer is special, it should be the layer with all
   // relevent categorical info. Subsequent layers should only, 
   // if necessary, expand numerical scales.
-  domain = this.layers()[0].geom().collectGroups();
+  domain = this.layers()[0].geom().collectGroups() || [];
   this.subDomain(domain);
-  this.subScale({single: ggd3.scale({type:'ordinal'})
-                              .scale({domain: domain})
-                              .range([0, ord.rangeBand()],
-                                     [this.subRangeBand(), 
-                                      this.subRangePadding()])});
+  if(!domain.length){
+    this.subScale({single: ggd3.scale({type:'ordinal'})
+                              .scale({domain:[1]})
+                              .range([0, ord.rangeBand()], [0,0])});
+  }else {
+    this.subScale({single: ggd3.scale({type:'ordinal'})
+                                .scale({domain: domain})
+                                .range([0, ord.rangeBand()],
+                                       [this.subRangeBand(), 
+                                        this.subRangePadding()])});
 
+  }
 };
 
 
@@ -408,7 +420,8 @@ Plot.prototype.draw = function(sel) {
       var cl = d3.select(this).attr('class').split(' ');
       return !_.contains(classes, cl[1]);
     })
-    .transition().style('opacity', 0).remove();
+    .transition().style('opacity', 0)
+    .remove();
   // if any of the layers had a jitter, it has
   // been added to each facet's dataset
   if(_.any(this.layers(), function(l) {

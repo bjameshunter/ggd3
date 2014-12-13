@@ -1,0 +1,78 @@
+<html>
+<head>
+<link rel='stylesheet' href='../css/ggd3style.css'>
+<link rel='stylesheet' href='../node_modules/bootstrap/dist/css/bootstrap.css'>
+<script type='text/javascript' src='../ggd3.standalone.js'></script></head>
+</head>
+<body>
+<!-- <select id="xVar" class='btn btn-primary'>
+</select>    
+<select id="yVar" class='btn btn-primary'>
+</select>    
+ -->
+<select id="facet-scales" class='btn btn-primary'>
+  <option value="fixed" id="fixed" >fixed</option>
+  <option value="free" id="free" selected>free</option>
+  <option value="free_x" id="free_x" >free x</option>
+  <option value="free_y" id="free_y" >free y</option>
+</select>    
+<!-- <select id="xAxisPos" class='btn btn-primary'>
+  <option value="bottom" selected>x axis bottom</option>
+  <option value="top">x axis top</option>
+</select>    
+<select id="yAxisPos" class='btn btn-primary'>
+  <option value="left" selected>y axis left</option>
+  <option value="right">y axis right</option>
+</select>    
+ -->
+</div>
+<div id='chart01' class='chart-frame'></div>
+<script>
+function collectData(layer) {
+  return d3.selectAll('.geom.' + layer).data();
+}
+$("#facet-scales").on('change', function() {
+  redraw();
+});
+var div = d3.select('#chart01'),
+    chart, data;
+
+var layers = [ggd3.geoms.path()
+                  .lineWidth(4)
+                  .freeColor(true)
+                  .lineType("none"),
+              ggd3.geoms.point()
+                .alpha(d3.functor(0))
+                .color('none')
+                .size(10)];
+
+var facet = ggd3.facet({x:'decade', ncols: 2}).scales('free');
+
+var chart = ggd3.plot()
+              .colorRange(['orange', 'blue'])
+              .layers(layers)
+              .facet(facet)
+              .margins({left: 35, bottom:30})
+              .xScale({axis:{ticks:4}})
+              .yScale({axis:{ticks:4}})
+              .dtypes({"date": ['date', 'many', "%Y-%m"]})
+              .width(300)
+              .height(300);
+
+d3.csv("../data/nelplo_columns.csv", function(error, d) {
+  data = d;
+  chart.data(data)
+      .aes({x:"real.wages", y: "unemp",
+          label: "date", color: 'date'});
+  chart.draw(div);
+})
+
+function redraw() {
+  chart.facet()
+    .scales($("#facet-scales")[0].value);
+  chart.draw(div);
+}
+
+</script>
+</body>
+</html>

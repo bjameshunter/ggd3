@@ -87,7 +87,7 @@ Line.prototype.drawLines = function (path, line, s, layerNum) {
     path
       .attr('opacity', function(d) { return s.alpha(d[1]) ;})
       .attr('stroke', function(d) { return s.lcolor(d[1]);})
-      .attr('stroke-width', 1)
+      .attr('stroke-width', this.lineWidth())
       .attr('fill',  function(d) { 
         return s.gradient ? s.lcolor(d[1]): 'none';});
   }
@@ -175,7 +175,7 @@ Line.prototype.sample = function(d, l, x, y, color, aes) {
         return o;
       });
   return d;
-  // use this code for continuous gradient legends, for example.
+  // uncomment this code for continuous gradient legends, for example.
   // var path = document.createElementNS(d3.ns.prefix.svg, "path");
   // path.setAttribute("d", l(d);
   // var n = path.getTotalLength(), t = [0], i = 0, 
@@ -192,7 +192,7 @@ Line.prototype.sample = function(d, l, x, y, color, aes) {
 };
 
 // Compute quads of adjacent points [p0, p1, p2, p3].
-Line.prototype.quad = function(points) {
+Line.prototype.quad = function(points, aes) {
   return d3.range(points.length - 1).map(function(i) {
     var a = [points[i - 1], points[i], points[i + 1], points[i + 2]];
     a[aes.color] = (points[i][aes.color] + points[i + 1][aes.color]) / 2;

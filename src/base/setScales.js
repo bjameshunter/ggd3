@@ -42,6 +42,7 @@ function makeScale(selector, a, opts, vname) {
     // if a dtype is not found, it's because it's x or y and 
     // has not been declared. It will be some numerical aggregation.
     dtype = this.dtypes()[vname] || ['number', 'many'];
+    console.log(vname + " " + dtype[0] + " " + dtype[1] + " " + a);
     settings = _.merge(ggd3.tools.defaultScaleSettings(dtype, a),
                        opts);
     var scale = ggd3.scale(settings)
@@ -57,6 +58,7 @@ function makeScale(selector, a, opts, vname) {
                     [this.rangeBand(), this.rangePadding()]);
       }
       scale.axis = d3.svg.axis().scale(scale.scale());
+      if(a === "y"){console.log(scale);}
       for(var ax in settings.axis){
         if(scale.axis.hasOwnProperty(ax)){
           scale.axis[ax](settings.axis[ax]);

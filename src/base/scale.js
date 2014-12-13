@@ -50,19 +50,19 @@ Scale.prototype.scaleType = function(scaleType) {
   this.attributes.scaleType = scaleType;
   switch(scaleType) {
     case 'linear':
-      this.attributes.scale = d3.scale.linear();
+      this.attributes.scale = d3.scale.linear().nice();
       break;
     case 'log':
-      this.attributes.scale = d3.scale.log();
+      this.attributes.scale = d3.scale.log().nice();
       break;
     case 'ordinal':
       this.attributes.scale = d3.scale.ordinal();
       break;
     case 'time':
-      this.attributes.scale = d3.time.scale();
+      this.attributes.scale = d3.time.scale().nice();
       break;
     case 'date':
-      this.attributes.scale = d3.time.scale();
+      this.attributes.scale = d3.time.scale().nice();
       break;
     case "category10":
       this.attributes.scale = d3.scale.category10();
@@ -93,7 +93,9 @@ Scale.prototype.scale = function(settings){
 Scale.prototype.range = function(range, rb) {
   if(!arguments.length) { return this.attributes.range; }
   if(this.scaleType() === "ordinal"){
-    if(_.isUndefined(rb)) { rb = this.rangeBands(); }
+    if(_.isUndefined(rb)) { 
+      rb = this.rangeBands(); 
+    }
     this.attributes.scale
         .rangeRoundBands(range, rb[0], rb[1]);
   } else {

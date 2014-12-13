@@ -17,6 +17,8 @@ function Geom(aes) {
     style: "", // optional class attributes for css 
     tooltip: null,
     groups: null, 
+    subRangeBand: 0,
+    subRangePadding: 0,
   };
   var r = function(d) { return ggd3.tools.round(d, 2);};
   // default tooltip

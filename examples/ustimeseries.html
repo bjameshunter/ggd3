@@ -1,0 +1,73 @@
+<html>
+<head>
+<link rel='stylesheet' href='../css/ggd3style.css'>
+<link rel='stylesheet' href='../node_modules/bootstrap/dist/css/bootstrap.css'>
+<script type='text/javascript' src='../ggd3.standalone.js'></script></head>
+</head>
+<body>
+<!-- <select id="xVar" class='btn btn-primary'>
+</select>    
+<select id="yVar" class='btn btn-primary'>
+</select>    
+ -->
+<select id="facet-scales" class='btn btn-primary'>
+  <option value="fixed" id="fixed">fixed</option>
+  <option value="free" id="free" selected>free</option>
+  <option value="free_x" id="free_x" >free x</option>
+  <option value="free_y" id="free_y" >free y</option>
+</select>    
+<!-- <select id="xAxisPos" class='btn btn-primary'>
+  <option value="bottom" selected>x axis bottom</option>
+  <option value="top">x axis top</option>
+</select>    
+<select id="yAxisPos" class='btn btn-primary'>
+  <option value="left" selected>y axis left</option>
+  <option value="right">y axis right</option>
+</select>    
+ -->
+</div>
+<div id='chart01' class='chart-frame'></div>
+<script>
+function collectData(layer) {
+  return d3.selectAll('.geom.' + layer).data();
+}
+$("#facet-scales").on('change', function() {
+  redraw();
+});
+
+var div = d3.select('#chart01'),
+    chart, data;
+
+var layers = [ggd3.geoms.line().lineWidth(2)
+                .freeColor(true)
+                .lineType('none'),
+              ggd3.geoms.point()
+                .color(d3.functor('none'))
+                .size(10)
+                .alpha(d3.functor(0))];
+
+var facet = ggd3.facet({y:"group", nrows:2, scales: 'free'});
+
+var chart = ggd3.plot()
+              .facet(facet)
+              .layers(layers)
+              .height(250)
+              .margins({left: 50})
+              .dtypes({date: ['date', 'many']})
+              .colorRange(['seagreen', 'orange'])
+              .aes({x: 'date', y: 'value', color:'value',
+                    group:'variable'})
+
+d3.csv("../data/ustimeseries.csv", function(error, d) {
+  data = d;
+  chart.data(data).draw(div);
+})
+
+function redraw() {
+  chart.facet().scales($('#facet-scales')[0].value);
+  chart.draw(div);
+}
+
+</script>
+</body>
+</html>

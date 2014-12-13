@@ -155,6 +155,7 @@ Facet.prototype.makeSVG = function(selection, rowNum, colNum) {
       x = selection.data()[0],
       addHeight = (rowNum === 0 || this.type() === "wrap") ? that.titleSize()[1]:0,
       addWidth = colNum === 0 ? that.titleSize()[0]:0,
+      addWidthSVG = (colNum+1) === this._ncols ? plot.margins().right:0,
       width = plot.width() + addWidth,
       height = plot.height() + addHeight,
       svg = selection
@@ -164,8 +165,8 @@ Facet.prototype.makeSVG = function(selection, rowNum, colNum) {
               .selectAll('svg.svg-wrap')
               .data([0]);
 
-  svg
-    .attr('width', width)
+    svg
+    .attr('width', width + addWidthSVG)
     .attr('height', height)
     .each(function(d) {
       that.makeTitle(d3.select(this), colNum, rowNum);
@@ -177,7 +178,7 @@ Facet.prototype.makeSVG = function(selection, rowNum, colNum) {
     });
   svg.enter().append('svg')
     .attr('class', 'svg-wrap')
-    .attr('width', width)
+    .attr('width', width + addWidthSVG)
     .attr('height', height)
     .each(function(d) {
       that.makeTitle(d3.select(this), colNum, rowNum);
@@ -253,18 +254,10 @@ Facet.prototype.makeCell = function(selection, colNum, rowNum,
       that = this,
       gridClassX = (this.type()==="grid" && rowNum!==0) ? " grid": "",
       gridClassY = (this.type()==="grid" && colNum!==(ncols-1)) ? " grid": "";
-
-  function makeG(sel, cls, cls2) {
-    var g = sel.selectAll('g.' + cls.replace(/ /g, "."))
-      .data([0]);
-    g.enter().append('g')
-      .attr('class', cls + cls2);
-    g.exit().remove();
-    return g;
-  }
-  makeG(selection, "xgrid", "")
+  
+  this.makeG(selection, "xgrid", "")
     .attr("transform", "translate(" + margins.left + "," + margins.top + ")");
-  makeG(selection, "ygrid", "")
+  this.makeG(selection, "ygrid", "")
     .attr("transform", "translate(" + margins.left + "," + margins.top + ")");
 
   var plot = selection.selectAll('g.plot')
@@ -287,8 +280,17 @@ Facet.prototype.makeCell = function(selection, colNum, rowNum,
     });
   plot.exit().remove();
 
-  makeG(selection, "x axis", gridClassX);
-  makeG(selection, "y axis", gridClassY);
+  // complex set of conditions based on facet and scale requests.
+  this.makeG(selection, "x axis", gridClassX);
+  this.makeG(selection, "y axis", gridClassY);
+};
+Facet.prototype.makeG = function (sel, cls, cls2) {
+  var g = sel.selectAll('g.' + cls.replace(/ /g, "."))
+    .data([0]);
+  g.enter().append('g')
+    .attr('class', cls + cls2);
+  g.exit().remove();
+  return g;
 };
 
 Facet.prototype.makeTitle = function(selection, colNum, rowNum) {

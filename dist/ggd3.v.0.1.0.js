@@ -12,6 +12,20 @@
     }
     return accessor;
   }
+ggd3.tools.arrayOfArrays = function(data) {
+  // first level are all arrays
+  if(_.all(_.map(data, _.isPlainObject))) {
+    // we shouldn't be here.
+    return data;
+  }
+  var l1 = _.flatten(data, true),
+      l1arrays = _.all(_.map(l1, _.isArray));
+  // second level
+  var l2 = _.flatten(l1, true),
+      l2obs = _.all(_.map(l2, _.isPlainObject));
+  if(l1arrays && l2obs) {console.log(l1); return l1; }
+  return ggd3.tools.arrayOfArrays(l1);
+};
 function Clean(data, obj) {
   // coerce each records data to reasonable
   // type and get domains for all scales in aes.
@@ -452,6 +466,7 @@ Facet.prototype.makeSVG = function(selection, rowNum, colNum) {
       x = selection.data()[0],
       addHeight = (rowNum === 0 || this.type() === "wrap") ? that.titleSize()[1]:0,
       addWidth = colNum === 0 ? that.titleSize()[0]:0,
+      addWidthSVG = (colNum+1) === this._ncols ? plot.margins().right:0,
       width = plot.width() + addWidth,
       height = plot.height() + addHeight,
       svg = selection
@@ -461,8 +476,8 @@ Facet.prototype.makeSVG = function(selection, rowNum, colNum) {
               .selectAll('svg.svg-wrap')
               .data([0]);
 
-  svg
-    .attr('width', width)
+    svg
+    .attr('width', width + addWidthSVG)
     .attr('height', height)
     .each(function(d) {
       that.makeTitle(d3.select(this), colNum, rowNum);
@@ -474,7 +489,7 @@ Facet.prototype.makeSVG = function(selection, rowNum, colNum) {
     });
   svg.enter().append('svg')
     .attr('class', 'svg-wrap')
-    .attr('width', width)
+    .attr('width', width + addWidthSVG)
     .attr('height', height)
     .each(function(d) {
       that.makeTitle(d3.select(this), colNum, rowNum);
@@ -550,18 +565,10 @@ Facet.prototype.makeCell = function(selection, colNum, rowNum,
       that = this,
       gridClassX = (this.type()==="grid" && rowNum!==0) ? " grid": "",
       gridClassY = (this.type()==="grid" && colNum!==(ncols-1)) ? " grid": "";
-
-  function makeG(sel, cls, cls2) {
-    var g = sel.selectAll('g.' + cls.replace(/ /g, "."))
-      .data([0]);
-    g.enter().append('g')
-      .attr('class', cls + cls2);
-    g.exit().remove();
-    return g;
-  }
-  makeG(selection, "xgrid", "")
+  
+  this.makeG(selection, "xgrid", "")
     .attr("transform", "translate(" + margins.left + "," + margins.top + ")");
-  makeG(selection, "ygrid", "")
+  this.makeG(selection, "ygrid", "")
     .attr("transform", "translate(" + margins.left + "," + margins.top + ")");
 
   var plot = selection.selectAll('g.plot')
@@ -584,8 +591,17 @@ Facet.prototype.makeCell = function(selection, colNum, rowNum,
     });
   plot.exit().remove();
 
-  makeG(selection, "x axis", gridClassX);
-  makeG(selection, "y axis", gridClassY);
+  // complex set of conditions based on facet and scale requests.
+  this.makeG(selection, "x axis", gridClassX);
+  this.makeG(selection, "y axis", gridClassY);
+};
+Facet.prototype.makeG = function (sel, cls, cls2) {
+  var g = sel.selectAll('g.' + cls.replace(/ /g, "."))
+    .data([0]);
+  g.enter().append('g')
+    .attr('class', cls + cls2);
+  g.exit().remove();
+  return g;
 };
 
 Facet.prototype.makeTitle = function(selection, colNum, rowNum) {
@@ -919,14 +935,18 @@ ggd3.layer = Layer;
 // 3. Better details on boxplot tooltip
 // 4. Consider annotation object
 // 5. Delete relevant scale when aes changes so they'll be recreated.
-// 6. Always update subscale so fixed/free scales work
+// 6. Sorting method for ordinal domains
 // 7. Add 5 number option to boxplot
 // 8. update numeric scale domains, they get bigger but not smaller.
-
+      // - resetting a scale with null also works
+// 9. Add rangeBand, subRangeBand, rangePadding and subRangePadding
+//    to all geoms that can be mounted on ordinal axes.
 
 // for much later:
 // Zoom behaviors: fixed scales get global zoom on linear axes
     // free scales get their own zoom;
+// A single context brush should be mountable as a seperate object
+// somewhere close to the plot
 
 
 function Plot() {
@@ -940,7 +960,7 @@ function Plot() {
     aes: {},
     legends: null, // strings corresponding to scales
     // that need legends or legend objects
-    facet: ggd3.facet(),
+    facet: ggd3.facet().plot(this),
     width: 400,
     height: 400,
     margins: {left:20, right:20, top:20, bottom:20},
@@ -1101,7 +1121,8 @@ Plot.prototype.margins = function(margins) {
 
 Plot.prototype.layers = function(layers) {
   if(!arguments.length) { return this.attributes.layers; }
-  var aes;
+  var aes,
+      origAes = _.clone(this.aes());
   if(_.isArray(layers)) {
     // allow reseting of layers by passing empty array
     if(layers.length === 0){
@@ -1113,7 +1134,7 @@ Plot.prototype.layers = function(layers) {
       if(_.isString(l)){
         // passed string to get geom with default settings
         l = ggd3.layer()
-              .aes(_.clone(this.aes()))
+              .aes(_.clone(origAes))
               .data(this.data(), true)
               .geom(l);
       } else if ( l instanceof ggd3.layer ){
@@ -1124,17 +1145,20 @@ Plot.prototype.layers = function(layers) {
         } else {
           l.ownData(true);
         }
-        l.aes(_.merge(_.clone(this.aes()), aes));
+        // inherit plot level aesthetics and override 
+        // w/ explicitly declared aesthetics.
+        l.aes(_.merge(_.clone(origAes), _.clone(aes)));
       } else if (l instanceof ggd3.geom){
+
         var g = l;
         l = ggd3.layer()
-                .aes(_.clone(this.aes()))
+                .aes(_.clone(origAes))
                 .data(this.data(), true)
                 .geom(g);
       }
       l.plot(this).dtypes(this.dtypes());
       this.attributes.layers.push(l);
-      this.aes(_.merge(l.aes(), this.aes()));
+      // this.aes(_.merge(_.clone(l.aes()), _.clone(origAes)));
     }, this);
   } else if (layers instanceof ggd3.layer) {
     if(!layers.data()) { 
@@ -1142,12 +1166,12 @@ Plot.prototype.layers = function(layers) {
     } else {
       layers.ownData(true);
     }
-    aes = layers.aes();
-    layers.aes(_.merge(_.clone(this.aes()), aes))
+    aes = _.clone(layers.aes());
+    layers.aes(_.merge(_.clone(origAes), _.clone(aes)))
       .dtypes(this.dtypes())
       .plot(this);
     this.attributes.layers.push(layers);
-    this.aes(_.merge(layers.aes(), this.aes()));
+    // this.aes(_.merge(_.clone(aes), _.clone(origAes)));
   } 
   return this;
 };
@@ -1179,7 +1203,8 @@ Plot.prototype.updateLayers = function() {
 
   _.each(this.layers(), function(l) {
     l.dtypes(this.dtypes());
-    if(!l.ownData()) { l.data(this.data(), true); }
+    if(!l.ownData()) { 
+      l.data(this.data(), true); }
     // plot level aes never override layer level.
     l.aes(_.merge(_.clone(this.aes()), l.aes()));
   }, this);
@@ -1223,12 +1248,15 @@ Plot.prototype.setFixedScale = function(a) {
                   return v.domain()[1];
                 }).domain()[1];
   } else {
-    domain = _.compact(_.sortBy(_.unique(
+    domain = _.sortBy(_.unique(
                   _.flatten(
                     _.map(this[a + "Scale"](), function(v, k){
                   if(k === "single") { return undefined; }
                       return v.domain();
-                    }, this) ))));
+                    }, this) )));
+    domain = _.filter(domain, function(d) {
+      return !_.isUndefined(d) && !_.isNull(d);
+    });
   }
   // scale.scale().domain(domain);
   return scale.domain(domain);
@@ -1243,16 +1271,10 @@ Plot.prototype.plotDim = function() {
   return {x: this.width() - margins.left - margins.right,
    y: this.height() - margins.top - margins.bottom};
 };
-Plot.prototype.makeSubScale = function(scale, groups) {
-  var sub = d3.scale.ordinal()
-              .rangeBands([0, scale.scale().rangeBand()], 
-                               this.subRangeBand(), 
-                               this.subRangePadding())
-              .domain(groups);
-  return sub;
-};
 
-// possible ordering rule as arg?
+// subScale holds default settings, but
+// geoms just copy those settings and make an 
+// entirely new scale.
 Plot.prototype.setSubScale = function(order) {
   // do nuthin if no ordinal
   var xord = this.xScale().single.scaleType(),
@@ -1273,14 +1295,20 @@ Plot.prototype.setSubScale = function(order) {
   // the first layer is special, it should be the layer with all
   // relevent categorical info. Subsequent layers should only, 
   // if necessary, expand numerical scales.
-  domain = this.layers()[0].geom().collectGroups();
+  domain = this.layers()[0].geom().collectGroups() || [];
   this.subDomain(domain);
-  this.subScale({single: ggd3.scale({type:'ordinal'})
-                              .scale({domain: domain})
-                              .range([0, ord.rangeBand()],
-                                     [this.subRangeBand(), 
-                                      this.subRangePadding()])});
+  if(!domain.length){
+    this.subScale({single: ggd3.scale({type:'ordinal'})
+                              .scale({domain:[1]})
+                              .range([0, ord.rangeBand()], [0,0])});
+  }else {
+    this.subScale({single: ggd3.scale({type:'ordinal'})
+                                .scale({domain: domain})
+                                .range([0, ord.rangeBand()],
+                                       [this.subRangeBand(), 
+                                        this.subRangePadding()])});
 
+  }
 };
 
 
@@ -1323,7 +1351,8 @@ Plot.prototype.draw = function(sel) {
       var cl = d3.select(this).attr('class').split(' ');
       return !_.contains(classes, cl[1]);
     })
-    .transition().style('opacity', 0).remove();
+    .transition().style('opacity', 0)
+    .remove();
   // if any of the layers had a jitter, it has
   // been added to each facet's dataset
   if(_.any(this.layers(), function(l) {
@@ -1409,19 +1438,19 @@ Scale.prototype.scaleType = function(scaleType) {
   this.attributes.scaleType = scaleType;
   switch(scaleType) {
     case 'linear':
-      this.attributes.scale = d3.scale.linear();
+      this.attributes.scale = d3.scale.linear().nice();
       break;
     case 'log':
-      this.attributes.scale = d3.scale.log();
+      this.attributes.scale = d3.scale.log().nice();
       break;
     case 'ordinal':
       this.attributes.scale = d3.scale.ordinal();
       break;
     case 'time':
-      this.attributes.scale = d3.time.scale();
+      this.attributes.scale = d3.time.scale().nice();
       break;
     case 'date':
-      this.attributes.scale = d3.time.scale();
+      this.attributes.scale = d3.time.scale().nice();
       break;
     case "category10":
       this.attributes.scale = d3.scale.category10();
@@ -1452,7 +1481,9 @@ Scale.prototype.scale = function(settings){
 Scale.prototype.range = function(range, rb) {
   if(!arguments.length) { return this.attributes.range; }
   if(this.scaleType() === "ordinal"){
-    if(_.isUndefined(rb)) { rb = this.rangeBands(); }
+    if(_.isUndefined(rb)) { 
+      rb = this.rangeBands(); 
+    }
     this.attributes.scale
         .rangeRoundBands(range, rb[0], rb[1]);
   } else {
@@ -1556,6 +1587,7 @@ function makeScale(selector, a, opts, vname) {
     // if a dtype is not found, it's because it's x or y and 
     // has not been declared. It will be some numerical aggregation.
     dtype = this.dtypes()[vname] || ['number', 'many'];
+    console.log(vname + " " + dtype[0] + " " + dtype[1] + " " + a);
     settings = _.merge(ggd3.tools.defaultScaleSettings(dtype, a),
                        opts);
     var scale = ggd3.scale(settings)
@@ -1571,6 +1603,7 @@ function makeScale(selector, a, opts, vname) {
                     [this.rangeBand(), this.rangePadding()]);
       }
       scale.axis = d3.svg.axis().scale(scale.scale());
+      if(a === "y"){console.log(scale);}
       for(var ax in settings.axis){
         if(scale.axis.hasOwnProperty(ax)){
           scale.axis[ax](settings.axis[ax]);
@@ -1769,6 +1802,8 @@ function Geom(aes) {
     style: "", // optional class attributes for css 
     tooltip: null,
     groups: null, 
+    subRangeBand: 0,
+    subRangePadding: 0,
   };
   var r = function(d) { return ggd3.tools.round(d, 2);};
   // default tooltip
@@ -2132,10 +2167,12 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       o2, // used to calculate rangeband if histogram
       valueVar, // holds aggregated name
       categoryVar, // name of bar positions
+      // original subscale
+      pSub = s.plot.subScale().single.scale(),
       // secondary ordinal scale to calc dodged rangebands
-      groupOrd  = d3.scale.ordinal(),
-      drawX     = true,
-      drawY     = true,
+      sub,
+      drawX     = this.drawX(),
+      drawY     = this.drawY(),
       vertical = this.vertical(s);
 
   if(_.contains(['wiggle', 'silhouette'], that.offset()) ){
@@ -2161,11 +2198,11 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
   if(that.offset() === "expand"){
     if(vertical){
       _.mapValues(s.plot.yScale(), function(v, k) {
-        v.domain([-0.05,1.05]);
+        v.domain([-0.02,1.02]);
       });
     } else {
       _.mapValues(s.plot.xScale(), function(v, k) {
-        v.domain([-0.05,1.05]);
+        v.domain([-0.02,1.02]);
       });  
     }
   }
@@ -2250,12 +2287,16 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
                    that.name() === "histogram" ? true:false);
   if(s.position === 'dodge') {
     // make ordinal scale for group
-    groupOrd.rangeBands([0, rb], 0, 0)
-            .domain(s.groups);
-    rb = groupOrd.rangeBand();
-  }
-  if(s.position !== "dodge"){
-    groupOrd = function(d) {
+    sub = d3.scale.ordinal()
+            .domain(pSub.domain());
+    var rrb = pSub.rangeExtent();
+    rb = [];
+    rb[0] = _.isNumber(this.subRangeBand()) ? this.subRangeBand(): s.plot.subRangeBand();
+    rb[1] = _.isNumber(this.subRangePadding()) ? this.subRangePadding(): s.plot.subRangePadding();
+    sub.rangeRoundBands(rrb, rb[0], rb[1]);
+    rb = sub.rangeBand();
+  } else {
+    sub = function(d) {
       return 0;
     };
   }
@@ -2264,12 +2305,12 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     if(that.name() === "bar" || vertical){
       return function(d) {
         var p = o(d[s.aes[width.p]]);
-        p += groupOrd(d[s.group]) || 0;
+        p += sub(d[s.group]) || 0;
         return p || 0;};
     } else {
       return function(d) {
         var p = o(d[s.aes[width.p]]) - rb;
-        p += groupOrd(d[s.group]) || 0;
+        p += sub(d[s.group]) || 0;
         return p || 0;
         };
     }
@@ -2465,7 +2506,7 @@ Line.prototype.drawLines = function (path, line, s, layerNum) {
     path
       .attr('opacity', function(d) { return s.alpha(d[1]) ;})
       .attr('stroke', function(d) { return s.lcolor(d[1]);})
-      .attr('stroke-width', 1)
+      .attr('stroke-width', this.lineWidth())
       .attr('fill',  function(d) { 
         return s.gradient ? s.lcolor(d[1]): 'none';});
   }
@@ -2553,7 +2594,7 @@ Line.prototype.sample = function(d, l, x, y, color, aes) {
         return o;
       });
   return d;
-  // use this code for continuous gradient legends, for example.
+  // uncomment this code for continuous gradient legends, for example.
   // var path = document.createElementNS(d3.ns.prefix.svg, "path");
   // path.setAttribute("d", l(d);
   // var n = path.getTotalLength(), t = [0], i = 0, 
@@ -2570,7 +2611,7 @@ Line.prototype.sample = function(d, l, x, y, color, aes) {
 };
 
 // Compute quads of adjacent points [p0, p1, p2, p3].
-Line.prototype.quad = function(points) {
+Line.prototype.quad = function(points, aes) {
   return d3.range(points.length - 1).map(function(i) {
     var a = [points[i - 1], points[i], points[i + 1], points[i + 2]];
     a[aes.color] = (points[i][aes.color] + points[i + 1][aes.color]) / 2;
@@ -2867,6 +2908,7 @@ function Area(spec) {
     geom: "path",
     position: null,
     interpolate: 'linear',
+    alpha: 0.2,
     strokeOpacity: 0.1
   };
 
@@ -2889,9 +2931,48 @@ Area.prototype.prepareData = function(data, s) {
   data = _.map(data, function(d) { return this.recurseNest(d);}, this);
   return _.isArray(data[0]) ? data: [data];
 };
-Area.prototype.generator = function(aes, x, y, o2, group, n) {
 
+Area.prototype.generator = function(aes, x, y, o2, group, n) {
+  var dir = !_.isUndefined(aes.ymin) ? 'x': 'y',
+      other = dir === "x" ? "y": 'x',
+      dirScale = dir === "x" ? x: y,
+      otherScale = dir === "x" ? y: x;
+  var area = d3.svg.area()
+                .interpolate(this.interpolate());
+
+  if(x.hasOwnProperty('rangeBand')) {
+    return area
+            .x0(function(d, i) { 
+              return (x()(d[aes.x]) + o2(d[group])); 
+            })
+            .x1(function(d, i) { 
+              return (x()(d[aes.x]) + o2(d[group]) + 
+                            o2.rangeBand()); 
+            })
+            .y(function(d) { return y()(d[aes.y]); });
+  }
+  if(y.hasOwnProperty('rangeBand')) {
+    return area
+            .x(function(d) { return x()(d[aes.x]); })
+            .y0(function(d, i) { 
+              return (y()(d[aes.y]) + o2(d[group]) +
+                            o2.rangeBand()); 
+            })
+            .y1(function(d, i) { 
+              return (y()(d[aes.y]) + o2(d[group])); 
+            });
+  }
+  area[dir](function(d, i) { 
+    console.log(dirScale()(d[aes[dir]]));
+    return dirScale()(d[aes[dir]]); 
+    });
+  area[other + "0"](function(d, i) { 
+    return otherScale(other + 'min', n)(d); });
+  area[other + '1'](function(d, i) { 
+    return otherScale(other + 'max', n)(d); });
+  return area;
 };
+
 
 Area.prototype.decorateScale = function(dir, s, sc, data) {
   // if it's area, don't use data and just use values
@@ -2902,7 +2983,7 @@ Area.prototype.decorateScale = function(dir, s, sc, data) {
     this.check(s.aes, dir);
     if(a) {
       return function(m) {
-        return function(d) { return sc(s.aes[m]); };
+        return function(d) { console.log(sc(s.aes[m]));return sc(s.aes[m]); };
       };
     }else {
       return function(m) {
@@ -2910,7 +2991,7 @@ Area.prototype.decorateScale = function(dir, s, sc, data) {
       };
     }
   } else if(_.isFunction(s.aes.ymin)) {
-    this.check(s.aes, 'y');
+    this.check(s.aes, dir);
     // is trusting the order a reliable thing to do?
     var minAgg = _.map(data, function(d) { 
       return -s.aes[dir + 'min'](_.pluck(d, s.aes[dir]));
@@ -2928,10 +3009,23 @@ Area.prototype.decorateScale = function(dir, s, sc, data) {
     // not tested, should work fine;
     return function(m) {
       return function(d) { 
-
-        return sc(d[s.aes.y] + d[s.aes[m]]);
+        return sc(d[s.aes[dir]] + d[s.aes[m]]);
       };
     };
+  } else {
+    // we're not going in that direction
+    return function() {
+      return function(d) {
+        return sc(d);
+      };
+    };
+  }
+};
+
+Area.prototype.check = function(aes, d) {
+  if(!aes[d + 'min'] || !aes[d + 'max']){
+    throw "You must specify, as a function, variable, or constant" +
+      " a " + d + "min and " + d + "max";
   }
 };
 
@@ -2941,19 +3035,10 @@ Area.prototype.drawArea = function(area, gen, s, layerNum) {
     .attr('d', gen)
     .attr('fill-opacity', function(d) { return s.alpha(d[0]); })
     .attr('stroke', function(d) { 
-      console.log(d); 
       return s.color(d[0]); 
     })
     .attr('stroke-opacity', function(d) { return that.strokeOpacity(); })
     .attr('fill', function(d) { return s.fill(d[0]); });
-};
-
-Area.prototype.check = function(aes) {
-  var a = ['xmin', 'ymin', 'xmax', 'ymax'];
-  if(!(_.all(a, function(d) { return _.isNumber(aes[d]); } ))){
-    throw "You must specify xmin, xmax, ymin and ymax for " +
-    "geom area";
-  }
 };
 
 // area recieves an array of objects, each of which
@@ -2969,29 +3054,53 @@ Area.prototype.draw = function(sel, data, i, layerNum){
       y2,
       x2,
       selector = data.selector,
+      o,
       o2 = function() { return 0; };
       o2.rangeBand = function() { return 0;};
-  data = this.prepareData(data, s);
+  // flatten till we have an array of arrays.
+  data = ggd3.tools.arrayOfArrays(this.prepareData(data, s));
   // area should work on ordinal axes as well.
   // so we can do, like, bullet charts'n shit.
   y2 = this.decorateScale('y', s, y);
   x2 = this.decorateScale('x', s, x);
-  var areaGen = function(n) {
-    return that.generator(s.aes, x2, y2, o2, s.group);
-    };
-  console.log(data);
+
+  // silly way to give scale wrappers an ownProperty
+  // of 'rangeBand' to satisfy generator conditions for ordinal
+  if(x.hasOwnProperty('rangeBand')){
+    if(s.grouped) {
+      o = s.plot.subScale().single.scale();
+      o2 = d3.scale.ordinal()
+              .domain(o.domain())
+              .rangeRoundBands(o.rangeExtent(), 
+                               s.plot.subRangeBand()/2,
+                               s.plot.subRangePadding()/2);
+      x2.rangeBand = function() { return "yep"; };
+    }
+  }
+  if(y.hasOwnProperty('rangeBand')){
+    if(s.grouped) {
+      o = s.plot.subScale().single.scale();
+      o2 = d3.scale.ordinal()
+              .domain(o.domain())
+              .rangeRoundBands(o.rangeExtent(), 
+                               s.plot.subRangeBand()/2,
+                               s.plot.subRangePadding()/2);
+      y2.rangeBand = function() { return "yep"; };
+    }
+  }
+  var areaGen = that.generator(s.aes, x2, y2, o2, s.group);
 
   var area = sel.select('.plot')
               .selectAll(".g" + layerNum + "geom-" + this.name())
               .data(data); // one area per geom
   area.transition()
     .each(function(d, i) {
-      that.drawArea(d3.select(this), areaGen(i), s, layerNum, i);
+      that.drawArea(d3.select(this), areaGen, s, layerNum);
     });
   // makes sense that all area/ribbons go first.
-  area.enter().insert(this.geom(), ".geom.g0")
+  area.enter().insert(this.geom(), "*")
     .each(function(d, i) {
-      that.drawArea(d3.select(this), areaGen(i), s, layerNum);
+      that.drawArea(d3.select(this), areaGen, s, layerNum);
     });
   area.exit()
     .transition()
@@ -3314,7 +3423,7 @@ function Density(spec) {
     smooth: 6,
     nPoints: 100,
     fill: false, // fill with same color?
-    alpha: 0.4,
+    alpha: 0.8,
     lineType: null,
     lineWidth: null
   };
@@ -3368,7 +3477,8 @@ Density.prototype.draw = function(sel, data, i, layerNum){
         .attr('stroke-dasharray', that.lineType())
         .attr('stroke', function(d) {
           return s.color(d.values[1]); 
-        });
+        })
+        .attr('stroke-opacity', that.alpha());
     if(that.fill()){
       path
         .style('fill', function(d) {
@@ -3539,7 +3649,7 @@ ggd3.geoms.hline = Hline;
 // 
 function Path(spec) {
   if(!(this instanceof Geom)){
-    return new Path(aes);
+    return new Path(spec);
   }
   Line.apply(this);
   var attributes = {
@@ -3741,13 +3851,6 @@ Ribbon.prototype.generator = function(aes, x, y, o2, group, n) {
           .x(function(d, i) { return x(d[aes.x]); })
           .y0(function(d, i) { return y('ymin', n)(d); })
           .y1(function(d, i) { return y('ymax', n)(d); });
-};
-
-Ribbon.prototype.check = function(aes, d) {
-  if(!aes[d + 'min'] || !aes[d + 'max']){
-    throw "You must specify, as a function, variable, or constant" +
-      " a " + d + "min and " + d + "max";
-  }
 };
 
 // ribbon is always an operation on ymin, ymax, and x

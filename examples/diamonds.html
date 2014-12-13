@@ -1,0 +1,66 @@
+<html>
+<head>
+<link rel='stylesheet' href='../css/ggd3style.css'>
+<link rel='stylesheet' href='../node_modules/bootstrap/dist/css/bootstrap.css'>
+<script type='text/javascript' src='../ggd3.standalone.js'></script></head>
+</head>
+<body>
+<!-- <select id="xVar" class='btn btn-primary'>
+</select>    
+<select id="yVar" class='btn btn-primary'>
+</select>    
+ -->
+<!-- <select id="facet-scales" class='btn btn-primary'>
+  <option value="fixed" id="fixed" selected>fixed</option>
+  <option value="free" id="free" >free</option>
+  <option value="free_x" id="free_x" >free x</option>
+  <option value="free_y" id="free_y" >free y</option>
+</select>    
+ --><!-- <select id="xAxisPos" class='btn btn-primary'>
+  <option value="bottom" selected>x axis bottom</option>
+  <option value="top">x axis top</option>
+</select>    
+<select id="yAxisPos" class='btn btn-primary'>
+  <option value="left" selected>y axis left</option>
+  <option value="right">y axis right</option>
+</select>    
+ -->
+</div>
+<div id='chart01' class='chart-frame' style="padding:30px"></div>
+<script>
+function collectData(layer) {
+  return d3.selectAll('.geom.' + layer).data();
+}
+
+var div = d3.select('#chart01'),
+    chart, data;
+
+var layers = [ggd3.geoms.boxplot()];
+
+var facet = ggd3.facet({x:'clarity', ncols: 8, type:'grid'});
+
+var chart = ggd3.plot()
+              .facet(facet)
+              .width(150)
+              .yScale({axis:{position:'right', orient:'left'}})
+              .xScale({axis:{position:'top', orient: 'bottom',
+                              ticks: 3}})
+              .height(700)
+              .margins({top:0, bottom:0, left:0, right:30})
+              .layers(layers)
+              .color('none')
+              .aes({x:'price', y: "color", fill: "cut",
+                    alpha:'carat'})
+
+d3.csv("../data/diamonds.csv", function(error, d) {
+  data = d;
+  chart.data(data).draw(div);
+})
+
+function redraw() {
+  chart.draw(div);
+}
+
+</script>
+</body>
+</html>

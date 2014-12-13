@@ -1,0 +1,133 @@
+<html>
+<head>
+<link rel='stylesheet' href='../css/ggd3style.css'>
+<link rel='stylesheet' href='../node_modules/bootstrap/dist/css/bootstrap.css'>
+<script type='text/javascript' src='../ggd3.standalone.js'></script></head>
+</head>
+<style>
+.axis .tick line, .axis path.domain {
+  stroke-opacity: 0 !important;
+} 
+</style>
+<body>
+<!-- <select id="xVar" class='btn btn-primary'>
+</select>    
+<select id="yVar" class='btn btn-primary'>
+</select>    
+ -->
+<!-- <select id="facet-scales" class='btn btn-primary'>
+  <option value="fixed" id="fixed" selected>fixed</option>
+  <option value="free" id="free" >free</option>
+  <option value="free_x" id="free_x" >free x</option>
+  <option value="free_y" id="free_y" >free y</option>
+</select>    
+ --><!-- <select id="xAxisPos" class='btn btn-primary'>
+  <option value="bottom" selected>x axis bottom</option>
+  <option value="top">x axis top</option>
+</select>    
+<select id="yAxisPos" class='btn btn-primary'>
+  <option value="left" selected>y axis left</option>
+  <option value="right">y axis right</option>
+</select>    
+ -->
+</div>
+<div id='chart01' class='chart-frame'></div>
+<script>
+function collectData(layer) {
+  return d3.selectAll('.geom.' + layer).data();
+}
+var div = d3.select('#chart01'),
+    chart, data;
+
+var mean = ggd3.geoms.hline()
+              .color('black')
+              .lineType("none")
+              .lineWidth(3)
+              .alpha(0.5);
+var max = ggd3.geoms.hline()
+              .color('black')
+              .lineType("none")
+              .lineWidth(3)
+              .alpha(0.5);
+var min = ggd3.geoms.hline()
+              .color('black')
+              .lineType("none")
+              .lineWidth(3)
+              .alpha(0.5);
+var area1 = ggd3.layer().geom(ggd3.geoms.area()
+                                .alpha(0.5))
+var area2 = ggd3.layer().geom(ggd3.geoms.area()
+                                .alpha(0.3))
+var area3 = ggd3.layer().geom(ggd3.geoms.area()
+                                .alpha(0.1))
+var areaData;
+var bar = ggd3.geoms.bar()
+            .subRangePadding(0.4)
+            .subRangeBand(0.7)
+            .alpha(1);
+var layers = [ggd3.layer()
+                .geom(bar)
+                .aes({x:'cyl', y:'mpg', fill:'gear'})
+                .stat({y:'median'}),
+              ggd3.layer().geom(mean).stat({y: 'mean'}),
+              ggd3.layer().geom(max).stat({y: 'max'}),
+              ggd3.layer().geom(min).stat({y: 'min'})
+              ];
+
+var facet = ggd3.facet().titleSize([0,0]);
+
+var chart = ggd3.plot()
+                    .width(400)
+                    .height(400)
+                    .aes({x:'cyl', y:'mpg', fill:'gear'})
+                    .yScale({axis:{ position:'left', 
+                            orient:'left'},
+                            scale: {domain:[0, 40]}})
+                    .xScale({axis: {ticks: 4, position: "top"}})
+                    .rangePadding(0)
+                    .facet(facet)
+                    .rangeBand(0.1)
+                    .margins({top: 5, bottom:10, left:50, right:10})
+                    .layers(layers);
+
+function makeOneZero(o, v) {
+  o2 = _.clone(o);
+  o2[v] = 0;
+  return [o, o2];
+}
+d3.csv("../data/mtcars.csv", function(error, d) {
+  data = d;
+  var d2 = _.clone(d)
+  areaData = d3.nest()
+                    .key(function(d) { return d.cyl; })
+                    .key(function(d) { return d.gear; })
+                    .rollup(function(d) {
+                      var o = {},
+                      arr = _.pluck(d, "mpg"),
+                      max = _.filter(d, function(r) {
+                        return r.mpg === d3.max(arr);
+                      })[0],
+                      min = _.filter(d, function(r) {
+                        return r.mpg === d3.min(arr);
+                      })[0],
+                      mean = d[0];
+                      o.max = makeOneZero(max, 'mpg')
+                      o.min = makeOneZero(min, 'mpg');
+                      o.mean = makeOneZero(mean, 'mpg');
+                      return o;
+                    })
+  chart.data(data);
+  areaData = chart.unNest(areaData.entries(data));
+  area1.data(_.flatten(_.pluck(areaData, 'min')));
+  area2.data(_.flatten(_.pluck(areaData, 'mean')));
+  area3.data(_.flatten(_.pluck(areaData, 'max')));
+  chart.layers([area1, area2, area3]).draw(div);
+});
+
+function redraw() {
+    chart.draw(div);
+}
+
+</script>
+</body>
+</html>

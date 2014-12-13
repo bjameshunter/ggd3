@@ -1,7 +1,7 @@
 // 
 function Path(spec) {
   if(!(this instanceof Geom)){
-    return new Path(aes);
+    return new Path(spec);
   }
   Line.apply(this);
   var attributes = {

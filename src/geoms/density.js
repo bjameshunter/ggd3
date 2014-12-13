@@ -12,7 +12,7 @@ function Density(spec) {
     smooth: 6,
     nPoints: 100,
     fill: false, // fill with same color?
-    alpha: 0.4,
+    alpha: 0.8,
     lineType: null,
     lineWidth: null
   };
@@ -66,7 +66,8 @@ Density.prototype.draw = function(sel, data, i, layerNum){
         .attr('stroke-dasharray', that.lineType())
         .attr('stroke', function(d) {
           return s.color(d.values[1]); 
-        });
+        })
+        .attr('stroke-opacity', that.alpha());
     if(that.fill()){
       path
         .style('fill', function(d) {

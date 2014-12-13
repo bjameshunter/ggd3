@@ -10,6 +10,7 @@ function Area(spec) {
     geom: "path",
     position: null,
     interpolate: 'linear',
+    alpha: 0.2,
     strokeOpacity: 0.1
   };
 
@@ -32,9 +33,48 @@ Area.prototype.prepareData = function(data, s) {
   data = _.map(data, function(d) { return this.recurseNest(d);}, this);
   return _.isArray(data[0]) ? data: [data];
 };
-Area.prototype.generator = function(aes, x, y, o2, group, n) {
 
+Area.prototype.generator = function(aes, x, y, o2, group, n) {
+  var dir = !_.isUndefined(aes.ymin) ? 'x': 'y',
+      other = dir === "x" ? "y": 'x',
+      dirScale = dir === "x" ? x: y,
+      otherScale = dir === "x" ? y: x;
+  var area = d3.svg.area()
+                .interpolate(this.interpolate());
+
+  if(x.hasOwnProperty('rangeBand')) {
+    return area
+            .x0(function(d, i) { 
+              return (x()(d[aes.x]) + o2(d[group])); 
+            })
+            .x1(function(d, i) { 
+              return (x()(d[aes.x]) + o2(d[group]) + 
+                            o2.rangeBand()); 
+            })
+            .y(function(d) { return y()(d[aes.y]); });
+  }
+  if(y.hasOwnProperty('rangeBand')) {
+    return area
+            .x(function(d) { return x()(d[aes.x]); })
+            .y0(function(d, i) { 
+              return (y()(d[aes.y]) + o2(d[group]) +
+                            o2.rangeBand()); 
+            })
+            .y1(function(d, i) { 
+              return (y()(d[aes.y]) + o2(d[group])); 
+            });
+  }
+  area[dir](function(d, i) { 
+    console.log(dirScale()(d[aes[dir]]));
+    return dirScale()(d[aes[dir]]); 
+    });
+  area[other + "0"](function(d, i) { 
+    return otherScale(other + 'min', n)(d); });
+  area[other + '1'](function(d, i) { 
+    return otherScale(other + 'max', n)(d); });
+  return area;
 };
+
 
 Area.prototype.decorateScale = function(dir, s, sc, data) {
   // if it's area, don't use data and just use values
@@ -45,7 +85,7 @@ Area.prototype.decorateScale = function(dir, s, sc, data) {
     this.check(s.aes, dir);
     if(a) {
       return function(m) {
-        return function(d) { return sc(s.aes[m]); };
+        return function(d) { console.log(sc(s.aes[m]));return sc(s.aes[m]); };
       };
     }else {
       return function(m) {
@@ -53,7 +93,7 @@ Area.prototype.decorateScale = function(dir, s, sc, data) {
       };
     }
   } else if(_.isFunction(s.aes.ymin)) {
-    this.check(s.aes, 'y');
+    this.check(s.aes, dir);
     // is trusting the order a reliable thing to do?
     var minAgg = _.map(data, function(d) { 
       return -s.aes[dir + 'min'](_.pluck(d, s.aes[dir]));
@@ -71,10 +111,23 @@ Area.prototype.decorateScale = function(dir, s, sc, data) {
     // not tested, should work fine;
     return function(m) {
       return function(d) { 
-
-        return sc(d[s.aes.y] + d[s.aes[m]]);
+        return sc(d[s.aes[dir]] + d[s.aes[m]]);
       };
     };
+  } else {
+    // we're not going in that direction
+    return function() {
+      return function(d) {
+        return sc(d);
+      };
+    };
+  }
+};
+
+Area.prototype.check = function(aes, d) {
+  if(!aes[d + 'min'] || !aes[d + 'max']){
+    throw "You must specify, as a function, variable, or constant" +
+      " a " + d + "min and " + d + "max";
   }
 };
 
@@ -84,19 +137,10 @@ Area.prototype.drawArea = function(area, gen, s, layerNum) {
     .attr('d', gen)
     .attr('fill-opacity', function(d) { return s.alpha(d[0]); })
     .attr('stroke', function(d) { 
-      console.log(d); 
       return s.color(d[0]); 
     })
     .attr('stroke-opacity', function(d) { return that.strokeOpacity(); })
     .attr('fill', function(d) { return s.fill(d[0]); });
-};
-
-Area.prototype.check = function(aes) {
-  var a = ['xmin', 'ymin', 'xmax', 'ymax'];
-  if(!(_.all(a, function(d) { return _.isNumber(aes[d]); } ))){
-    throw "You must specify xmin, xmax, ymin and ymax for " +
-    "geom area";
-  }
 };
 
 // area recieves an array of objects, each of which
@@ -112,29 +156,53 @@ Area.prototype.draw = function(sel, data, i, layerNum){
       y2,
       x2,
       selector = data.selector,
+      o,
       o2 = function() { return 0; };
       o2.rangeBand = function() { return 0;};
-  data = this.prepareData(data, s);
+  // flatten till we have an array of arrays.
+  data = ggd3.tools.arrayOfArrays(this.prepareData(data, s));
   // area should work on ordinal axes as well.
   // so we can do, like, bullet charts'n shit.
   y2 = this.decorateScale('y', s, y);
   x2 = this.decorateScale('x', s, x);
-  var areaGen = function(n) {
-    return that.generator(s.aes, x2, y2, o2, s.group);
-    };
-  console.log(data);
+
+  // silly way to give scale wrappers an ownProperty
+  // of 'rangeBand' to satisfy generator conditions for ordinal
+  if(x.hasOwnProperty('rangeBand')){
+    if(s.grouped) {
+      o = s.plot.subScale().single.scale();
+      o2 = d3.scale.ordinal()
+              .domain(o.domain())
+              .rangeRoundBands(o.rangeExtent(), 
+                               s.plot.subRangeBand()/2,
+                               s.plot.subRangePadding()/2);
+      x2.rangeBand = function() { return "yep"; };
+    }
+  }
+  if(y.hasOwnProperty('rangeBand')){
+    if(s.grouped) {
+      o = s.plot.subScale().single.scale();
+      o2 = d3.scale.ordinal()
+              .domain(o.domain())
+              .rangeRoundBands(o.rangeExtent(), 
+                               s.plot.subRangeBand()/2,
+                               s.plot.subRangePadding()/2);
+      y2.rangeBand = function() { return "yep"; };
+    }
+  }
+  var areaGen = that.generator(s.aes, x2, y2, o2, s.group);
 
   var area = sel.select('.plot')
               .selectAll(".g" + layerNum + "geom-" + this.name())
               .data(data); // one area per geom
   area.transition()
     .each(function(d, i) {
-      that.drawArea(d3.select(this), areaGen(i), s, layerNum, i);
+      that.drawArea(d3.select(this), areaGen, s, layerNum);
     });
   // makes sense that all area/ribbons go first.
-  area.enter().insert(this.geom(), ".geom.g0")
+  area.enter().insert(this.geom(), "*")
     .each(function(d, i) {
-      that.drawArea(d3.select(this), areaGen(i), s, layerNum);
+      that.drawArea(d3.select(this), areaGen, s, layerNum);
     });
   area.exit()
     .transition()
