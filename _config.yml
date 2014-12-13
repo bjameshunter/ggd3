@@ -4,6 +4,8 @@ keep_files: []
 
 timezone: America/Chicago
 
+baseurl: 'ggd3'
+
 defaults:
   -
     scope:
