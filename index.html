@@ -17,27 +17,27 @@
     <link href='http://fonts.googleapis.com/css?family=Montserrat:400,700' rel='stylesheet' type='text/css'> 
     <!-- Global CSS -->
     <link rel="stylesheet" href="assets/plugins/bootstrap/css/bootstrap.min.css">
-    <!-- Plugins CSS -->    
+    <!-- Plugins CSS -->
     <link rel="stylesheet" href="assets/plugins/font-awesome/css/font-awesome.css">
     <link rel="stylesheet" href="assets/plugins/prism/prism.css">
     <!-- Theme CSS -->  
-    <link rel="stylesheet" href="assets/css/ggd3style.css">
+
     <link id="theme-style" rel="stylesheet" href="assets/css/styles-2.css">
+    <link rel="stylesheet" href="assets/css/ggd3style.css">
 
 
-    <script type="text/javascript" src="assets/js/ggd3.standalone.js"></script>
-    <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
+     <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
     <!--[if lt IE 9]>
       <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
       <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
     <![endif]-->
 </head> 
-
+{% include customcss.html %}
 <body data-spy="scroll">
     
     <!-- ******HEADER****** --> 
     <header id="header" class="header">  
-        <div class="container">            
+        <div class="container">
             <h1 class="logo pull-left">
                 <a class="scrollto" href="#promo">
                     <span class="logo-title"></span>
@@ -51,18 +51,25 @@
                         <span class="icon-bar"></span>
                         <span class="icon-bar"></span>
                     </button><!--//nav-toggle-->
-                </div>
-                <!--//navbar-header-->            
+                </div><!--//navbar-header-->            
                 <div class="collapse navbar-collapse" id="navbar-collapse">
                     <ul class="nav navbar-nav">
-                        <li class="active nav-item sr-only"><a class="scrollto" href="#promo">top</a></li>
+                        <li class="active nav-item sr-only"><a class="scrollto" href="#promo">  </a></li>
                         <li class="nav-item"><a class="scrollto" href="#plan">the plan</a></li>
                         <li class="nav-item"><a class="scrollto" href="#start">start</a></li>
-                        <li class="nav-item"><a href="" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Examples<span class="caret"></span></a>
+                        <li class="nav-item"><a href="#" class="dropdown-toggle scrollto" data-toggle="dropdown" role="button" aria-expanded="false">examples<span class="caret"></span></a>
+                            <ul class='dropdown-menu' role='menu'>
+                            {% for example in site.data.examples %}
+                              <li>
+                                <a href="/{{ example.url }}">
+                                  {{ example.name }}
+                                </a>
+                              </li>
+                            {% endfor %}
+                            </ul>
                         </li>
-        </li>
-        <!--                         <li class="nav-item"><a class="scrollto" href="#license">License</a></li>                        
- -->                    </ul><!--//nav-->
+
+                    </ul><!--//nav-->
                 </div><!--//navabr-collapse-->
             </nav><!--//main-nav-->
         </div>
@@ -160,7 +167,6 @@
             <div class="block">
                 <h3 class="sub-title text-center">The basics</h3>
                 <p>This features a gaussian density curve drawn over a histogram with 30 bins. Proportions are shown, rather than frequency counts to allow you to see the density curve. With stacked histograms, the proportion will add up to more than one. I'll have to fix that. </p>
-                <p>I confess, I don't want the mouseover text to be green, but I am tired and don't want to figure out where my css wires are crossed.</p>
                 <div class="code-block">
                     <pre><code class="language-javascript">
 gaussian = ggd3.geoms.density().kernel('gaussianKernel');
@@ -217,15 +223,6 @@ carChart.draw(d3.select('#cars'));
             </div><!--//block-->   
             <div class="block">
                 <p>And yes, there are no axis labels yet. Those'll happen in due time. Check out the examples, they're still a little rough, but they make sense. Thanks for reading. Hit me up on github.</p>
-<ul>
-{% for example in site.data.examples %}
-  <li>
-    <a href="{{ example.url }}">
-      {{ example.name }}
-    </a>
-  </li>
-{% endfor %}
-</ul>
             </div>    
 <!--             <div class="block">
                 <h3 class="sub-title text-center">Full Documentation</h3>
@@ -286,6 +283,9 @@ carChart.draw(d3.select('#cars'));
     <script type="text/javascript" src="assets/plugins/jquery-scrollTo/jquery.scrollTo.min.js"></script> 
     <script type="text/javascript" src="assets/plugins/prism/prism.js"></script>    
     <script type="text/javascript" src="assets/js/main.js"></script>       
+    <script type="text/javascript" src="assets/js/d3.min.js"></script>
+    <script type="text/javascript" src="assets/js/lodash.min.js"></script>
+    <script type="text/javascript" src="assets/js/ggd3.v.0.1.0.js"></script>
     <script type="text/javascript" src="assets/js/homepage.js"></script>
 </body>
 </html> 

@@ -17,7 +17,6 @@ svg {
 /* tooltips */
 .plot-div .ggd3tip {
   min-width: 200px;
-  color: black;
   position: absolute;
   border-style: solid;
   border-width: 1px;
@@ -31,12 +30,16 @@ svg {
   box-shadow: 5px 5px 5px #888888;
   z-index: 1000;
 }
-.plot-div .tooltip-content {
+
+.ggd3tip .tooltip-content h1, h2, h3, h4, h5, h6, p {
+  font-weight: normal;
   color: black;
 }
-
+.ggd3tip .tooltip-content p {
+  font-weight: normal;
+}
 .tooltip-content h4 span {
-    font-size: 12pt;
+  font-size: 12pt;
 }
 
 rect.brushframe {
