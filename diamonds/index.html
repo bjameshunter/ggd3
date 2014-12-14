@@ -46,7 +46,7 @@ var chart = ggd3.plot()
               .aes({x:'price', y: "color", fill: "cut",
                    alpha:'carat'})
 
-d3.csv("../assets/data/diamonds.csv", function(error, d) {
+d3.csv("{{ site.baseurl }}/assets/data/diamonds.csv", function(error, d) {
   data = d;
   chart.data(data).draw(div);
 })

@@ -54,7 +54,7 @@ var chart = ggd3.plot()
               .width(300)
               .height(300);
 
-d3.csv("../assets/data/nelplo_columns.csv", function(error, d) {
+d3.csv("{{ site.baseurl }}/assets/data/nelplo_columns.csv", function(error, d) {
   data = d;
   chart.data(data)
       .aes({x:"real.wages", y: "unemp",

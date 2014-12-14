@@ -55,7 +55,7 @@ var chart = ggd3.plot()
               .aes({x: 'date', y: 'value', color:'value',
                     group:'variable'})
 
-d3.csv("../assets/data/ustimeseries.csv", function(error, d) {
+d3.csv("{{ site.baseurl }}/assets/data/ustimeseries.csv", function(error, d) {
   data = d;
   chart.data(data).draw(div);
 })

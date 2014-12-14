@@ -49,7 +49,7 @@ var chart = ggd3.plot()
               .facet(facet)
               .layers(layers)
 
-d3.csv("../assets/data/iris.csv", function(error, d) {
+d3.csv("{{ site.baseurl }}/assets/data/iris.csv", function(error, d) {
   data = d;
   chart.data(data).draw(div);
 })

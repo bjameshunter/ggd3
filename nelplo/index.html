@@ -76,7 +76,7 @@ var chart = ggd3.plot()
               .xScale({axis: {ticks: 4, position: "bottom",
                       orient: "bottom"}})
               .aes({x:'date', y:'value', color:'variable', fill: 'variable'})
-d3.csv("../assets/data/nelplo.csv", function(error, d) {
+d3.csv("{{ site.baseurl }}/assets/data/nelplo.csv", function(error, d) {
   data = d;
   chart.data(data).draw(div);
 })

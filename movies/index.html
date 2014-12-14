@@ -40,7 +40,7 @@ var chart = ggd3.plot()
               .xScale({axis:{orient:'bottom', position:'top'}})
               .aes({x:"Drama", y:"rating", fill: 'Action'})
 
-d3.csv("../assets/data/movies.csv", function(error, d) {
+d3.csv("{{ site.baseurl }}/assets/data/movies.csv", function(error, d) {
   data = d;
   chart.data(data).draw(div);
 })

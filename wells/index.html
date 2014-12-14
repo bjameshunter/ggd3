@@ -53,7 +53,7 @@ var chart = ggd3.plot()
               .color('none')
               .aes({x:'dist', y:'educ'})
 
-d3.csv("../data/wells.csv", function(error, d) {
+d3.csv("{{ site.baseurl }}/assets/data/wells.csv", function(error, d) {
   data = d;
   chart.data(data).draw(div);
 })

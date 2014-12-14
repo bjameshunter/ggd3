@@ -2,26 +2,7 @@
 layout: example
 title: Baseball
 ---
-<!-- <select id="xVar" class='btn btn-primary'>
-</select>    
-<select id="yVar" class='btn btn-primary'>
-</select>    
- -->
-<!-- <select id="facet-scales" class='btn btn-primary'>
-  <option value="fixed" id="fixed" selected>fixed</option>
-  <option value="free" id="free" >free</option>
-  <option value="free_x" id="free_x" >free x</option>
-  <option value="free_y" id="free_y" >free y</option>
-</select>    
- --><!-- <select id="xAxisPos" class='btn btn-primary'>
-  <option value="bottom" selected>x axis bottom</option>
-  <option value="top">x axis top</option>
-</select>    
-<select id="yAxisPos" class='btn btn-primary'>
-  <option value="left" selected>y axis left</option>
-  <option value="right">y axis right</option>
-</select>    
- -->
+
 <style>
 .axis .tick line, .axis path.domain {
   stroke-opacity: 0 !important;
@@ -64,7 +45,7 @@ var chart = ggd3.plot()
                   "stint": ['string'],
                   "batting": ["number", "many"]})
 
-d3.csv("../assets/data/baseball.csv", function(error, d) {
+d3.csv("{{ site.baseurl }}/assets/data/baseball.csv", function(error, d) {
   data = d;
   chart.data(data).draw(div);
 })

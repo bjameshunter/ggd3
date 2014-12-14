@@ -31,9 +31,11 @@ svg {
   z-index: 1000;
 }
 
-.ggd3tip .tooltip-content h1, h2, h3, h4, h5, h6, p {
-  font-weight: normal;
-  color: black;
+.ggd3tip .tooltip-content {
+    h1, h2, h3, h4, h5, h6, p {
+    font-weight: normal;
+    color: black;
+  }
 }
 .ggd3tip .tooltip-content p {
   font-weight: normal;
