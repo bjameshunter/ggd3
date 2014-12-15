@@ -211,18 +211,27 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
     y = setup.plot.yScale()[selector];
     yfree = true;
   }
-  x.axis.scale(x.scale());
-  y.axis.scale(y.scale());
+  // think this need not be here.
+  // x.axis.scale(x.scale());
+  // y.axis.scale(y.scale());
 
   if(layerNum === 0 && drawX){
     sel.select('.x.axis')
       .attr("transform", "translate(" + x.positionAxis() + ")")
       .transition().call(x.axis);
+    if(x.label()){
+      sel.select('.x.axis')
+        .call(_.bind(x.axisLabel, x), x.axisLabel());
+    }
   }
   if(layerNum === 0 && drawY){
     sel.select('.y.axis')
       .attr("transform", "translate(" + y.positionAxis() + ")")
       .transition().call(y.axis);
+    if(y.label()){
+      sel.select('.y.axis')
+        .call(_.bind(y.axisLabel, y), y.axisLabel());
+    }
   }
   return {
     x: x,

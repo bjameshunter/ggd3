@@ -1,3 +1,7 @@
+.chart-frame {
+  padding: 50px;
+}
+
 .tick text {
   font-size: 10pt;
   stroke: grey;
@@ -17,7 +21,6 @@ svg {
 /* tooltips */
 .plot-div .ggd3tip {
   min-width: 200px;
-  color: black;
   position: absolute;
   border-style: solid;
   border-width: 1px;
@@ -31,12 +34,18 @@ svg {
   box-shadow: 5px 5px 5px #888888;
   z-index: 1000;
 }
-.plot-div .tooltip-content {
-  color: black;
-}
 
+.ggd3tip .tooltip-content {
+    h1, h2, h3, h4, h5, h6, p {
+    font-weight: normal;
+    color: black;
+  }
+}
+.ggd3tip .tooltip-content p {
+  font-weight: normal;
+}
 .tooltip-content h4 span {
-    font-size: 12pt;
+  font-size: 12pt;
 }
 
 rect.brushframe {
@@ -92,13 +101,7 @@ rect.brushframe {
   fill-opacity: .125;
   shape-rendering: crispEdges;
 }
-/*make grid axes 100% transparent*/
-.axis.grid .tick {
-  stroke-opacity: 0;
-}
-.axis.grid text {
-  fill-opacity: 0;
-}
+
 /* geoms */
 path.geom-grid-horiz, path.geom-grid-vert {
   stroke-dasharray: 3,1;

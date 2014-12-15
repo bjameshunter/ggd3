@@ -310,7 +310,6 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       return n(0);
     };
   } )();
-  console.log(rb);
 
 
   var bars = sel.select('.plot')

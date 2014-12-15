@@ -309,6 +309,33 @@ function recurseNest(data) {
 }
 
 
+function Annotate(spec) {
+  if(!(this instanceof Annotate)){
+    return new Annotate(spec);
+  }
+  // annotations are divs or foreignObjects that contain a div to be placed in an svg or g element.
+  // used to label plots and axes. They can also be fed a selection
+  // of geoms and draw a line to that geom to display more info about
+  // the data it contains. They will live in the rightmost or leftmost
+  // margin of the plot
+  var attributes = {
+    content: "",
+    class: "annotation",
+    orient: "horizontal",
+  };
+  for(var attr in attributes){
+    if(!this[attr]){
+      this[attr] = createAccessor(attr);
+    }
+  }
+}
+
+Annotate.prototype.selection = function(sel) {
+  
+
+};
+
+ggd3.annotate = Annotate;
 function Facet(spec) {
   if(!(this instanceof Facet)){
     return new ggd3.facet(spec);
@@ -323,6 +350,8 @@ function Facet(spec) {
     plot: null, 
     nrows: null,
     ncols: null,
+    // if we're doing grid facets, do y labels go left or right?
+    yGridLabel: "right",
     margins: {x: 5, y:5}, 
     titleSize: [20, 20],
     // inherit from plot, but allow override
@@ -382,6 +411,7 @@ Facet.prototype.updateFacet = function() {
                     );
     }
   }
+
   that.nFacets = that.xFacets.length * that.yFacets.length;
 
   if( that.scales() !== "fixed" && that.type()==="grid"){
@@ -467,6 +497,7 @@ Facet.prototype.makeSVG = function(selection, rowNum, colNum) {
       addHeight = (rowNum === 0 || this.type() === "wrap") ? that.titleSize()[1]:0,
       addWidth = colNum === 0 ? that.titleSize()[0]:0,
       addWidthSVG = (colNum+1) === this._ncols ? plot.margins().right:0,
+      addHeightSVG = (rowNum + 1) === this._nrows ? plot.margins().bottom:0,
       width = plot.width() + addWidth,
       height = plot.height() + addHeight,
       svg = selection
@@ -478,7 +509,7 @@ Facet.prototype.makeSVG = function(selection, rowNum, colNum) {
 
     svg
     .attr('width', width + addWidthSVG)
-    .attr('height', height)
+    .attr('height', height + addHeightSVG)
     .each(function(d) {
       that.makeTitle(d3.select(this), colNum, rowNum);
       var sel = d3.select(this).select('.plot-svg');
@@ -490,7 +521,7 @@ Facet.prototype.makeSVG = function(selection, rowNum, colNum) {
   svg.enter().append('svg')
     .attr('class', 'svg-wrap')
     .attr('width', width + addWidthSVG)
-    .attr('height', height)
+    .attr('height', height + addHeightSVG)
     .each(function(d) {
       that.makeTitle(d3.select(this), colNum, rowNum);
       var sel = d3.select(this).selectAll('.plot-svg')
@@ -509,8 +540,11 @@ Facet.prototype.makeSVG = function(selection, rowNum, colNum) {
   that.nSVGs += 1;
 };
 // overrides default margins if facet type == "grid"
-// or scales are free
 Facet.prototype.calculateMargins = function(plot) {
+  // grids are complicated. If I'm requesting "grid" facets
+  // y axis position 'left' means only left column facets
+  // x axis position 'bottom' means only bottom row facets.
+
 
 };
 
@@ -560,12 +594,14 @@ Facet.prototype.id = function(x, y) {
 };
 Facet.prototype.makeCell = function(selection, colNum, rowNum, 
                                     ncols) {
+  console.log(colNum === (ncols-1));  
   var margins = this.plot().margins(),
       dim = this.plot().plotDim(),
       that = this,
       gridClassX = (this.type()==="grid" && rowNum!==0) ? " grid": "",
-      gridClassY = (this.type()==="grid" && colNum!==(ncols-1)) ? " grid": "";
-  
+      // drawing Axis on rightmost facet.
+      gridClassY = (this.type()==="grid" && colNum === (ncols-1)) ? " grid": "";
+
   this.makeG(selection, "xgrid", "")
     .attr("transform", "translate(" + margins.left + "," + margins.top + ")");
   this.makeG(selection, "ygrid", "")
@@ -573,7 +609,7 @@ Facet.prototype.makeCell = function(selection, colNum, rowNum,
 
   var plot = selection.selectAll('g.plot')
                 .data([0]);
-  plot
+  plot.transition()
     .attr('transform', "translate(" + margins.left + 
             "," + margins.top + ")")
     .select('rect.background')
@@ -592,11 +628,20 @@ Facet.prototype.makeCell = function(selection, colNum, rowNum,
   plot.exit().remove();
 
   // complex set of conditions based on facet and scale requests.
-  this.makeG(selection, "x axis", gridClassX);
-  this.makeG(selection, "y axis", gridClassY);
+  if(this.type() === "grid" && gridClassX){
+    this.makeG(selection, "x axis", gridClassX);
+  } else if(this.type() !== "grid") {
+    this.makeG(selection, "x axis", gridClassX);
+  }
+  if(this.type() === "grid" && gridClassY){
+    this.makeG(selection, "y axis", gridClassY);
+  } else if(this.type() !== "grid"){
+    this.makeG(selection, "y axis", gridClassY);
+  }
 };
 Facet.prototype.makeG = function (sel, cls, cls2) {
-  var g = sel.selectAll('g.' + cls.replace(/ /g, "."))
+  var both = cls + cls2;
+  var g = sel.selectAll('g.' + both.replace(/ /g, "."))
     .data([0]);
   g.enter().append('g')
     .attr('class', cls + cls2);
@@ -933,7 +978,7 @@ ggd3.layer = Layer;
    // who cares about inheriting for this. Just write custom per geom
 // 2. Label facets better and provide option to label with function.
 // 3. Better details on boxplot tooltip
-// 4. Consider annotation object
+// 4. Make annotation object
 // 5. Delete relevant scale when aes changes so they'll be recreated.
 // 6. Sorting method for ordinal domains
 // 7. Add 5 number option to boxplot
@@ -991,6 +1036,7 @@ function Plot() {
     yAdjust: false,
     xGrid: true,
     yGrid: true,
+    gridLineType: "1,1",
     alphaRange: [0.1, 1],
     sizeRange: [3, 20],
     fillRange: ["blue", "red"],
@@ -1014,12 +1060,8 @@ function Plot() {
   // data are nested or not.
   // this.nested = false;
   this.hgrid = ggd3.layer()
-                .geom(ggd3.geoms.hline().grid(true)
-                      .lineType("2,2"))
                 .plot(this);
   this.vgrid = ggd3.layer()
-                .geom(ggd3.geoms.vline().grid(true)
-                      .lineType("2,2"))
                 .plot(this); 
   // explicitly declare which attributes get a basic
   // getter/setter
@@ -1031,7 +1073,7 @@ function Plot() {
     'rangeBand', 'rangePadding', 
     'subRangeBand', 'subRangePadding', 'subDomain',
     "alphaRange", "lineWidth",
-    "xGrid", "yGrid"];
+    "xGrid", "yGrid", "gridLineType"];
 
   for(var attr in attributes){
     if((!this[attr] && 
@@ -1366,9 +1408,15 @@ Plot.prototype.draw = function(sel) {
   // if you're drawing something with more than
   // 30 layers, you can tweak this yourself.
   if(this.yGrid()) { 
+    this.hgrid
+      .geom(ggd3.geoms.hline().grid(true)
+        .lineType(this.gridLineType()));
     this.hgrid.compute(sel, 30);
     this.hgrid.draw(sel, 30);}
   if(this.xGrid()) { 
+    this.vgrid
+      .geom(ggd3.geoms.vline().grid(true)
+        .lineType(this.gridLineType()));
     this.vgrid.compute(sel, 30);
     this.vgrid.draw(sel, 30);}
 };
@@ -1405,19 +1453,20 @@ function Scale(opts) {
     aesthetic: null,
     domain: null,
     range: null,
-    position: null, // left right top bottom none
-    orient: null, // left right top bottom
     plot: null,
     scaleType: null, // linear, log, ordinal, time, category, 
     // maybe radial, etc.
     scale: null,
     rangeBands: [0.1, 0.1],
     opts: {},
+    label: "",
+    labelPosition: [0.5, 0.5],
+    offset: 45,
   };
   // store passed object
   this.attributes = attributes;
-  var getSet = ["aesthetic", "plot", "orient", "position", "opts",
-                "rangeBands"];
+  var getSet = ["aesthetic", "plot", "opts",
+                "rangeBands", "label", 'offset'];
   for(var attr in this.attributes){
     if(!this[attr] && _.contains(getSet, attr) ){
       this[attr] = createAccessor(attr);
@@ -1430,6 +1479,7 @@ function Scale(opts) {
     this.attributes.opts = opts;
     this._userOpts = opts;
     this.scaleType(opts.type ? opts.type:null);
+    this.offset(opts.offset ? opts.offset:attributes.offset);
   }
 }
 
@@ -1519,6 +1569,45 @@ Scale.prototype.domain = function(domain) {
   return this;
 };
 
+Scale.prototype.axisLabel = function(o, l) {
+  if(!arguments.length) { return this.attributes.label; }
+  // o is the label
+  if(_.isString(o)){ 
+    this.attributes.label = o; 
+    return this;
+  }
+  if(o instanceof d3.selection){
+    var pd = this.plot().plotDim(),
+        tr, offset,
+        r = 90;
+    if(this.aesthetic() === "y"){
+      offset = this.opts().axis.position === "left" ? -this.offset():this.offset();
+      tr = "translate(" + offset + "," + pd.y + ")rotate(" + -r + ")";
+    } else {
+      offset = this.opts().axis.position === "top" ? -this.offset():this.offset();
+      tr = "translate(0," + offset + ")";
+    }
+    // make the label
+    var label = o.selectAll('.label').data([0]);
+    label
+      .attr('width', pd[this.aesthetic()])
+      .attr('height', "20")
+      .attr('transform', tr)
+      .each(function() {
+        d3.select(this).select('p').text(l);
+      });
+    label.enter().append('foreignObject')
+      .attr('width', pd[this.aesthetic()])
+      .attr('height', "20")
+      .attr('transform', tr)
+      .attr('class', 'label')
+      .append('xhtml:body')
+      .append('div')
+      .append('p')
+      .text(l);
+  }
+};
+
 Scale.prototype.positionAxis = function() {
   var margins = this.plot().margins(),
       dim = this.plot().plotDim(),
@@ -1587,7 +1676,6 @@ function makeScale(selector, a, opts, vname) {
     // if a dtype is not found, it's because it's x or y and 
     // has not been declared. It will be some numerical aggregation.
     dtype = this.dtypes()[vname] || ['number', 'many'];
-    console.log(vname + " " + dtype[0] + " " + dtype[1] + " " + a);
     settings = _.merge(ggd3.tools.defaultScaleSettings(dtype, a),
                        opts);
     var scale = ggd3.scale(settings)
@@ -1602,8 +1690,8 @@ function makeScale(selector, a, opts, vname) {
         scale.range([this.plotDim().y, 0],
                     [this.rangeBand(), this.rangePadding()]);
       }
+      scale.axisLabel(vname);
       scale.axis = d3.svg.axis().scale(scale.scale());
-      if(a === "y"){console.log(scale);}
       for(var ax in settings.axis){
         if(scale.axis.hasOwnProperty(ax)){
           scale.axis[ax](settings.axis[ax]);
@@ -1621,6 +1709,7 @@ function makeScale(selector, a, opts, vname) {
 
 function setDomain(data, layer) {
   if(_.any(_.map(data.data, function(d) {
+    // pass holds aesthetics that shouldn't factor into scale training.
     var pass = ['yintercept', 'xintercept', 'slope'];
     return _.intersection(pass, _.keys(d)).length > 0;
   }))){
@@ -1744,7 +1833,6 @@ Tooltip.prototype.find = function(el) {
 Tooltip.prototype.tooltip = function(selection, s) {
   var that = this;
   if(_.isUndefined(s)){
-    console.log("s is undefined");
     s = this.geom().setup();
   }
   selection.each(function(data) {
@@ -1996,18 +2084,27 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
     y = setup.plot.yScale()[selector];
     yfree = true;
   }
-  x.axis.scale(x.scale());
-  y.axis.scale(y.scale());
+  // think this need not be here.
+  // x.axis.scale(x.scale());
+  // y.axis.scale(y.scale());
 
   if(layerNum === 0 && drawX){
     sel.select('.x.axis')
       .attr("transform", "translate(" + x.positionAxis() + ")")
       .transition().call(x.axis);
+    if(x.label()){
+      sel.select('.x.axis')
+        .call(_.bind(x.axisLabel, x), x.axisLabel());
+    }
   }
   if(layerNum === 0 && drawY){
     sel.select('.y.axis')
       .attr("transform", "translate(" + y.positionAxis() + ")")
       .transition().call(y.axis);
+    if(y.label()){
+      sel.select('.y.axis')
+        .call(_.bind(y.axisLabel, y), y.axisLabel());
+    }
   }
   return {
     x: x,
@@ -2357,7 +2454,6 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       return n(0);
     };
   } )();
-  console.log(rb);
 
 
   var bars = sel.select('.plot')

@@ -17,19 +17,20 @@ function Scale(opts) {
     aesthetic: null,
     domain: null,
     range: null,
-    position: null, // left right top bottom none
-    orient: null, // left right top bottom
     plot: null,
     scaleType: null, // linear, log, ordinal, time, category, 
     // maybe radial, etc.
     scale: null,
     rangeBands: [0.1, 0.1],
     opts: {},
+    label: "",
+    labelPosition: [0.5, 0.5],
+    offset: 45,
   };
   // store passed object
   this.attributes = attributes;
-  var getSet = ["aesthetic", "plot", "orient", "position", "opts",
-                "rangeBands"];
+  var getSet = ["aesthetic", "plot", "opts",
+                "rangeBands", "label", 'offset'];
   for(var attr in this.attributes){
     if(!this[attr] && _.contains(getSet, attr) ){
       this[attr] = createAccessor(attr);
@@ -42,6 +43,7 @@ function Scale(opts) {
     this.attributes.opts = opts;
     this._userOpts = opts;
     this.scaleType(opts.type ? opts.type:null);
+    this.offset(opts.offset ? opts.offset:attributes.offset);
   }
 }
 
@@ -129,6 +131,45 @@ Scale.prototype.domain = function(domain) {
   }
   this.scale().domain(this.attributes.domain);
   return this;
+};
+
+Scale.prototype.axisLabel = function(o, l) {
+  if(!arguments.length) { return this.attributes.label; }
+  // o is the label
+  if(_.isString(o)){ 
+    this.attributes.label = o; 
+    return this;
+  }
+  if(o instanceof d3.selection){
+    var pd = this.plot().plotDim(),
+        tr, offset,
+        r = 90;
+    if(this.aesthetic() === "y"){
+      offset = this.opts().axis.position === "left" ? -this.offset():this.offset();
+      tr = "translate(" + offset + "," + pd.y + ")rotate(" + -r + ")";
+    } else {
+      offset = this.opts().axis.position === "top" ? -this.offset():this.offset();
+      tr = "translate(0," + offset + ")";
+    }
+    // make the label
+    var label = o.selectAll('.label').data([0]);
+    label
+      .attr('width', pd[this.aesthetic()])
+      .attr('height', "20")
+      .attr('transform', tr)
+      .each(function() {
+        d3.select(this).select('p').text(l);
+      });
+    label.enter().append('foreignObject')
+      .attr('width', pd[this.aesthetic()])
+      .attr('height', "20")
+      .attr('transform', tr)
+      .attr('class', 'label')
+      .append('xhtml:body')
+      .append('div')
+      .append('p')
+      .text(l);
+  }
 };
 
 Scale.prototype.positionAxis = function() {

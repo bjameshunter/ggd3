@@ -42,7 +42,6 @@ function makeScale(selector, a, opts, vname) {
     // if a dtype is not found, it's because it's x or y and 
     // has not been declared. It will be some numerical aggregation.
     dtype = this.dtypes()[vname] || ['number', 'many'];
-    console.log(vname + " " + dtype[0] + " " + dtype[1] + " " + a);
     settings = _.merge(ggd3.tools.defaultScaleSettings(dtype, a),
                        opts);
     var scale = ggd3.scale(settings)
@@ -57,8 +56,8 @@ function makeScale(selector, a, opts, vname) {
         scale.range([this.plotDim().y, 0],
                     [this.rangeBand(), this.rangePadding()]);
       }
+      scale.axisLabel(vname);
       scale.axis = d3.svg.axis().scale(scale.scale());
-      if(a === "y"){console.log(scale);}
       for(var ax in settings.axis){
         if(scale.axis.hasOwnProperty(ax)){
           scale.axis[ax](settings.axis[ax]);
@@ -76,6 +75,7 @@ function makeScale(selector, a, opts, vname) {
 
 function setDomain(data, layer) {
   if(_.any(_.map(data.data, function(d) {
+    // pass holds aesthetics that shouldn't factor into scale training.
     var pass = ['yintercept', 'xintercept', 'slope'];
     return _.intersection(pass, _.keys(d)).length > 0;
   }))){

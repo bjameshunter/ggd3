@@ -8,7 +8,7 @@
 .ygrid path, .xgrid path {
   stroke-opacity: 0.2;
 }
-.axis .tick line, .axis path.domain {
+.axis>.tick>line, .axis path.domain {
   stroke-opacity: 0 !important;
 } 
 </style>
@@ -47,12 +47,12 @@ var chart = ggd3.plot()
               .width(300)
               .rangePadding(0.8)
               .rangeBand(0.05)
-              .yScale({axis:{position:'right',
+              .yScale({axis:{position:'left',
                       orient: 'right'}})
-              .xScale({axis:{position:'top',
+              .xScale({axis:{position:'bottom',
                       orient: 'bottom'}})
               .fillScale({type:'category20b'})
-              .margins({right: 35, left:5, top:5, bottom:0})
+              .margins({right: 35, left:5, top:5, bottom:50})
               .color('none')
               .aes({x:'dist', y:'educ'})
 

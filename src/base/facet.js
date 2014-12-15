@@ -12,6 +12,8 @@ function Facet(spec) {
     plot: null, 
     nrows: null,
     ncols: null,
+    // if we're doing grid facets, do y labels go left or right?
+    yGridLabel: "right",
     margins: {x: 5, y:5}, 
     titleSize: [20, 20],
     // inherit from plot, but allow override
@@ -71,6 +73,7 @@ Facet.prototype.updateFacet = function() {
                     );
     }
   }
+
   that.nFacets = that.xFacets.length * that.yFacets.length;
 
   if( that.scales() !== "fixed" && that.type()==="grid"){
@@ -156,6 +159,7 @@ Facet.prototype.makeSVG = function(selection, rowNum, colNum) {
       addHeight = (rowNum === 0 || this.type() === "wrap") ? that.titleSize()[1]:0,
       addWidth = colNum === 0 ? that.titleSize()[0]:0,
       addWidthSVG = (colNum+1) === this._ncols ? plot.margins().right:0,
+      addHeightSVG = (rowNum + 1) === this._nrows ? plot.margins().bottom:0,
       width = plot.width() + addWidth,
       height = plot.height() + addHeight,
       svg = selection
@@ -167,7 +171,7 @@ Facet.prototype.makeSVG = function(selection, rowNum, colNum) {
 
     svg
     .attr('width', width + addWidthSVG)
-    .attr('height', height)
+    .attr('height', height + addHeightSVG)
     .each(function(d) {
       that.makeTitle(d3.select(this), colNum, rowNum);
       var sel = d3.select(this).select('.plot-svg');
@@ -179,7 +183,7 @@ Facet.prototype.makeSVG = function(selection, rowNum, colNum) {
   svg.enter().append('svg')
     .attr('class', 'svg-wrap')
     .attr('width', width + addWidthSVG)
-    .attr('height', height)
+    .attr('height', height + addHeightSVG)
     .each(function(d) {
       that.makeTitle(d3.select(this), colNum, rowNum);
       var sel = d3.select(this).selectAll('.plot-svg')
@@ -198,8 +202,11 @@ Facet.prototype.makeSVG = function(selection, rowNum, colNum) {
   that.nSVGs += 1;
 };
 // overrides default margins if facet type == "grid"
-// or scales are free
 Facet.prototype.calculateMargins = function(plot) {
+  // grids are complicated. If I'm requesting "grid" facets
+  // y axis position 'left' means only left column facets
+  // x axis position 'bottom' means only bottom row facets.
+
 
 };
 
@@ -249,12 +256,14 @@ Facet.prototype.id = function(x, y) {
 };
 Facet.prototype.makeCell = function(selection, colNum, rowNum, 
                                     ncols) {
+  console.log(colNum === (ncols-1));  
   var margins = this.plot().margins(),
       dim = this.plot().plotDim(),
       that = this,
       gridClassX = (this.type()==="grid" && rowNum!==0) ? " grid": "",
-      gridClassY = (this.type()==="grid" && colNum!==(ncols-1)) ? " grid": "";
-  
+      // drawing Axis on rightmost facet.
+      gridClassY = (this.type()==="grid" && colNum === (ncols-1)) ? " grid": "";
+
   this.makeG(selection, "xgrid", "")
     .attr("transform", "translate(" + margins.left + "," + margins.top + ")");
   this.makeG(selection, "ygrid", "")
@@ -262,7 +271,7 @@ Facet.prototype.makeCell = function(selection, colNum, rowNum,
 
   var plot = selection.selectAll('g.plot')
                 .data([0]);
-  plot
+  plot.transition()
     .attr('transform', "translate(" + margins.left + 
             "," + margins.top + ")")
     .select('rect.background')
@@ -281,11 +290,20 @@ Facet.prototype.makeCell = function(selection, colNum, rowNum,
   plot.exit().remove();
 
   // complex set of conditions based on facet and scale requests.
-  this.makeG(selection, "x axis", gridClassX);
-  this.makeG(selection, "y axis", gridClassY);
+  if(this.type() === "grid" && gridClassX){
+    this.makeG(selection, "x axis", gridClassX);
+  } else if(this.type() !== "grid") {
+    this.makeG(selection, "x axis", gridClassX);
+  }
+  if(this.type() === "grid" && gridClassY){
+    this.makeG(selection, "y axis", gridClassY);
+  } else if(this.type() !== "grid"){
+    this.makeG(selection, "y axis", gridClassY);
+  }
 };
 Facet.prototype.makeG = function (sel, cls, cls2) {
-  var g = sel.selectAll('g.' + cls.replace(/ /g, "."))
+  var both = cls + cls2;
+  var g = sel.selectAll('g.' + both.replace(/ /g, "."))
     .data([0]);
   g.enter().append('g')
     .attr('class', cls + cls2);

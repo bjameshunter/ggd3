@@ -50,17 +50,21 @@ var facet = ggd3.facet().titleSize([0,0]);
 var chart = ggd3.plot()
               .facet(facet)
               .width(300)
-              .height(1100)
+              .height(800)
               .color('white')
               .rangeBand(0)
               .rangePadding(0)
               .subRangePadding(0.2)
               .layers(layers)
-              .margins({right: 50, left: 20})
+              .yGrid(false)
+              .xGrid(false)
+              .margins({right: 50, top:60})
               .xScale({axis: {ticks:4, position: 'top',
-                              orient:'top'}})
+                              orient:'top'},
+                              offset:45})
               .yScale({axis:{position:"right",
-                            orient: "right"}})
+                            orient: "right"},
+                            offset:45})
               .aes({y: "team", x:"batting",
                     fill: "decade",
                     alpha: "hr"})

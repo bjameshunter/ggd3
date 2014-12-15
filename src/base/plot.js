@@ -2,7 +2,7 @@
    // who cares about inheriting for this. Just write custom per geom
 // 2. Label facets better and provide option to label with function.
 // 3. Better details on boxplot tooltip
-// 4. Consider annotation object
+// 4. Make annotation object
 // 5. Delete relevant scale when aes changes so they'll be recreated.
 // 6. Sorting method for ordinal domains
 // 7. Add 5 number option to boxplot
@@ -60,6 +60,7 @@ function Plot() {
     yAdjust: false,
     xGrid: true,
     yGrid: true,
+    gridLineType: "1,1",
     alphaRange: [0.1, 1],
     sizeRange: [3, 20],
     fillRange: ["blue", "red"],
@@ -83,12 +84,8 @@ function Plot() {
   // data are nested or not.
   // this.nested = false;
   this.hgrid = ggd3.layer()
-                .geom(ggd3.geoms.hline().grid(true)
-                      .lineType("2,2"))
                 .plot(this);
   this.vgrid = ggd3.layer()
-                .geom(ggd3.geoms.vline().grid(true)
-                      .lineType("2,2"))
                 .plot(this); 
   // explicitly declare which attributes get a basic
   // getter/setter
@@ -100,7 +97,7 @@ function Plot() {
     'rangeBand', 'rangePadding', 
     'subRangeBand', 'subRangePadding', 'subDomain',
     "alphaRange", "lineWidth",
-    "xGrid", "yGrid"];
+    "xGrid", "yGrid", "gridLineType"];
 
   for(var attr in attributes){
     if((!this[attr] && 
@@ -435,9 +432,15 @@ Plot.prototype.draw = function(sel) {
   // if you're drawing something with more than
   // 30 layers, you can tweak this yourself.
   if(this.yGrid()) { 
+    this.hgrid
+      .geom(ggd3.geoms.hline().grid(true)
+        .lineType(this.gridLineType()));
     this.hgrid.compute(sel, 30);
     this.hgrid.draw(sel, 30);}
   if(this.xGrid()) { 
+    this.vgrid
+      .geom(ggd3.geoms.vline().grid(true)
+        .lineType(this.gridLineType()));
     this.vgrid.compute(sel, 30);
     this.vgrid.draw(sel, 30);}
 };

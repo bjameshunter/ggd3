@@ -28,7 +28,6 @@ Tooltip.prototype.find = function(el) {
 Tooltip.prototype.tooltip = function(selection, s) {
   var that = this;
   if(_.isUndefined(s)){
-    console.log("s is undefined");
     s = this.geom().setup();
   }
   selection.each(function(data) {
