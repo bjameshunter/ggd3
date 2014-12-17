@@ -22,10 +22,16 @@ title: Diamonds
   <option value="right">y axis right</option>
 </select>    
  -->
+<style>
+.x.axis path.domain, .y.axis path.domain, .axis .tick line { 
+  stroke: none; 
+} 
+</style>
 <script>
 function collectData(layer) {
   return d3.selectAll('.geom.' + layer).data();
 }
+
 
 var div = d3.select('#chart01'),
     chart, data;
