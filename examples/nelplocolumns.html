@@ -48,11 +48,12 @@ var layers = [ggd3.geoms.path()
 
 var facet = ggd3.facet({x:'decade', ncols: 2}).scales('free');
 
+
 var chart = ggd3.plot()
               .colorRange(['orange', 'blue'])
               .layers(layers)
               .facet(facet)
-              .margins({left: 35, bottom:30})
+              .margins({left: 60, bottom:30})
               .xScale({axis:{ticks:4}})
               .yScale({axis:{ticks:4}})
               .dtypes({"date": ['date', 'many', "%Y-%m"]})

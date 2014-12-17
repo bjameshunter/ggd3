@@ -37,16 +37,16 @@ var div = d3.select('#chart01'),
 
 var layers = [ggd3.geoms.boxplot()];
 
-var facet = ggd3.facet({x:'clarity', ncols: 8, type:'grid'});
+var facet = ggd3.facet({x:'clarity', ncols: 8});
 
 var chart = ggd3.plot()
               .facet(facet)
               .width(150)
-              .yScale({axis:{position:'right', orient:'left'}})
+              .yScale({axis:{position:'left', orient:'left'}})
               .xScale({axis:{position:'top', orient: 'bottom',
                               ticks: 3}})
               .height(700)
-              .margins({top:0, bottom:0, left:0, right:30})
+              .margins({top:0, bottom:0, left:40, right:0})
               .layers(layers)
               .color('none')
               .aes({x:'price', y: "color", fill: "cut",

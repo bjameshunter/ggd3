@@ -25,12 +25,12 @@ function Scale(opts) {
     opts: {},
     label: "",
     labelPosition: [0.5, 0.5],
-    offset: 45,
+    offset: null,
   };
   // store passed object
   this.attributes = attributes;
   var getSet = ["aesthetic", "plot", "opts",
-                "rangeBands", "label", 'offset'];
+                "rangeBands", "label"];
   for(var attr in this.attributes){
     if(!this[attr] && _.contains(getSet, attr) ){
       this[attr] = createAccessor(attr);
@@ -133,6 +133,12 @@ Scale.prototype.domain = function(domain) {
   return this;
 };
 
+Scale.prototype.offset = function(o) {
+  if(!arguments.length && !this.attributes.offset){
+    return 45;
+  }
+};
+
 Scale.prototype.axisLabel = function(o, l) {
   if(!arguments.length) { return this.attributes.label; }
   // o is the label
@@ -172,27 +178,41 @@ Scale.prototype.axisLabel = function(o, l) {
   }
 };
 
-Scale.prototype.positionAxis = function() {
+Scale.prototype.positionAxis = function(rowNum, colNum) {
   var margins = this.plot().margins(),
       dim = this.plot().plotDim(),
       aes = this.aesthetic(),
-      opts = this.opts().axis;
+      opts = this.opts().axis, 
+      grid = this.plot().facet().type() === "grid",
+      ts = this.plot().facet().titleSize(),
+      y, x;
   if(aes === "x"){
+    if(grid){
+      x = colNum === 0 ? margins.left: 0;
+    } else {
+      x = margins.left;
+    }
     if(opts.position === "bottom"){
-      return [margins.left, margins.top + dim.y];
+      y = dim.y;
     }
     if(opts.position === "top"){
-      return [margins.left, margins.top];
+      y = 0;
     }
   }
   if(aes === "y") {
+    if(grid){
+      y = 0;
+    } else {
+      y = 0;
+    }
     if(opts.position === "left"){
-      return [margins.left, margins.top];
+      x = margins.left;
     }
     if(opts.position === "right"){
-      return [margins.left + dim.x, margins.top];
+      x = margins.left + dim.x;
     }
   }
+  return [x, y];
 };
 
 ggd3.scale = Scale;

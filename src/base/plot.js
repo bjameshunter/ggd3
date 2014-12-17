@@ -10,6 +10,8 @@
       // - resetting a scale with null also works
 // 9. Add rangeBand, subRangeBand, rangePadding and subRangePadding
 //    to all geoms that can be mounted on ordinal axes.
+// 10. plot.subScale isn't found on refresh
+        // - try changing stacked histogram to dodge
 
 // for much later:
 // Zoom behaviors: fixed scales get global zoom on linear axes
@@ -330,12 +332,14 @@ Plot.prototype.setFixedScale = function(a) {
 
 Plot.prototype.plotDim = function() {
   var margins = this.margins();
-  if(this.facet().type() === "grid"){
-    return {x: this.width() - this.facet().margins().x, 
-      y: this.height() - this.facet().margins().y};
-  }
-  return {x: this.width() - margins.left - margins.right,
-   y: this.height() - margins.top - margins.bottom};
+  return {x: this.width(),
+   y: this.height()};
+  // if(this.facet().type() === "grid"){
+  //   return {x: this.width() - this.facet().margins().x, 
+  //     y: this.height() - this.facet().margins().y};
+  // }
+  // return {x: this.width() - margins.left - margins.right,
+  //  y: this.height() - margins.top - margins.bottom};
 };
 
 // subScale holds default settings, but
@@ -379,10 +383,9 @@ Plot.prototype.setSubScale = function(order) {
 
 
 Plot.prototype.draw = function(sel) {
-  var updateFacet = this.facet().updateFacet();
-  
   // draw/update facets
-  updateFacet(sel);
+  this.facet().updateFacet(sel);
+  
   // reset nSVGs after they're drawn.
   this.facet().nSVGs = 0;
   // get the layer classes that should
@@ -394,6 +397,7 @@ Plot.prototype.draw = function(sel) {
                   }, this);
 
   this.setScale('single', this.aes());
+
   _.each(this.layers(), function(l, layerNum) {
     l.compute(sel, layerNum);
   });

@@ -275,7 +275,6 @@ Stat.prototype.compute_bin = function(data) {
 };
 
 Stat.prototype.compute_density = function(data) {
-  console.log(data.length);
   var out = {},
       start = {},
       end = {},

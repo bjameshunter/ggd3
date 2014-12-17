@@ -193,8 +193,11 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
                                      layerNum, drawX, drawY){
 
   var x, y,
-      plot = this.layer().plot();
+      plot = this.layer().plot(),
+      rowNum = parseInt(sel.select('.plot-svg').attr('row')),
+      colNum = parseInt(sel.select('.plot-svg').attr('col'));
   // choosing scales based on facet rule
+
   if(!_.contains(["free", "free_x"], setup.facet.scales()) || 
      _.isUndefined(setup.plot.xScale()[selector])){
     x = setup.plot.xScale().single;
@@ -217,7 +220,7 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
 
   if(layerNum === 0 && drawX){
     sel.select('.x.axis')
-      .attr("transform", "translate(" + x.positionAxis() + ")")
+      .attr("transform", "translate(" + x.positionAxis(rowNum, colNum) + ")")
       .transition().call(x.axis);
     if(x.label()){
       sel.select('.x.axis')
@@ -226,7 +229,7 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
   }
   if(layerNum === 0 && drawY){
     sel.select('.y.axis')
-      .attr("transform", "translate(" + y.positionAxis() + ")")
+      .attr("transform", "translate(" + y.positionAxis(rowNum, colNum) + ")")
       .transition().call(y.axis);
     if(y.label()){
       sel.select('.y.axis')

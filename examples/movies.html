@@ -34,13 +34,15 @@ function collectData(layer) {
 var div = d3.select('#chart01'),
     chart, data;
 
-var layers = [];
+var layers = ['boxplot'];
 
-var facet = ggd3.facet();
+var facet = ggd3.facet({scales: 'fixed', x:'Documentary', y:'Romance',
+                          type: 'grid'});
 
 var chart = ggd3.plot()
               .facet(facet)
               .layers(layers)
+              .aes({x:'rating', y: 'Comedy', group: "Action"})
 
 d3.csv("../data/movies.csv", function(error, d) {
   data = d;

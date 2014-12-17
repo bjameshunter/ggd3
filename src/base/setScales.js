@@ -111,6 +111,7 @@ function setDomain(data, layer) {
     _.map(this.freeScales, function(k){
       scale = this[k+ "Scale"]()[data.selector];
       scale.domain(geom.domain(data.data, k));
+      scale.scale().nice();
     }, this);
   }
   function first(d) {
@@ -130,6 +131,7 @@ function setDomain(data, layer) {
         if(_.contains(linearScales, scale.scaleType())){
           domain = ggd3.tools.numericDomain(data.data, s.aes[g]);
           scale.range(this[g + 'Range']());
+          scale.scale().nice();
         } else {
           domain = _.sortBy(
                     _.unique(
@@ -143,6 +145,9 @@ function setDomain(data, layer) {
         }
       }
       scale.domain(domain);
+      if(_.contains(linearScales, scale.scaleType())){
+        scale.scale().nice();
+      }
       this[g + "Scale"]()[data.selector] = scale;
       for(var sc in scale._userOpts.scale){
         if(scale.scale().hasOwnProperty(sc)){
