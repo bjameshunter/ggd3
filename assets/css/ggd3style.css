@@ -1,3 +1,7 @@
+.chart-frame {
+  padding: 50px;
+}
+
 .tick text {
   font-size: 10pt;
   stroke: grey;
@@ -97,13 +101,7 @@ rect.brushframe {
   fill-opacity: .125;
   shape-rendering: crispEdges;
 }
-/*make grid axes 100% transparent*/
-.axis.grid .tick {
-  stroke-opacity: 0;
-}
-.axis.grid text {
-  fill-opacity: 0;
-}
+
 /* geoms */
 path.geom-grid-horiz, path.geom-grid-vert {
   stroke-dasharray: 3,1;
