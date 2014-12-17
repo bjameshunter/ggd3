@@ -56,7 +56,9 @@ function makeScale(selector, a, opts, vname) {
         scale.range([this.plotDim().y, 0],
                     [this.rangeBand(), this.rangePadding()]);
       }
-      scale.axisLabel(vname);
+      if(_.isNull(scale.label())){
+        scale.label(vname);
+      }
       scale.axis = d3.svg.axis().scale(scale.scale());
       for(var ax in settings.axis){
         if(scale.axis.hasOwnProperty(ax)){

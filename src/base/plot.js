@@ -91,7 +91,7 @@ function Plot() {
   // getter/setter
   var getSet = ["opts", "theme", 
     "width", "height", "xAdjust", "yAdjust", 
-    "xDomain", "yDomain",
+    "xDomain", "yDomain", 
     'colorRange', 'sizeRange',
     'fillRange', "lineType", "subScale",
     'rangeBand', 'rangePadding', 
@@ -349,16 +349,15 @@ Plot.prototype.setSubScale = function(order) {
       ord,
       direction, 
       domain;
-  if(xord !== "ordinal" &&
-     this.yScale().single.scaleType() !== "ordinal"){
-    return false;
-  }
+  // histogram needs subscales, too.
   if(xord === "ordinal"){
     ord = this.xScale().single.scale();
     direction = 'x';
-  } else {
+  } else if(this.yScale().single.scaleType() === "ordinal"){
     ord = this.yScale().single.scale();
     direction = 'y';
+  } else {
+    return false;
   }
   // the first layer is special, it should be the layer with all
   // relevent categorical info. Subsequent layers should only, 

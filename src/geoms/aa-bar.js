@@ -198,7 +198,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     data = d3.nest().key(function(d) { return d[s.group];})
               .entries(data);
   } else {
-    data = [{key: 'single',values:data}];
+    data = [{key: 'single',values: data}];
   }
 
   // with histograms, if a bin is empty, it's key comes
@@ -238,7 +238,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
                           });
   data = _.flatten(data, 
                    that.name() === "histogram" ? true:false);
-  if(s.position === 'dodge') {
+  if(s.position === 'dodge' && this.name() === 'bar') {
     // make ordinal scale for group
     sub = d3.scale.ordinal()
             .domain(pSub.domain());
@@ -252,6 +252,13 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     sub = function(d) {
       return 0;
     };
+  }
+  // dodge histograms require a secondary scale on a numeric axis
+  if(this.name() === "histogram" && s.position === "dodge"){
+    sub = d3.scale.ordinal()
+            .domain(this.collectGroups())
+            .rangeRoundBands([0, rb], 0, 0);
+    rb = sub.rangeBand();
   }
   
   var placeBar = (function() {

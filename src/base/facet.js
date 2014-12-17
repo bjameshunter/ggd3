@@ -361,10 +361,10 @@ Facet.prototype.makeTitle = function(selection, colNum, rowNum) {
   var ylab = selection
               .selectAll('svg.facet-title-y')
               .data([that.y() + " - " + that.yFacets[rowNum]]);
-  if(this.type() !== "grid" || rowNum === 0){
+  if(this.type() !== "grid" || rowNum === 0 && this.x()){
     xlab.enter().append('svg')
         .attr('class', 'facet-title-x')
-        .attr({width: dim.x, x:0,
+        .attr({width: dim.x, 
           height: ts[0]})
         .each(function() {
           d3.select(this).append('rect')
@@ -381,9 +381,7 @@ Facet.prototype.makeTitle = function(selection, colNum, rowNum) {
           "text-anchor": that.textAnchorX()})
         .text(_.identity);
   }
-  if(that.type() === "grid" && colNum === (this._ncols - 1)){
-    var tr = "translate(" + [dim.plotX/2, dim.plotY/2] + ")rotate(90)" +
-            "translate(0," + -ts[1]*0.25 + ")";
+  if(that.type() === "grid" && colNum === (this._ncols - 1) && this.y()){
     ylab.enter().append('svg')
         .attr('class', 'facet-title-y')
         .each(function() {
@@ -394,7 +392,7 @@ Facet.prototype.makeTitle = function(selection, colNum, rowNum) {
     ylab
       .attr({width: ts[1],
           height: dim.plotY,
-          x: dim.plotX,
+          x: (that._ncols === 1) ? dim.plotX + dim.ftx:dim.plotX,
           y: dim.fty})
       .select('rect')
       .attr({width: ts[1], 
@@ -402,13 +400,14 @@ Facet.prototype.makeTitle = function(selection, colNum, rowNum) {
     ylab.select('text')
         .attr({fill: 'black',
             opacity: 1,
-            x: ts[1] * 0.8,
-            y: dim.plotY/2,
+            x: dim.plotY/2,
+            y: -ts[1]*0.25,
             "text-anchor": that.textAnchorY(),
-            transform: tr})
+            transform: "rotate(90)"})
         .text(_.identity);
-  } else {
-    // add labels to wrap-style faceting.
+  }
+  // add labels to wrap-style faceting.
+  if(this.type() === "wrap"){
     xlab.select('text')
         .text(that.wrapLabel(rowNum, colNum));
     selection.select('.facet-title-y')

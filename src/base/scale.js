@@ -23,7 +23,7 @@ function Scale(opts) {
     scale: null,
     rangeBands: [0.1, 0.1],
     opts: {},
-    label: "",
+    label: null,
     labelPosition: [0.5, 0.5],
     offset: null,
   };
@@ -42,6 +42,7 @@ function Scale(opts) {
     // _userOpts stays fixed on initiation.
     this.attributes.opts = opts;
     this._userOpts = opts;
+    this.label(opts.label);
     this.scaleType(opts.type ? opts.type:null);
     this.offset(opts.offset ? opts.offset:attributes.offset);
   }
@@ -83,7 +84,7 @@ Scale.prototype.scaleType = function(scaleType) {
 };
 
 Scale.prototype.style = function(sel) {
-  var styles = ['text', 'style'],
+  var styles = ['text', 'style', 'tickFormat'],
       axis = this.opts().axis;
   _.each(styles, function(s) {
     if(axis.hasOwnProperty(s)){
@@ -193,12 +194,13 @@ Scale.prototype.positionAxis = function(rowNum, colNum) {
       dim = this.plot().plotDim(),
       aes = this.aesthetic(),
       opts = this.opts().axis, 
+      facet = this.plot().facet(),
       grid = this.plot().facet().type() === "grid",
       ts = this.plot().facet().titleSize(),
       y, x;
   if(aes === "x"){
     if(grid){
-      x = colNum === 0 ? margins.left: 0;
+      x = colNum === 0 ? margins.left: facet.margins().x;
     } else {
       x = margins.left;
     }
@@ -211,7 +213,7 @@ Scale.prototype.positionAxis = function(rowNum, colNum) {
   }
   if(aes === "y") {
     if(grid){
-      y = 0;
+      y = rowNum === 0 ? 0: facet.margins().y;
     } else {
       y = 0;
     }

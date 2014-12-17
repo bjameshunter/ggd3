@@ -699,10 +699,10 @@ Facet.prototype.makeTitle = function(selection, colNum, rowNum) {
   var ylab = selection
               .selectAll('svg.facet-title-y')
               .data([that.y() + " - " + that.yFacets[rowNum]]);
-  if(this.type() !== "grid" || rowNum === 0){
+  if(this.type() !== "grid" || rowNum === 0 && this.x()){
     xlab.enter().append('svg')
         .attr('class', 'facet-title-x')
-        .attr({width: dim.x, x:0,
+        .attr({width: dim.x, 
           height: ts[0]})
         .each(function() {
           d3.select(this).append('rect')
@@ -719,9 +719,7 @@ Facet.prototype.makeTitle = function(selection, colNum, rowNum) {
           "text-anchor": that.textAnchorX()})
         .text(_.identity);
   }
-  if(that.type() === "grid" && colNum === (this._ncols - 1)){
-    var tr = "translate(" + [dim.plotX/2, dim.plotY/2] + ")rotate(90)" +
-            "translate(0," + -ts[1]*0.25 + ")";
+  if(that.type() === "grid" && colNum === (this._ncols - 1) && this.y()){
     ylab.enter().append('svg')
         .attr('class', 'facet-title-y')
         .each(function() {
@@ -732,7 +730,7 @@ Facet.prototype.makeTitle = function(selection, colNum, rowNum) {
     ylab
       .attr({width: ts[1],
           height: dim.plotY,
-          x: dim.plotX,
+          x: (that._ncols === 1) ? dim.plotX + dim.ftx:dim.plotX,
           y: dim.fty})
       .select('rect')
       .attr({width: ts[1], 
@@ -740,13 +738,14 @@ Facet.prototype.makeTitle = function(selection, colNum, rowNum) {
     ylab.select('text')
         .attr({fill: 'black',
             opacity: 1,
-            x: ts[1] * 0.8,
-            y: dim.plotY/2,
+            x: dim.plotY/2,
+            y: -ts[1]*0.25,
             "text-anchor": that.textAnchorY(),
-            transform: tr})
+            transform: "rotate(90)"})
         .text(_.identity);
-  } else {
-    // add labels to wrap-style faceting.
+  }
+  // add labels to wrap-style faceting.
+  if(this.type() === "wrap"){
     xlab.select('text')
         .text(that.wrapLabel(rowNum, colNum));
     selection.select('.facet-title-y')
@@ -1077,7 +1076,7 @@ function Plot() {
   // getter/setter
   var getSet = ["opts", "theme", 
     "width", "height", "xAdjust", "yAdjust", 
-    "xDomain", "yDomain",
+    "xDomain", "yDomain", 
     'colorRange', 'sizeRange',
     'fillRange', "lineType", "subScale",
     'rangeBand', 'rangePadding', 
@@ -1335,16 +1334,15 @@ Plot.prototype.setSubScale = function(order) {
       ord,
       direction, 
       domain;
-  if(xord !== "ordinal" &&
-     this.yScale().single.scaleType() !== "ordinal"){
-    return false;
-  }
+  // histogram needs subscales, too.
   if(xord === "ordinal"){
     ord = this.xScale().single.scale();
     direction = 'x';
-  } else {
+  } else if(this.yScale().single.scaleType() === "ordinal"){
     ord = this.yScale().single.scale();
     direction = 'y';
+  } else {
+    return false;
   }
   // the first layer is special, it should be the layer with all
   // relevent categorical info. Subsequent layers should only, 
@@ -1471,7 +1469,7 @@ function Scale(opts) {
     scale: null,
     rangeBands: [0.1, 0.1],
     opts: {},
-    label: "",
+    label: null,
     labelPosition: [0.5, 0.5],
     offset: null,
   };
@@ -1490,6 +1488,7 @@ function Scale(opts) {
     // _userOpts stays fixed on initiation.
     this.attributes.opts = opts;
     this._userOpts = opts;
+    this.label(opts.label);
     this.scaleType(opts.type ? opts.type:null);
     this.offset(opts.offset ? opts.offset:attributes.offset);
   }
@@ -1531,7 +1530,7 @@ Scale.prototype.scaleType = function(scaleType) {
 };
 
 Scale.prototype.style = function(sel) {
-  var styles = ['text', 'style'],
+  var styles = ['text', 'style', 'tickFormat'],
       axis = this.opts().axis;
   _.each(styles, function(s) {
     if(axis.hasOwnProperty(s)){
@@ -1641,12 +1640,13 @@ Scale.prototype.positionAxis = function(rowNum, colNum) {
       dim = this.plot().plotDim(),
       aes = this.aesthetic(),
       opts = this.opts().axis, 
+      facet = this.plot().facet(),
       grid = this.plot().facet().type() === "grid",
       ts = this.plot().facet().titleSize(),
       y, x;
   if(aes === "x"){
     if(grid){
-      x = colNum === 0 ? margins.left: 0;
+      x = colNum === 0 ? margins.left: facet.margins().x;
     } else {
       x = margins.left;
     }
@@ -1659,7 +1659,7 @@ Scale.prototype.positionAxis = function(rowNum, colNum) {
   }
   if(aes === "y") {
     if(grid){
-      y = 0;
+      y = rowNum === 0 ? 0: facet.margins().y;
     } else {
       y = 0;
     }
@@ -1732,7 +1732,9 @@ function makeScale(selector, a, opts, vname) {
         scale.range([this.plotDim().y, 0],
                     [this.rangeBand(), this.rangePadding()]);
       }
-      scale.axisLabel(vname);
+      if(_.isNull(scale.label())){
+        scale.label(vname);
+      }
       scale.axis = d3.svg.axis().scale(scale.scale());
       for(var ax in settings.axis){
         if(scale.axis.hasOwnProperty(ax)){
@@ -2398,7 +2400,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     data = d3.nest().key(function(d) { return d[s.group];})
               .entries(data);
   } else {
-    data = [{key: 'single',values:data}];
+    data = [{key: 'single',values: data}];
   }
 
   // with histograms, if a bin is empty, it's key comes
@@ -2438,7 +2440,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
                           });
   data = _.flatten(data, 
                    that.name() === "histogram" ? true:false);
-  if(s.position === 'dodge') {
+  if(s.position === 'dodge' && this.name() === 'bar') {
     // make ordinal scale for group
     sub = d3.scale.ordinal()
             .domain(pSub.domain());
@@ -2452,6 +2454,13 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     sub = function(d) {
       return 0;
     };
+  }
+  // dodge histograms require a secondary scale on a numeric axis
+  if(this.name() === "histogram" && s.position === "dodge"){
+    sub = d3.scale.ordinal()
+            .domain(this.collectGroups())
+            .rangeRoundBands([0, rb], 0, 0);
+    rb = sub.rangeBand();
   }
   
   var placeBar = (function() {
