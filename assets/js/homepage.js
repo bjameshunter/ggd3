@@ -10,7 +10,7 @@ d3.csv("assets/data/iris.csv", function(error, iris) {
                             color:'Species'})
                     .layers([proportionHist, gaussian])
                     .data(iris)
-                    .width(700)
+                    .width(600)
                     .height(350);
     irisHistogram.draw(d3.select('#iris'));
 });
