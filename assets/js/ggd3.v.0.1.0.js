@@ -309,6 +309,33 @@ function recurseNest(data) {
 }
 
 
+function Annotate(spec) {
+  if(!(this instanceof Annotate)){
+    return new Annotate(spec);
+  }
+  // annotations are divs or foreignObjects that contain a div to be placed in an svg or g element.
+  // used to label plots and axes. They can also be fed a selection
+  // of geoms and draw a line to that geom to display more info about
+  // the data it contains. They will live in the rightmost or leftmost
+  // margin of the plot
+  var attributes = {
+    content: "",
+    class: "annotation",
+    orient: "horizontal",
+  };
+  for(var attr in attributes){
+    if(!this[attr]){
+      this[attr] = createAccessor(attr);
+    }
+  }
+}
+
+Annotate.prototype.selection = function(sel) {
+  
+
+};
+
+ggd3.annotate = Annotate;
 function Facet(spec) {
   if(!(this instanceof Facet)){
     return new ggd3.facet(spec);
@@ -323,15 +350,20 @@ function Facet(spec) {
     plot: null, 
     nrows: null,
     ncols: null,
+    // if we're doing grid facets, do y labels go left or right?
     margins: {x: 5, y:5}, 
     titleSize: [20, 20],
+    textAnchorX: "middle",
+    textAnchorY: "middle",
+    // function to label facets.
+    labels: null,
     // inherit from plot, but allow override
     // if scales are fixed, much smaller margins
     // because scales won't be drawn for inner plots.
   };
   // store number of facet svgs made to 
   // limit number to nFacets later
-  this.nSVGs = 0;
+ this.nSVGs = 0;
   if(typeof spec === "object"){
     for(var s in spec) {
       attributes[s] = spec[s];
@@ -346,11 +378,10 @@ function Facet(spec) {
 }
 
 
-Facet.prototype.updateFacet = function() {
+Facet.prototype.updateFacet = function(sel) {
   var that = this,
       data = this.plot().data(),
       nrows, ncols;
-  that.calculateMargins();
   that.xFacets = ["single"];
   that.yFacets = ["single"];
   // rules of faceting:
@@ -382,6 +413,7 @@ Facet.prototype.updateFacet = function() {
                     );
     }
   }
+
   that.nFacets = that.xFacets.length * that.yFacets.length;
 
   if( that.scales() !== "fixed" && that.type()==="grid"){
@@ -416,25 +448,22 @@ Facet.prototype.updateFacet = function() {
     that._ncols = that.xFacets.length;
   }
 
-  this.update = function(sel) {
-    var rows = sel.selectAll('div.row')
-                .data(_.range(that._nrows));
-    rows
-      .attr('id', function(d) { return "row-" + d; })
-      .each(function(d, i) {
-        that.makeDIV(d3.select(this), d, that._ncols);
-      });
+  var rows = sel.selectAll('div.row')
+              .data(_.range(that._nrows));
+  rows
+    .attr('id', function(d) { return "row-" + d; })
+    .each(function(d, i) {
+      that.makeDIV(d3.select(this), d, that._ncols);
+    });
 
-    rows.enter()
-      .append('div')
-      .attr('class', 'row')
-      .attr('id', function(d) { return "row-" + d; })
-      .each(function(d, i) {
-        that.makeDIV(d3.select(this), d, that._ncols);
-      });
-    rows.exit().remove();
-  };
-  return this.update;
+  rows.enter()
+    .append('div')
+    .attr('class', 'row')
+    .attr('id', function(d) { return "row-" + d; })
+    .each(function(d, i) {
+      that.makeDIV(d3.select(this), d, that._ncols);
+    });
+  rows.exit().remove();
 };
 
 Facet.prototype.makeDIV = function(selection, rowNum, ncols) {
@@ -459,16 +488,66 @@ Facet.prototype.makeDIV = function(selection, rowNum, ncols) {
   row.exit().remove();
 };
 
+Facet.prototype.svgDims = function(rowNum, colNum) {
+  var pd = this.plot().plotDim(),
+      m = this.plot().margins(),
+      fm = this.margins(),
+      dim = {
+        // outer svg width and height
+        x: pd.x,
+        y: pd.y,
+        // facet title shift left and down
+        fty: 0,
+        ftx: 0,
+        // plot-svg shifts
+        psvgx: 0,
+        psvgy: 0,
+        // plot g elements shifts left and down
+        px: 0,
+        py: 0,
+        // plot dimensions - straight from ggd3.plot()[width|height]()...
+        plotX: pd.x,
+        plotY: pd.y,
+      }, 
+      ts = this.titleSize();
+  if(this.type() === "grid"){
+    if(colNum === 0){
+      dim.x += m.left + fm.x; 
+      dim.px += m.left;
+      dim.ftx += m.left;
+    } else {
+      dim.x += fm.x;
+    }
+    if(colNum === (this._ncols - 1)){
+      dim.x += ts[1] + m.right + fm.x;
+    }
+    if(rowNum === 0){
+      dim.y += ts[0];
+      dim.psvgy += ts[0];
+      dim.fty += ts[0];
+    } else {
+      dim.y += fm.y;
+      dim.py += fm.y;
+      dim.fty += fm.y;
+    }
+    if(rowNum === (this._nrows - 1)){
+      dim.y += m.bottom + fm.y; 
+    }
+  } else {
+    dim.x += m.left + m.right;
+    dim.y += ts[0] + m.top + m.bottom;
+    dim.ftx += m.left;
+    dim.px += m.left;
+    dim.psvgy += ts[0];
+  }
+  return dim;
+};
+
 Facet.prototype.makeSVG = function(selection, rowNum, colNum) {
   var that = this,
       plot = this.plot(),
-      dim = plot.plotDim(),
-      x = selection.data()[0],
-      addHeight = (rowNum === 0 || this.type() === "wrap") ? that.titleSize()[1]:0,
-      addWidth = colNum === 0 ? that.titleSize()[0]:0,
-      addWidthSVG = (colNum+1) === this._ncols ? plot.margins().right:0,
-      width = plot.width() + addWidth,
-      height = plot.height() + addHeight,
+      x = selection.data()[0], // isn't this colNum?
+      dim = this.svgDims(rowNum, colNum),
       svg = selection
               .attr('id', function(d) {
                 return that.id(d, rowNum);
@@ -476,42 +555,35 @@ Facet.prototype.makeSVG = function(selection, rowNum, colNum) {
               .selectAll('svg.svg-wrap')
               .data([0]);
 
-    svg
-    .attr('width', width + addWidthSVG)
-    .attr('height', height)
+  svg
+    .attr('width', dim.x)
+    .attr('height', dim.y)
     .each(function(d) {
       that.makeTitle(d3.select(this), colNum, rowNum);
       var sel = d3.select(this).select('.plot-svg');
-      sel.attr('x', addWidth)
-        .attr('y', addHeight);
+      sel
+        .attr({col: colNum, row: rowNum, x: 0, y:dim.psvgy});
       that.makeCell(sel, x, rowNum, that._ncols);
       that.makeClip(sel, x, rowNum);
     });
   svg.enter().append('svg')
     .attr('class', 'svg-wrap')
-    .attr('width', width + addWidthSVG)
-    .attr('height', height)
+    .attr('width', dim.x)
+    .attr('height', dim.y)
     .each(function(d) {
       that.makeTitle(d3.select(this), colNum, rowNum);
       var sel = d3.select(this).selectAll('.plot-svg')
                   .data([0]);
       sel
-        .attr('x', addWidth)
-        .attr('y', addHeight);
+        .attr({col: colNum, row: rowNum, x: 0, y:dim.psvgy});
       sel.enter().append('svg')
-        .attr('x', addWidth)
-        .attr('y', addHeight)
+        .attr({col: colNum, row: rowNum, x: 0, y:dim.psvgy})
         .attr('class', 'plot-svg');
       that.makeCell(sel, x, rowNum, that._ncols);
       that.makeClip(sel, x, rowNum);
     });
   svg.exit().remove();
   that.nSVGs += 1;
-};
-// overrides default margins if facet type == "grid"
-// or scales are free
-Facet.prototype.calculateMargins = function(plot) {
-
 };
 
 Facet.prototype.makeClip = function(selection, x, y) {
@@ -558,45 +630,58 @@ Facet.prototype.id = function(x, y) {
     return 'single';
   }
 };
+
 Facet.prototype.makeCell = function(selection, colNum, rowNum, 
                                     ncols) {
   var margins = this.plot().margins(),
-      dim = this.plot().plotDim(),
+      dim = this.svgDims(rowNum, colNum),
       that = this,
-      gridClassX = (this.type()==="grid" && rowNum!==0) ? " grid": "",
-      gridClassY = (this.type()==="grid" && colNum!==(ncols-1)) ? " grid": "";
-  
+      gridX = this.type() === "grid" && rowNum === (this._nrows -1),
+      gridY = this.type() === "grid" && colNum === 0;
+
   this.makeG(selection, "xgrid", "")
-    .attr("transform", "translate(" + margins.left + "," + margins.top + ")");
+    .attr("transform", "translate(" + [dim.px,dim.py] + ")");
   this.makeG(selection, "ygrid", "")
-    .attr("transform", "translate(" + margins.left + "," + margins.top + ")");
+    .attr("transform", "translate(" + [dim.px,dim.py] + ")");
 
   var plot = selection.selectAll('g.plot')
                 .data([0]);
-  plot
-    .attr('transform', "translate(" + margins.left + 
-            "," + margins.top + ")")
+  plot.transition()
+    .attr("transform", "translate(" + [dim.px,dim.py] + ")")
     .select('rect.background')
-    .attr({x: 0, y:0, width: dim.x, height:dim.y});
+    .attr({x: 0, y:0, 
+      width: dim.plotX, height:dim.plotY});
   plot.enter().append('g')
     .attr('class', 'plot')
-    .attr('transform', "translate(" + margins.left + 
-            "," + margins.top + ")")
+    .attr("transform", "translate(" + [dim.px,dim.py] + ")")
     .each(function() {
       var sel = d3.select(this);
       sel.append('rect')
         .attr('class', 'background')
         .attr({x: 0, y:0, 
-          width: dim.x, height:dim.y});
+          width: dim.plotX, height:dim.plotY});
     });
   plot.exit().remove();
 
-  // complex set of conditions based on facet and scale requests.
-  this.makeG(selection, "x axis", gridClassX);
-  this.makeG(selection, "y axis", gridClassY);
+  if(gridX){
+    this.makeG(selection, "x axis", " grid")
+    .attr("transform", "translate(" + [dim.px,dim.py] + ")");
+  } else if(this.type() !== "grid") {
+    this.makeG(selection, "x axis", "")
+    .attr("transform", "translate(" + [dim.px,dim.py] + ")");
+  }
+  if(gridY){
+    this.makeG(selection, "y axis", " grid")
+    .attr("transform", "translate(" + [dim.px,dim.py] + ")");
+  } else if(this.type() !== "grid"){
+    this.makeG(selection, "y axis", "")
+    .attr("transform", "translate(" + [dim.px,dim.py] + ")");
+  }
 };
+
 Facet.prototype.makeG = function (sel, cls, cls2) {
-  var g = sel.selectAll('g.' + cls.replace(/ /g, "."))
+  var both = cls + cls2;
+  var g = sel.selectAll('g.' + both.replace(/ /g, "."))
     .data([0]);
   g.enter().append('g')
     .attr('class', cls + cls2);
@@ -606,96 +691,65 @@ Facet.prototype.makeG = function (sel, cls, cls2) {
 
 Facet.prototype.makeTitle = function(selection, colNum, rowNum) {
   var that = this,
-      plot = this.plot(),
-      dim = plot.plotDim(),
-      margins = plot.margins(),
-      addHeight = that.titleSize()[1],
-      addWidth = colNum === 0 ? that.titleSize()[0]:0;
+      ts = this.titleSize(),
+      dim = this.svgDims(rowNum, colNum);
   var xlab = selection
               .selectAll('svg.facet-title-x')
               .data([that.x() + " - " + that.xFacets[colNum]]);
   var ylab = selection
               .selectAll('svg.facet-title-y')
               .data([that.y() + " - " + that.yFacets[rowNum]]);
-  xlab.enter().append('svg')
-      .attr('class', 'facet-title-x')
-      .each(function() {
-        d3.select(this).append('rect')
-          .attr('class', 'facet-label-x');
-        d3.select(this).append('text');
-      });
-  ylab.enter().append('svg')
-      .attr('class', 'facet-title-y')
-      .each(function() {
-        d3.select(this).append('rect')
-          .attr('class', 'facet-label-y');
-        d3.select(this).append('text');
-      });
-  if(that.type() === "grid"){
-    addHeight = rowNum === 0 ? addHeight:0;
-    if(rowNum===0){
-      xlab
-        .attr({ width: dim.x + addWidth,
-            x: margins.left,
-            y: margins.top,
-            height: addHeight})
-        .select('rect')
-        .attr({width: dim.x, x: addWidth,
-          height: addHeight,
-          y:margins.top});
-      xlab.select('text')
-          .attr({fill: 'black',
-            opacity: 1,
-            x: dim.x/2 + addWidth,
-            y: addHeight*0.8,
-            "text-anchor": 'middle'})
-          .text(_.identity);
-    } else {
-      // set other row labels to 0 height
-      // if previous chart was not grid facet.
-      selection.select('.facet-title-x')
-        .attr("height", 0)
-        .select('text').text('');
-    }
-    if(colNum===0){
-      ylab
-        .attr({width: addWidth,
-            y:margins.top + addHeight,
-            x:margins.left})
-        .select('rect')
-        .attr({width: addWidth, height: dim.y});
-      ylab.select('text')
-          .attr({fill: 'black',
-              opacity: 1,
-              x: addWidth * 0.8,
-              y: dim.y/2,
-              "text-anchor": 'middle',
-              transform: "rotate(-90 " + 
-                (addWidth * 0.8) + 
-                ", " + (dim.y/2) + ")"})
-          .text(_.identity);
-    } else {
-      selection.select('.facet-title-y')
-        .attr({width:0}).select('text').text('');
-    }
-  } else {
-    // add labels to wrap-style faceting.
-    xlab.attr({y: margins.top,
-      x: 0, 
-      height: addHeight, 
-      width: plot.width() + addWidth})
-      .select('rect')
-        .attr({height: addHeight,
-          width: dim.x, y:0,
-          x: margins.left + addWidth});
-    xlab.select('text').attr({fill: 'black',
+  if(this.type() !== "grid" || rowNum === 0 && this.x()){
+    xlab.enter().append('svg')
+        .attr('class', 'facet-title-x')
+        .attr({width: dim.x, 
+          height: ts[0]})
+        .each(function() {
+          d3.select(this).append('rect')
+            .attr('class', 'facet-label-x')
+            .attr({width: dim.plotX, x: dim.ftx,
+              height: ts[0]});
+          d3.select(this).append('text');
+        });
+    xlab.select('text')
+        .attr({fill: 'black',
           opacity: 1,
-          x: dim.x/2 + addWidth + margins.left,
-          y: addHeight*0.8,
-          "text-anchor": 'middle'})
+          x: dim.plotX/2 + dim.ftx,
+          y: ts[0] * 0.8,
+          "text-anchor": that.textAnchorX()})
+        .text(_.identity);
+  }
+  if(that.type() === "grid" && colNum === (this._ncols - 1) && this.y()){
+    ylab.enter().append('svg')
+        .attr('class', 'facet-title-y')
+        .each(function() {
+          d3.select(this).append('rect')
+            .attr('class', 'facet-label-y');
+          d3.select(this).append('text');
+        });
+    ylab
+      .attr({width: ts[1],
+          height: dim.plotY,
+          x: (that._ncols === 1) ? dim.plotX + dim.ftx:dim.plotX,
+          y: dim.fty})
+      .select('rect')
+      .attr({width: ts[1], 
+        height: dim.plotY});
+    ylab.select('text')
+        .attr({fill: 'black',
+            opacity: 1,
+            x: dim.plotY/2,
+            y: -ts[1]*0.25,
+            "text-anchor": that.textAnchorY(),
+            transform: "rotate(90)"})
+        .text(_.identity);
+  }
+  // add labels to wrap-style faceting.
+  if(this.type() === "wrap"){
+    xlab.select('text')
         .text(that.wrapLabel(rowNum, colNum));
     selection.select('.facet-title-y')
-      .attr({width:0}).select('text').text('');
+      .remove();
   }
 };
 
@@ -933,14 +987,14 @@ ggd3.layer = Layer;
    // who cares about inheriting for this. Just write custom per geom
 // 2. Label facets better and provide option to label with function.
 // 3. Better details on boxplot tooltip
-// 4. Consider annotation object
+// 4. Make annotation object
 // 5. Delete relevant scale when aes changes so they'll be recreated.
 // 6. Sorting method for ordinal domains
 // 7. Add 5 number option to boxplot
 // 8. update numeric scale domains, they get bigger but not smaller.
       // - resetting a scale with null also works
-// 9. Add rangeBand, subRangeBand, rangePadding and subRangePadding
-//    to all geoms that can be mounted on ordinal axes.
+// 9. plot.subScale isn't found on refresh
+        // - try changing stacked histogram to dodge
 
 // for much later:
 // Zoom behaviors: fixed scales get global zoom on linear axes
@@ -991,6 +1045,7 @@ function Plot() {
     yAdjust: false,
     xGrid: true,
     yGrid: true,
+    gridLineType: "1,1",
     alphaRange: [0.1, 1],
     sizeRange: [3, 20],
     fillRange: ["blue", "red"],
@@ -1014,24 +1069,20 @@ function Plot() {
   // data are nested or not.
   // this.nested = false;
   this.hgrid = ggd3.layer()
-                .geom(ggd3.geoms.hline().grid(true)
-                      .lineType("2,2"))
                 .plot(this);
   this.vgrid = ggd3.layer()
-                .geom(ggd3.geoms.vline().grid(true)
-                      .lineType("2,2"))
                 .plot(this); 
   // explicitly declare which attributes get a basic
   // getter/setter
   var getSet = ["opts", "theme", 
     "width", "height", "xAdjust", "yAdjust", 
-    "xDomain", "yDomain",
+    "xDomain", "yDomain", 
     'colorRange', 'sizeRange',
     'fillRange', "lineType", "subScale",
     'rangeBand', 'rangePadding', 
     'subRangeBand', 'subRangePadding', 'subDomain',
     "alphaRange", "lineWidth",
-    "xGrid", "yGrid"];
+    "xGrid", "yGrid", "gridLineType"];
 
   for(var attr in attributes){
     if((!this[attr] && 
@@ -1264,12 +1315,14 @@ Plot.prototype.setFixedScale = function(a) {
 
 Plot.prototype.plotDim = function() {
   var margins = this.margins();
-  if(this.facet().type() === "grid"){
-    return {x: this.width() - this.facet().margins().x, 
-      y: this.height() - this.facet().margins().y};
-  }
-  return {x: this.width() - margins.left - margins.right,
-   y: this.height() - margins.top - margins.bottom};
+  return {x: this.width(),
+   y: this.height()};
+  // if(this.facet().type() === "grid"){
+  //   return {x: this.width() - this.facet().margins().x, 
+  //     y: this.height() - this.facet().margins().y};
+  // }
+  // return {x: this.width() - margins.left - margins.right,
+  //  y: this.height() - margins.top - margins.bottom};
 };
 
 // subScale holds default settings, but
@@ -1281,16 +1334,15 @@ Plot.prototype.setSubScale = function(order) {
       ord,
       direction, 
       domain;
-  if(xord !== "ordinal" &&
-     this.yScale().single.scaleType() !== "ordinal"){
-    return false;
-  }
+  // histogram needs subscales, too.
   if(xord === "ordinal"){
     ord = this.xScale().single.scale();
     direction = 'x';
-  } else {
+  } else if(this.yScale().single.scaleType() === "ordinal"){
     ord = this.yScale().single.scale();
     direction = 'y';
+  } else {
+    return false;
   }
   // the first layer is special, it should be the layer with all
   // relevent categorical info. Subsequent layers should only, 
@@ -1313,10 +1365,9 @@ Plot.prototype.setSubScale = function(order) {
 
 
 Plot.prototype.draw = function(sel) {
-  var updateFacet = this.facet().updateFacet();
-  
   // draw/update facets
-  updateFacet(sel);
+  this.facet().updateFacet(sel);
+  
   // reset nSVGs after they're drawn.
   this.facet().nSVGs = 0;
   // get the layer classes that should
@@ -1328,6 +1379,7 @@ Plot.prototype.draw = function(sel) {
                   }, this);
 
   this.setScale('single', this.aes());
+
   _.each(this.layers(), function(l, layerNum) {
     l.compute(sel, layerNum);
   });
@@ -1366,9 +1418,15 @@ Plot.prototype.draw = function(sel) {
   // if you're drawing something with more than
   // 30 layers, you can tweak this yourself.
   if(this.yGrid()) { 
+    this.hgrid
+      .geom(ggd3.geoms.hline().grid(true)
+        .lineType(this.gridLineType()));
     this.hgrid.compute(sel, 30);
     this.hgrid.draw(sel, 30);}
   if(this.xGrid()) { 
+    this.vgrid
+      .geom(ggd3.geoms.vline().grid(true)
+        .lineType(this.gridLineType()));
     this.vgrid.compute(sel, 30);
     this.vgrid.draw(sel, 30);}
 };
@@ -1405,19 +1463,20 @@ function Scale(opts) {
     aesthetic: null,
     domain: null,
     range: null,
-    position: null, // left right top bottom none
-    orient: null, // left right top bottom
     plot: null,
     scaleType: null, // linear, log, ordinal, time, category, 
     // maybe radial, etc.
     scale: null,
     rangeBands: [0.1, 0.1],
     opts: {},
+    label: null,
+    labelPosition: [0.5, 0.5],
+    offset: null,
   };
   // store passed object
   this.attributes = attributes;
-  var getSet = ["aesthetic", "plot", "orient", "position", "opts",
-                "rangeBands"];
+  var getSet = ["aesthetic", "plot", "opts",
+                "rangeBands", "label"];
   for(var attr in this.attributes){
     if(!this[attr] && _.contains(getSet, attr) ){
       this[attr] = createAccessor(attr);
@@ -1429,7 +1488,9 @@ function Scale(opts) {
     // _userOpts stays fixed on initiation.
     this.attributes.opts = opts;
     this._userOpts = opts;
+    this.label(opts.label);
     this.scaleType(opts.type ? opts.type:null);
+    this.offset(opts.offset ? opts.offset:attributes.offset);
   }
 }
 
@@ -1466,6 +1527,16 @@ Scale.prototype.scaleType = function(scaleType) {
       break;
   }
   return this;
+};
+
+Scale.prototype.style = function(sel) {
+  var styles = ['text', 'style', 'tickFormat'],
+      axis = this.opts().axis;
+  _.each(styles, function(s) {
+    if(axis.hasOwnProperty(s)){
+      sel.call(axis[s]);
+    }
+  }, this);
 };
 
 Scale.prototype.scale = function(settings){
@@ -1519,27 +1590,87 @@ Scale.prototype.domain = function(domain) {
   return this;
 };
 
-Scale.prototype.positionAxis = function() {
+Scale.prototype.offset = function(o) {
+  if(!arguments.length && !this.attributes.offset){
+    return 45;
+  }
+};
+
+Scale.prototype.axisLabel = function(o, l) {
+  if(!arguments.length) { return this.attributes.label; }
+  // o is the label
+  if(_.isString(o)){ 
+    this.attributes.label = o; 
+    return this;
+  }
+  if(o instanceof d3.selection){
+    var pd = this.plot().plotDim(),
+        tr, offset,
+        r = 90;
+    if(this.aesthetic() === "y"){
+      offset = this.opts().axis.position === "left" ? -this.offset():this.offset();
+      tr = "translate(" + offset + "," + pd.y + ")rotate(" + -r + ")";
+    } else {
+      offset = this.opts().axis.position === "top" ? -this.offset():this.offset();
+      tr = "translate(0," + offset + ")";
+    }
+    // make the label
+    var label = o.selectAll('.label').data([0]);
+    label
+      .attr('width', pd[this.aesthetic()])
+      .attr('height', "20")
+      .attr('transform', tr)
+      .each(function() {
+        d3.select(this).select('p').text(l);
+      });
+    label.enter().append('foreignObject')
+      .attr('width', pd[this.aesthetic()])
+      .attr('height', "20")
+      .attr('transform', tr)
+      .attr('class', 'label')
+      .append('xhtml:body')
+      .append('div')
+      .append('p')
+      .text(l);
+  }
+};
+
+Scale.prototype.positionAxis = function(rowNum, colNum) {
   var margins = this.plot().margins(),
       dim = this.plot().plotDim(),
       aes = this.aesthetic(),
-      opts = this.opts().axis;
+      opts = this.opts().axis, 
+      facet = this.plot().facet(),
+      grid = this.plot().facet().type() === "grid",
+      ts = this.plot().facet().titleSize(),
+      y, x;
   if(aes === "x"){
+    if(grid){
+      x = colNum === 0 ? margins.left: facet.margins().x;
+    } else {
+      x = margins.left;
+    }
     if(opts.position === "bottom"){
-      return [margins.left, margins.top + dim.y];
+      y = dim.y;
     }
     if(opts.position === "top"){
-      return [margins.left, margins.top];
+      y = 0;
     }
   }
   if(aes === "y") {
+    if(grid){
+      y = rowNum === 0 ? 0: facet.margins().y;
+    } else {
+      y = 0;
+    }
     if(opts.position === "left"){
-      return [margins.left, margins.top];
+      x = margins.left;
     }
     if(opts.position === "right"){
-      return [margins.left + dim.x, margins.top];
+      x = margins.left + dim.x;
     }
   }
+  return [x, y];
 };
 
 ggd3.scale = Scale;
@@ -1587,7 +1718,6 @@ function makeScale(selector, a, opts, vname) {
     // if a dtype is not found, it's because it's x or y and 
     // has not been declared. It will be some numerical aggregation.
     dtype = this.dtypes()[vname] || ['number', 'many'];
-    console.log(vname + " " + dtype[0] + " " + dtype[1] + " " + a);
     settings = _.merge(ggd3.tools.defaultScaleSettings(dtype, a),
                        opts);
     var scale = ggd3.scale(settings)
@@ -1602,11 +1732,18 @@ function makeScale(selector, a, opts, vname) {
         scale.range([this.plotDim().y, 0],
                     [this.rangeBand(), this.rangePadding()]);
       }
+      if(_.isNull(scale.label())){
+        scale.label(vname);
+      }
       scale.axis = d3.svg.axis().scale(scale.scale());
-      if(a === "y"){console.log(scale);}
       for(var ax in settings.axis){
         if(scale.axis.hasOwnProperty(ax)){
-          scale.axis[ax](settings.axis[ax]);
+          if(!_.isArray(settings.axis[ax])){
+            scale.axis[ax](settings.axis[ax]);
+          } else {
+            var x = settings.axis[ax];
+            scale.axis[ax](x[0], x[1]); 
+          }
         }
       }
     }
@@ -1621,6 +1758,7 @@ function makeScale(selector, a, opts, vname) {
 
 function setDomain(data, layer) {
   if(_.any(_.map(data.data, function(d) {
+    // pass holds aesthetics that shouldn't factor into scale training.
     var pass = ['yintercept', 'xintercept', 'slope'];
     return _.intersection(pass, _.keys(d)).length > 0;
   }))){
@@ -1656,6 +1794,7 @@ function setDomain(data, layer) {
     _.map(this.freeScales, function(k){
       scale = this[k+ "Scale"]()[data.selector];
       scale.domain(geom.domain(data.data, k));
+      scale.scale().nice();
     }, this);
   }
   function first(d) {
@@ -1675,6 +1814,7 @@ function setDomain(data, layer) {
         if(_.contains(linearScales, scale.scaleType())){
           domain = ggd3.tools.numericDomain(data.data, s.aes[g]);
           scale.range(this[g + 'Range']());
+          scale.scale().nice();
         } else {
           domain = _.sortBy(
                     _.unique(
@@ -1688,6 +1828,9 @@ function setDomain(data, layer) {
         }
       }
       scale.domain(domain);
+      if(_.contains(linearScales, scale.scaleType())){
+        scale.scale().nice();
+      }
       this[g + "Scale"]()[data.selector] = scale;
       for(var sc in scale._userOpts.scale){
         if(scale.scale().hasOwnProperty(sc)){
@@ -1744,7 +1887,6 @@ Tooltip.prototype.find = function(el) {
 Tooltip.prototype.tooltip = function(selection, s) {
   var that = this;
   if(_.isUndefined(s)){
-    console.log("s is undefined");
     s = this.geom().setup();
   }
   selection.each(function(data) {
@@ -1978,8 +2120,11 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
                                      layerNum, drawX, drawY){
 
   var x, y,
-      plot = this.layer().plot();
+      plot = this.layer().plot(),
+      rowNum = parseInt(sel.select('.plot-svg').attr('row')),
+      colNum = parseInt(sel.select('.plot-svg').attr('col'));
   // choosing scales based on facet rule
+
   if(!_.contains(["free", "free_x"], setup.facet.scales()) || 
      _.isUndefined(setup.plot.xScale()[selector])){
     x = setup.plot.xScale().single;
@@ -1996,18 +2141,28 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
     y = setup.plot.yScale()[selector];
     yfree = true;
   }
-  x.axis.scale(x.scale());
-  y.axis.scale(y.scale());
+  // think this need not be here.
+  // x.axis.scale(x.scale());
+  // y.axis.scale(y.scale());
 
   if(layerNum === 0 && drawX){
-    sel.select('.x.axis')
-      .attr("transform", "translate(" + x.positionAxis() + ")")
-      .transition().call(x.axis);
+    var xax = sel.select('.x.axis')
+              .attr("transform", "translate(" + x.positionAxis(rowNum, colNum) + ")")
+              .transition().call(x.axis);
+    x.style(xax);
+    if(x.label()){
+      sel.select('.x.axis')
+        .call(_.bind(x.axisLabel, x), x.axisLabel());
+    }
   }
   if(layerNum === 0 && drawY){
     sel.select('.y.axis')
-      .attr("transform", "translate(" + y.positionAxis() + ")")
+      .attr("transform", "translate(" + y.positionAxis(rowNum, colNum) + ")")
       .transition().call(y.axis);
+    if(y.label()){
+      sel.select('.y.axis')
+        .call(_.bind(y.axisLabel, y), y.axisLabel());
+    }
   }
   return {
     x: x,
@@ -2245,7 +2400,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     data = d3.nest().key(function(d) { return d[s.group];})
               .entries(data);
   } else {
-    data = [{key: 'single',values:data}];
+    data = [{key: 'single',values: data}];
   }
 
   // with histograms, if a bin is empty, it's key comes
@@ -2285,7 +2440,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
                           });
   data = _.flatten(data, 
                    that.name() === "histogram" ? true:false);
-  if(s.position === 'dodge') {
+  if(s.position === 'dodge' && this.name() === 'bar') {
     // make ordinal scale for group
     sub = d3.scale.ordinal()
             .domain(pSub.domain());
@@ -2299,6 +2454,13 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     sub = function(d) {
       return 0;
     };
+  }
+  // dodge histograms require a secondary scale on a numeric axis
+  if(this.name() === "histogram" && s.position === "dodge"){
+    sub = d3.scale.ordinal()
+            .domain(this.collectGroups())
+            .rangeRoundBands([0, rb], 0, 0);
+    rb = sub.rangeBand();
   }
   
   var placeBar = (function() {
@@ -2357,7 +2519,6 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       return n(0);
     };
   } )();
-  console.log(rb);
 
 
   var bars = sel.select('.plot')
@@ -4382,7 +4543,6 @@ Stat.prototype.compute_bin = function(data) {
 };
 
 Stat.prototype.compute_density = function(data) {
-  console.log(data.length);
   var out = {},
       start = {},
       end = {},

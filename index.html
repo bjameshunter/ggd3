@@ -193,6 +193,7 @@ irisHistogram.draw(d3.select('#iris'));
                 <div class="code-block">
                     <pre><code class="language-javascript">
 irisHistogram.layers()[0].position('dodge');
+irisHistogram.yScale(null) // reset yscale for resolution
 irisHistogram.draw(d3.select('#iris')); 
                     </code></pre>
                 </div>                           
