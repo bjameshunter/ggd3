@@ -30,21 +30,33 @@ function collectData(layer) {
 var div = d3.select('#chart01'),
     chart, data;
 
-var layers = [ggd3.geoms.boxplot()];
+var layers = ['boxplot'];
 
-var facet = ggd3.facet({x:'clarity', ncols: 8, type:'grid'});
+var facet = ggd3.facet({y:'clarity', nrows: 8, type: 'grid',
+                          margins: {x: 5, y:15},
+                          titleSize: [20, 30]});
 
 var chart = ggd3.plot()
               .facet(facet)
-              .width(125)
-              .yScale({axis:{position:'right', orient:'left'}})
-              .xScale({axis:{position:'top', orient: 'bottom',
-                              ticks: 3}})
-              .height(700)
-              .margins({top:0, bottom:0, left:0, right:30})
+              .width(700)
+              .xScale({axis:{position:'bottom', orient:'bottom'}, label: ""})
+              .yScale({axis:{position:'left', orient: 'left',
+                      ticks:4, label: "",
+                      tickFormat: function(d) {
+                        return d > 1000 ? "$" + d/1000 + "k": "$" + d;
+                      },
+                      text: function(sel) {
+                        sel.selectAll('text')
+                          .attr({x: -5, y: 0, 
+                            dy:0, dx:0, transform: 'rotate(-45, -5, 0)'})
+                          .style('text-anchor', 'end');
+                      }}})
+              .height(150)
+              .margins({top:0, bottom:120, left:40, right:0})
               .layers(layers)
-              .aes({x:'price', y: "color", fill: "cut",
-                   alpha:'carat'})
+              .color('none')
+              .aes({x:'color', y: "price", fill: "cut",
+                    alpha:'carat'});  
 
 d3.csv("{{ site.baseurl }}/assets/data/diamonds.csv", function(error, d) {
   data = d;
