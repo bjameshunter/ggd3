@@ -3,23 +3,31 @@
     shims = require("./shim"),
     sharedModules = Object.keys(shims).concat([
     ]);
-
 module.exports = function(grunt){
   grunt.initConfig({
     pkg: grunt.file.readJSON("package.json"),
     concat: {
-
       dist: {
-        src: [
-          "begin.js",
-          "src/tools/*.js",
-          "src/base/+(a)-*.js",
-          "src/base/!(a-|aa-|aaa-)*.js",
-          "src/geoms/*.js",
-          "src/stats/*.js",
-          "end.js"
-        ],
+        src: ["begin.js",
+              "src/tools/*.js",
+              "src/base/+(a)-*.js",
+              "src/base/!(a-|aa-|aaa-)*.js",
+              "src/geoms/*.js",
+              "src/stats/*.js",
+              "end.js"
+              ],
         dest: "dist/<%= pkg.name %>.v.<%= pkg.version%>.js"
+      },
+      site: {
+        src: ["begin.js",
+              "src/tools/*.js",
+              "src/base/+(a)-*.js",
+              "src/base/!(a-|aa-|aaa-)*.js",
+              "src/geoms/*.js",
+              "src/stats/*.js",
+              "end.js"
+              ],
+        dest: "../v3_site/ggd3/assets/js/<%= pkg.name %>.v.<%= pkg.version%>.js"
       },
       css: {
         src: [

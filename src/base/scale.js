@@ -199,13 +199,17 @@ Scale.prototype.positionAxis = function(rowNum, colNum) {
       ts = this.plot().facet().titleSize(),
       y, x;
   if(aes === "x"){
-    if(grid){
+    if(grid){ 
       x = colNum === 0 ? margins.left: facet.margins().x;
     } else {
       x = margins.left;
     }
     if(opts.position === "bottom"){
-      y = dim.y;
+      if(grid){
+        y = dim.y + facet.margins().y;
+      } else {
+        y = dim.y;
+      }
     }
     if(opts.position === "top"){
       y = 0;
