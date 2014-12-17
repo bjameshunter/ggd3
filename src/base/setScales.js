@@ -60,7 +60,12 @@ function makeScale(selector, a, opts, vname) {
       scale.axis = d3.svg.axis().scale(scale.scale());
       for(var ax in settings.axis){
         if(scale.axis.hasOwnProperty(ax)){
-          scale.axis[ax](settings.axis[ax]);
+          if(!_.isArray(settings.axis[ax])){
+            scale.axis[ax](settings.axis[ax]);
+          } else {
+            var x = settings.axis[ax];
+            scale.axis[ax](x[0], x[1]); 
+          }
         }
       }
     }

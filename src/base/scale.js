@@ -82,6 +82,16 @@ Scale.prototype.scaleType = function(scaleType) {
   return this;
 };
 
+Scale.prototype.style = function(sel) {
+  var styles = ['text', 'style'],
+      axis = this.opts().axis;
+  _.each(styles, function(s) {
+    if(axis.hasOwnProperty(s)){
+      sel.call(axis[s]);
+    }
+  }, this);
+};
+
 Scale.prototype.scale = function(settings){
   if(!arguments.length) { return this.attributes.scale; }
   for(var s in settings){

@@ -35,22 +35,28 @@ function collectData(layer) {
 var div = d3.select('#chart01'),
     chart, data;
 
-var layers = [ggd3.geoms.boxplot()];
+var layers = ['boxplot'];
 
-var facet = ggd3.facet({x:'clarity', ncols: 8});
+var facet = ggd3.facet({x:'clarity', ncols: 8, type: 'grid'});
 
 var chart = ggd3.plot()
               .facet(facet)
               .width(150)
               .yScale({axis:{position:'left', orient:'left'}})
-              .xScale({axis:{position:'top', orient: 'bottom',
-                              ticks: 3}})
+              .xScale({axis:{position:'bottom', orient: 'bottom',
+                      ticks:4, 
+                      text: function(sel) {
+                        sel.selectAll('text')
+                          .attr({x: 3, y: 15, 
+                            dy:0, dx:0, transform: 'rotate(-45, 3, 15)'})
+                          .style('text-anchor', 'end');
+                      }}})
               .height(700)
-              .margins({top:0, bottom:0, left:40, right:0})
+              .margins({top:0, bottom:120, left:40, right:0})
               .layers(layers)
               .color('none')
               .aes({x:'price', y: "color", fill: "cut",
-                    alpha:'carat'})
+                    alpha:'carat'});  
 
 d3.csv("../data/diamonds.csv", function(error, d) {
   data = d;

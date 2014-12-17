@@ -366,6 +366,8 @@ function Facet(spec) {
     titleSize: [20, 20],
     textAnchorX: "middle",
     textAnchorY: "middle",
+    // function to label facets.
+    labels: null,
     // inherit from plot, but allow override
     // if scales are fixed, much smaller margins
     // because scales won't be drawn for inner plots.
@@ -1003,9 +1005,7 @@ ggd3.layer = Layer;
 // 7. Add 5 number option to boxplot
 // 8. update numeric scale domains, they get bigger but not smaller.
       // - resetting a scale with null also works
-// 9. Add rangeBand, subRangeBand, rangePadding and subRangePadding
-//    to all geoms that can be mounted on ordinal axes.
-// 10. plot.subScale isn't found on refresh
+// 9. plot.subScale isn't found on refresh
         // - try changing stacked histogram to dodge
 
 // for much later:
@@ -1541,6 +1541,16 @@ Scale.prototype.scaleType = function(scaleType) {
   return this;
 };
 
+Scale.prototype.style = function(sel) {
+  var styles = ['text', 'style'],
+      axis = this.opts().axis;
+  _.each(styles, function(s) {
+    if(axis.hasOwnProperty(s)){
+      sel.call(axis[s]);
+    }
+  }, this);
+};
+
 Scale.prototype.scale = function(settings){
   if(!arguments.length) { return this.attributes.scale; }
   for(var s in settings){
@@ -1737,7 +1747,12 @@ function makeScale(selector, a, opts, vname) {
       scale.axis = d3.svg.axis().scale(scale.scale());
       for(var ax in settings.axis){
         if(scale.axis.hasOwnProperty(ax)){
-          scale.axis[ax](settings.axis[ax]);
+          if(!_.isArray(settings.axis[ax])){
+            scale.axis[ax](settings.axis[ax]);
+          } else {
+            var x = settings.axis[ax];
+            scale.axis[ax](x[0], x[1]); 
+          }
         }
       }
     }
@@ -2140,9 +2155,10 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
   // y.axis.scale(y.scale());
 
   if(layerNum === 0 && drawX){
-    sel.select('.x.axis')
-      .attr("transform", "translate(" + x.positionAxis(rowNum, colNum) + ")")
-      .transition().call(x.axis);
+    var xax = sel.select('.x.axis')
+              .attr("transform", "translate(" + x.positionAxis(rowNum, colNum) + ")")
+              .transition().call(x.axis);
+    x.style(xax);
     if(x.label()){
       sel.select('.x.axis')
         .call(_.bind(x.axisLabel, x), x.axisLabel());

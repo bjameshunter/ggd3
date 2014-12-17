@@ -219,9 +219,10 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
   // y.axis.scale(y.scale());
 
   if(layerNum === 0 && drawX){
-    sel.select('.x.axis')
-      .attr("transform", "translate(" + x.positionAxis(rowNum, colNum) + ")")
-      .transition().call(x.axis);
+    var xax = sel.select('.x.axis')
+              .attr("transform", "translate(" + x.positionAxis(rowNum, colNum) + ")")
+              .transition().call(x.axis);
+    x.style(xax);
     if(x.label()){
       sel.select('.x.axis')
         .call(_.bind(x.axisLabel, x), x.axisLabel());

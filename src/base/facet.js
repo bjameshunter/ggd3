@@ -17,6 +17,8 @@ function Facet(spec) {
     titleSize: [20, 20],
     textAnchorX: "middle",
     textAnchorY: "middle",
+    // function to label facets.
+    labels: null,
     // inherit from plot, but allow override
     // if scales are fixed, much smaller margins
     // because scales won't be drawn for inner plots.

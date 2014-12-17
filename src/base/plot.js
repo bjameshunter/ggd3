@@ -8,9 +8,7 @@
 // 7. Add 5 number option to boxplot
 // 8. update numeric scale domains, they get bigger but not smaller.
       // - resetting a scale with null also works
-// 9. Add rangeBand, subRangeBand, rangePadding and subRangePadding
-//    to all geoms that can be mounted on ordinal axes.
-// 10. plot.subScale isn't found on refresh
+// 9. plot.subScale isn't found on refresh
         // - try changing stacked histogram to dodge
 
 // for much later:
