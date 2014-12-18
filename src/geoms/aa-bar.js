@@ -73,7 +73,7 @@ Bar.prototype.domain = function(data, a) {
       group, stackby,
       groupRange, stackRange,
       grouped;
-  if(!_.contains(linearScales, s.plot[a + "Scale"]().single.scaleType())) {
+  if(!_.contains(linearScales, s.plot[a + "Scale"]().single.type())) {
     var domain = _.sortBy(_.unique(_.pluck(data, s.aes[a])));
     return domain;
   }
@@ -105,7 +105,7 @@ Bar.prototype.domain = function(data, a) {
 };
 
 Bar.prototype.vertical = function(s){
-  return (s.plot.xScale().single.scaleType() === "ordinal" ||
+  return (s.plot.xScale().single.type() === "ordinal" ||
                       s.aes.y === "binHeight");
 };
 
@@ -183,8 +183,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     size = {s: "height", p: 'y'};
     width = {s: "width", p: 'x'};
   } else {
-    // horizontal bars
-    
+    // horizontal bars    
     o = scales.y.scale();
     n = scales.x.scale();
     size = {s: "width", p:'x'};
@@ -210,7 +209,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     rb = o.rangeBand();
     valueVar = s.aes[size.p] || "n. observations";
     categoryVar = s.aes[width.p];
-  } else if(that.name() === "histogram"){
+  } else if(this.name() === "histogram"){
     valueVar = "binHeight";
     categoryVar = s.group;
     if(vertical){
@@ -280,21 +279,21 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
   var calcSizeS = (function() {
     if(s.position === 'stack' && size.p === "y"){
       return function(d) {
-        return n(0) - n(d.y);
+        return Math.abs(n(0) - n(d.y));
       };
     }
     if(s.position === "stack"){
       return function(d) {
-        return n(d.y) - n(0);
+        return Math.abs(n(d.y) - n(0));
       };
     }
     if(s.position === "dodge" && size.p === "y"){
       return function(d) {
-        return n(0) - n(d.y); 
+        return Math.abs(n(0) - n(d.y)); 
       };
     }
     return function(d) {
-      return n(d[valueVar]) - n(0); 
+      return Math.abs(n(d[valueVar]) - n(0)); 
     };
   })();
   var calcSizeP = (function () {
@@ -310,11 +309,11 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     }
     if(s.position === "dodge" && size.p === "y") {
       return function(d) {
-        return n(d.y);
+        return d3.min([n(d.y), n(0)]);
       };
     }
     return function(d) {
-      return n(0);
+      return d3.min([n(0), n(d.y)]);
     };
   } )();
 

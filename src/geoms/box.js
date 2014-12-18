@@ -24,7 +24,7 @@ Box.prototype.constructor = Box;
 
 Box.prototype.determineOrdinal = function(s) {
   // this is dumb, this logic needs to happen when scales are created;
-  if(s.plot.xScale().single.scaleType() === "ordinal"){
+  if(s.plot.xScale().single.type() === "ordinal"){
     return 'x';
   } else {
     return 'y';

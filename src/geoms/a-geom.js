@@ -161,7 +161,7 @@ Geom.prototype.domain = function(data, a) {
       extent,
       range;
 
-  if(_.contains(linearScales, plot[a + "Scale"]().single.scaleType())) {
+  if(_.contains(linearScales, plot[a + "Scale"]().single.type())) {
     extent  = d3.extent(_.pluck(data, aes[a]));
     range   = extent[1] - extent[0];
   } else {
@@ -260,7 +260,7 @@ Geom.prototype.nest = function() {
     }
   });
   _.map(['x', 'y'], function(a) {
-    if(plot[a + "Scale"]().single.scaleType() === "ordinal"){
+    if(plot[a + "Scale"]().single.type() === "ordinal"){
       nest.key(function(d) { return d[aes[a]]; });
     }
   });

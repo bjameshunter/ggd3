@@ -92,7 +92,7 @@ Layer.prototype.setStat = function() {
   _.each(_.difference(_.keys(aes), stat.exclude), function(a) {
     dtype = dtypes[aes[a]];
     if(!stat[a]() && _.contains(measureScales, a)){
-    scaleType = plot[a + "Scale"]().single.scaleType();
+    scaleType = plot[a + "Scale"]().single.type();
       if(_.contains(linearScales, scaleType) && 
          _.contains(['x', 'y'], a)){
         if(this.geom() instanceof ggd3.geoms.hline){
@@ -143,6 +143,7 @@ Layer.prototype.data = function(data, fromPlot) {
   }
   return this;
 };
+
 Layer.prototype.compute = function(sel, layerNum) {
   this.setStat();
   var plot = this.plot(),

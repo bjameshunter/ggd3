@@ -4,12 +4,14 @@
 // 3. Better details on boxplot tooltip
 // 4. Make annotation object
 // 5. Delete relevant scale when aes changes so they'll be recreated.
-// 6. Sorting method for ordinal domains
+// 6. Sorting method for ordinal domains -- currently works manually
+      // could be better
 // 7. Add 5 number option to boxplot
 // 8. update numeric scale domains, they get bigger but not smaller.
       // - resetting a scale with null also works
-// 9. plot.subScale isn't found on refresh
-        // - try changing stacked histogram to dodge
+// 10. Intuitive way of ordering layers with g elements
+// 11. figure out scale label offsets and foreign object height
+// 12. Allow top x-axis labeling/annotation.
 
 // for much later:
 // Zoom behaviors: fixed scales get global zoom on linear axes
@@ -47,7 +49,7 @@ function Plot() {
     subRangeBand: 0.1,
     subRangePadding: 0.1,
     rangeBand: 0.1,
-    rangePadding: 0.1,
+    rangePadding: 0.0,
     subDomain: null,
     alpha: d3.functor(0.7),
     fill: d3.functor('steelblue'),
@@ -142,6 +144,7 @@ function scaleConfig(type) {
     if(!_.isUndefined(obj)) {
       // merge additional options with old options
       if(this.attributes[scale].single instanceof ggd3.scale){
+        // scale must have type to be initiated.
         obj = _.merge(this.attributes[scale].single._userOpts,
                            obj);
       }
@@ -304,7 +307,7 @@ Plot.prototype.setFixedScale = function(a) {
   var domain = [];
   // don't bother if no facets.
   if(_.keys(this[a + "Scale"]()).length === 1) { return scale; }
-  if(_.contains(linearScales, scale.scaleType())){
+  if(_.contains(linearScales, scale.type())){
     domain[0] = _.min(this[a + "Scale"](), function(v, k) {
                   if(k === "single") { return undefined; }
                   return v.domain()[0];
@@ -314,15 +317,23 @@ Plot.prototype.setFixedScale = function(a) {
                   return v.domain()[1];
                 }).domain()[1];
   } else {
+    if(!_.isUndefined(scale._userOpts.scale) &&
+       !_.isUndefined(scale._userOpts.scale.domain)){
+      domain = scale._userOpts.scale.domain;
+      return scale.domain(domain);
+    }
     domain = _.sortBy(_.unique(
                   _.flatten(
                     _.map(this[a + "Scale"](), function(v, k){
                   if(k === "single") { return undefined; }
                       return v.domain();
                     }, this) )));
+    console.log("compacting ordinal domain");
+    console.log(a);
     domain = _.filter(domain, function(d) {
       return !_.isUndefined(d) && !_.isNull(d);
     });
+    console.log(domain);
   }
   // scale.scale().domain(domain);
   return scale.domain(domain);
@@ -345,7 +356,7 @@ Plot.prototype.plotDim = function() {
 // entirely new scale.
 Plot.prototype.setSubScale = function(order) {
   // do nuthin if no ordinal
-  var xord = this.xScale().single.scaleType(),
+  var xord = this.xScale().single.type(),
       ord,
       direction, 
       domain;
@@ -353,7 +364,7 @@ Plot.prototype.setSubScale = function(order) {
   if(xord === "ordinal"){
     ord = this.xScale().single.scale();
     direction = 'x';
-  } else if(this.yScale().single.scaleType() === "ordinal"){
+  } else if(this.yScale().single.type() === "ordinal"){
     ord = this.yScale().single.scale();
     direction = 'y';
   } else {

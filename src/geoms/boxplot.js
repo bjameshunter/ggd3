@@ -43,7 +43,7 @@ Boxplot.prototype.constructor = Boxplot;
 
 Boxplot.prototype.determineOrdinal = function(s) {
   // this is dumb, this logic needs to happen when scales are created;
-  if(s.plot.xScale().single.scaleType() === "ordinal"){
+  if(s.plot.xScale().single.type() === "ordinal"){
     return 'x';
   } else {
     return 'y';
@@ -81,7 +81,7 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
       line,
       scales = this.scalesAxes(sel, s, data.selector, layerNum,
                                this.drawX(), this.drawY()),
-      vertical = scales.x.scaleType() === "ordinal",
+      vertical = scales.x.type() === "ordinal",
       factor = vertical ? "x": "y",
       number = vertical ? "y": "x";
 

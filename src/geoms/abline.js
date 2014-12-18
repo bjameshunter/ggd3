@@ -34,7 +34,7 @@ Abline.prototype.prepareData = function(d, s, scales) {
   if(!_.contains(_.keys(s.aes), "yintercept")){
     throw "geom abline requires aesthetic 'yintercept' and an optional slope.";
   }
-  if(!_.contains(linearScales, scales.x.scaleType() )){
+  if(!_.contains(linearScales, scales.x.type() )){
     throw "use geom hline or vline to draw lines on an ordinal x axis y yaxis";
   }
   if(!s.aes.slope){

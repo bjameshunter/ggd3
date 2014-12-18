@@ -149,7 +149,7 @@ Histogram.prototype.nest = function() {
     }
   });
   _.map(['x', 'y'], function(a) {
-    if(plot[a + "Scale"]().single.scaleType() === "ordinal"){
+    if(plot[a + "Scale"]().single.type() === "ordinal"){
       nest.key(function(d) { return d[aes[a]]; });
     }
   });

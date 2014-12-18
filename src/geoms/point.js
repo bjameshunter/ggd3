@@ -32,12 +32,12 @@ Point.prototype.positionPoint = function(s, group) {
       a = s.aesthetic(),
       shift = 0,
       aes = this.layer().aes();
-  if(s.scaleType() === "ordinal" && group){
+  if(s.type() === "ordinal" && group){
     o2 = this.layer().plot().subScale().single.scale();
     rb = o2.rangeBand()/2;
     shift = d3.sum(s.rangeBands(), function(r) {
       return r*s.scale().rangeBand();});
-  } else if(s.scaleType() === "ordinal") {
+  } else if(s.type() === "ordinal") {
     o2 = function() { 
       return s.scale().rangeBand() / 2; 
     };

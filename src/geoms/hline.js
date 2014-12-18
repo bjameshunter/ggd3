@@ -56,7 +56,7 @@ Hline.prototype.prepareData = function(data, s, scales) {
       range = scale.domain(),
       p;
   if(this.grid()) {
-    if(!_.contains(linearScales, scale.scaleType())){
+    if(!_.contains(linearScales, scale.type())){
       p =  _.map(scale.scale().domain(),
                 function(i) {
                   return scale.scale()(i) + scale.scale().rangeBand()/2;
@@ -84,7 +84,7 @@ Hline.prototype.prepareData = function(data, s, scales) {
     // data must be array of objects with required aesthetics.
     data = Line.prototype.prepareData.call(this, data, s);
     // data are nested
-    if(_.contains(linearScales, scale.scaleType())) {
+    if(_.contains(linearScales, scale.type())) {
       data = _.map(data, function(d) {
         return _.map(d, function(r) {
           return _.map(range, function(e){

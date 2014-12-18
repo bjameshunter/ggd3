@@ -874,7 +874,7 @@ Layer.prototype.setStat = function() {
   _.each(_.difference(_.keys(aes), stat.exclude), function(a) {
     dtype = dtypes[aes[a]];
     if(!stat[a]() && _.contains(measureScales, a)){
-    scaleType = plot[a + "Scale"]().single.scaleType();
+    scaleType = plot[a + "Scale"]().single.type();
       if(_.contains(linearScales, scaleType) && 
          _.contains(['x', 'y'], a)){
         if(this.geom() instanceof ggd3.geoms.hline){
@@ -925,6 +925,7 @@ Layer.prototype.data = function(data, fromPlot) {
   }
   return this;
 };
+
 Layer.prototype.compute = function(sel, layerNum) {
   this.setStat();
   var plot = this.plot(),
@@ -1001,12 +1002,14 @@ ggd3.layer = Layer;
 // 3. Better details on boxplot tooltip
 // 4. Make annotation object
 // 5. Delete relevant scale when aes changes so they'll be recreated.
-// 6. Sorting method for ordinal domains
+// 6. Sorting method for ordinal domains -- currently works manually
+      // could be better
 // 7. Add 5 number option to boxplot
 // 8. update numeric scale domains, they get bigger but not smaller.
       // - resetting a scale with null also works
-// 9. plot.subScale isn't found on refresh
-        // - try changing stacked histogram to dodge
+// 10. Intuitive way of ordering layers with g elements
+// 11. figure out scale label offsets and foreign object height
+// 12. Allow top x-axis labeling/annotation.
 
 // for much later:
 // Zoom behaviors: fixed scales get global zoom on linear axes
@@ -1044,7 +1047,7 @@ function Plot() {
     subRangeBand: 0.1,
     subRangePadding: 0.1,
     rangeBand: 0.1,
-    rangePadding: 0.1,
+    rangePadding: 0.0,
     subDomain: null,
     alpha: d3.functor(0.7),
     fill: d3.functor('steelblue'),
@@ -1139,6 +1142,7 @@ function scaleConfig(type) {
     if(!_.isUndefined(obj)) {
       // merge additional options with old options
       if(this.attributes[scale].single instanceof ggd3.scale){
+        // scale must have type to be initiated.
         obj = _.merge(this.attributes[scale].single._userOpts,
                            obj);
       }
@@ -1301,7 +1305,7 @@ Plot.prototype.setFixedScale = function(a) {
   var domain = [];
   // don't bother if no facets.
   if(_.keys(this[a + "Scale"]()).length === 1) { return scale; }
-  if(_.contains(linearScales, scale.scaleType())){
+  if(_.contains(linearScales, scale.type())){
     domain[0] = _.min(this[a + "Scale"](), function(v, k) {
                   if(k === "single") { return undefined; }
                   return v.domain()[0];
@@ -1311,15 +1315,23 @@ Plot.prototype.setFixedScale = function(a) {
                   return v.domain()[1];
                 }).domain()[1];
   } else {
+    if(!_.isUndefined(scale._userOpts.scale) &&
+       !_.isUndefined(scale._userOpts.scale.domain)){
+      domain = scale._userOpts.scale.domain;
+      return scale.domain(domain);
+    }
     domain = _.sortBy(_.unique(
                   _.flatten(
                     _.map(this[a + "Scale"](), function(v, k){
                   if(k === "single") { return undefined; }
                       return v.domain();
                     }, this) )));
+    console.log("compacting ordinal domain");
+    console.log(a);
     domain = _.filter(domain, function(d) {
       return !_.isUndefined(d) && !_.isNull(d);
     });
+    console.log(domain);
   }
   // scale.scale().domain(domain);
   return scale.domain(domain);
@@ -1342,7 +1354,7 @@ Plot.prototype.plotDim = function() {
 // entirely new scale.
 Plot.prototype.setSubScale = function(order) {
   // do nuthin if no ordinal
-  var xord = this.xScale().single.scaleType(),
+  var xord = this.xScale().single.type(),
       ord,
       direction, 
       domain;
@@ -1350,7 +1362,7 @@ Plot.prototype.setSubScale = function(order) {
   if(xord === "ordinal"){
     ord = this.xScale().single.scale();
     direction = 'x';
-  } else if(this.yScale().single.scaleType() === "ordinal"){
+  } else if(this.yScale().single.type() === "ordinal"){
     ord = this.yScale().single.scale();
     direction = 'y';
   } else {
@@ -1469,25 +1481,25 @@ function Scale(opts) {
   if(!(this instanceof Scale)){
     return new Scale(opts);
   }
-  // allow setting of orient, position, scaleType, 
+  // allow setting of orient, position, type, 
   // scale and axis settings, etc.
   var attributes = {
     aesthetic: null,
     domain: null,
     range: null,
     plot: null,
-    scaleType: null, // linear, log, ordinal, time, category, 
+    type: null, // linear, log, ordinal, time, category, 
     // maybe radial, etc.
     scale: null,
     rangeBands: [0.1, 0.1],
     opts: {},
     label: null,
     labelPosition: [0.5, 0.5],
-    offset: null,
+    offset: 55,
   };
   // store passed object
   this.attributes = attributes;
-  var getSet = ["aesthetic", "plot", "opts",
+  var getSet = ["aesthetic", "plot", 
                 "rangeBands", "label"];
   for(var attr in this.attributes){
     if(!this[attr] && _.contains(getSet, attr) ){
@@ -1498,18 +1510,27 @@ function Scale(opts) {
   if(!_.isUndefined(opts)){
     // opts may be updated by later functions
     // _userOpts stays fixed on initiation.
-    this.attributes.opts = opts;
-    this._userOpts = opts;
-    this.label(opts.label);
-    this.scaleType(opts.type ? opts.type:null);
-    this.offset(opts.offset ? opts.offset:attributes.offset);
+    this._userOpts = _.clone(opts);
+    this.opts(opts);
+    opts = this.opts();
+    _.each(['type', 'scale', 'label', 'offset'], function(o){
+      if(opts.hasOwnProperty(o)){
+        this[o](opts[o]);
+      }
+    }, this);
   }
 }
 
-Scale.prototype.scaleType = function(scaleType) {
-  if(!arguments.length) { return this.attributes.scaleType; }
-  this.attributes.scaleType = scaleType;
-  switch(scaleType) {
+Scale.prototype.opts = function(o) {
+  if(!(arguments.length)) { return this.attributes.opts; }
+  this.attributes.opts = o;
+  return this;
+};
+
+Scale.prototype.type = function(type) {
+  if(!arguments.length) { return this.attributes.type; }
+  this.attributes.type = type;
+  switch(type) {
     case 'linear':
       this.attributes.scale = d3.scale.linear().nice();
       break;
@@ -1554,7 +1575,8 @@ Scale.prototype.style = function(sel) {
 Scale.prototype.scale = function(settings){
   if(!arguments.length) { return this.attributes.scale; }
   for(var s in settings){
-    if(this.attributes.scale.hasOwnProperty(s)){
+    if(this.attributes.scale && 
+       this.attributes.scale.hasOwnProperty(s)){
       this.attributes.scale[s](settings[s]);
     }
   }
@@ -1563,7 +1585,7 @@ Scale.prototype.scale = function(settings){
 
 Scale.prototype.range = function(range, rb) {
   if(!arguments.length) { return this.attributes.range; }
-  if(this.scaleType() === "ordinal"){
+  if(this.type() === "ordinal"){
     if(_.isUndefined(rb)) { 
       rb = this.rangeBands(); 
     }
@@ -1578,7 +1600,7 @@ Scale.prototype.range = function(range, rb) {
 
 Scale.prototype.domain = function(domain) {
   if(!arguments.length) { return this.attributes.domain; }
-  if(this.scaleType() ==="log"){
+  if(this.type() ==="log"){
     if(!_.all(domain, function(d) { return d > 0;}) ){
       console.warn("domain must be greater than 0 for log scale." +
       " Scale " + this.aesthetic() + " has requested domain " +
@@ -1591,21 +1613,26 @@ Scale.prototype.domain = function(domain) {
     this.attributes.domain = domain; 
   } else {
     var d = this.attributes.domain;
-    if(_.contains(linearScales, this.scaleType())){
+    if(_.contains(linearScales, this.type())){
       if(domain[0] < d[0]) { this.attributes.domain[0] = domain[0];}
       if(domain[1] > d[1]) { this.attributes.domain[1] = domain[1];}
+      // this.attributes.domain = ggd3.tools
+      //                           .numericDomain(this.attributes.domain);
     } else {
-      this.attributes.domain = _.unique(_.flatten([d, domain]));
+      // this.attributes.domain = _.unique(_.flatten([d, domain]));
+      this.attributes.domain = domain;
     }
   }
-  this.scale().domain(this.attributes.domain);
+  if(!_.isNull(this.scale())){
+    this.scale().domain(this.attributes.domain);
+  }
   return this;
 };
 
 Scale.prototype.offset = function(o) {
-  if(!arguments.length && !this.attributes.offset){
-    return 45;
-  }
+  if(!arguments.length) { return this.attributes.offset; }
+  this.attributes.offset = o;
+  return this;
 };
 
 Scale.prototype.axisLabel = function(o, l) {
@@ -1630,14 +1657,14 @@ Scale.prototype.axisLabel = function(o, l) {
     var label = o.selectAll('.label').data([0]);
     label
       .attr('width', pd[this.aesthetic()])
-      .attr('height', "20")
+      .attr('height', "23")
       .attr('transform', tr)
       .each(function() {
         d3.select(this).select('p').text(l);
       });
     label.enter().append('foreignObject')
       .attr('width', pd[this.aesthetic()])
-      .attr('height', "20")
+      .attr('height', "23")
       .attr('transform', tr)
       .attr('class', 'label')
       .append('xhtml:body')
@@ -1802,6 +1829,7 @@ function setDomain(data, layer) {
       }
     }
   }, this);
+
   // each facet's data rolled up according to stat
   // unnested - an array of observations.
   data.data = this.unNest(geom.compute(data.data, s));
@@ -1809,13 +1837,19 @@ function setDomain(data, layer) {
   // free scales
   if(!_.isEmpty(this.freeScales)){
     _.map(this.freeScales, function(k){
+      var minmax;
       if(_.contains(['xmin', 'ymin', 'xmax', 'ymax'], k)){
         // must do soemthing different for mins and maxes
+        // if a min or max is requested, send it to domain
+        // this is getting ugly...
+        minmax = k;
         k = k[0];
       }
       scale = this[k+ "Scale"]()[data.selector];
-      scale.domain(geom.domain(data.data, k));
-      scale.scale().nice();
+      scale.domain(geom.domain(data.data, k, minmax));
+      if(_.contains(linearScales, scale.type())){
+        scale.scale().nice();
+      }
     }, this);
   }
   function first(d) {
@@ -1829,37 +1863,49 @@ function setDomain(data, layer) {
         function(g){
     if(!_.isNull(s.aes[g])){
       if(_.contains(globalScales, g)){
-        if(_.contains(['xmin', 'ymin', 'xmax', 'ymax'], g)){
-          g = g[0];
-        }
+        // if(_.contains(['xmin', 'ymin', 'xmax', 'ymax'], g)){
+        //   g = g[0];
+        // }
         scale = this[g + "Scale"]().single;
         // scale is fill, color, alpha, etc.
         // with no padding on either side of domain.
-        if(_.contains(linearScales, scale.scaleType())){
+        if(_.contains(linearScales, scale.type())){
           domain = ggd3.tools.numericDomain(data.data, s.aes[g]);
           scale.range(this[g + 'Range']());
           scale.scale().nice();
         } else {
-          domain = _.sortBy(
-                    _.unique(
-                      ggd3.tools.categoryDomain(data.data,s.aes[g])));
+          if(_.isNull(scale.domain())){
+            domain = _.sortBy(
+                      _.unique(
+                        ggd3.tools.categoryDomain(data.data,s.aes[g])));
+          } else {
+            domain = scale.domain();
+          }
         }
+        scale.domain(domain);
       } else {
         scale = this[g + "Scale"]()[data.selector];
-        domain = geom.domain(data.data, g);
-        if(!_.contains(linearScales, scale.scaleType())){
-          domain = _.sortBy(_.unique(domain));
+        if(!_.isUndefined(scale._userOpts.scale) &&
+           !_.isUndefined(scale._userOpts.scale.domain)){
+          domain = scale._userOpts.scale.domain;
+        }else {
+          domain = geom.domain(data.data, g);
         }
-      }
-      scale.domain(domain);
-      if(_.contains(linearScales, scale.scaleType())){
-        scale.scale().nice();
+        if(!_.contains(linearScales, scale.type())){
+          // domain = _.sortBy(_.unique(domain));
+        }
+
+          scale.domain(domain);
       }
       this[g + "Scale"]()[data.selector] = scale;
+      // user-supplied scale parameters
       for(var sc in scale._userOpts.scale){
         if(scale.scale().hasOwnProperty(sc)){
           scale.scale()[sc](scale._userOpts.scale[sc]);
         }
+      }
+      if(_.contains(linearScales, scale.type())){
+        scale.scale().nice();
       }
       // weird wrapper for legend aesthetic functions
       if(_.contains(globalScales, g)) {
@@ -1873,6 +1919,7 @@ function setDomain(data, layer) {
       }
     }
   }, this);
+
   return data;
 }
 
@@ -2112,7 +2159,7 @@ Geom.prototype.domain = function(data, a) {
       extent,
       range;
 
-  if(_.contains(linearScales, plot[a + "Scale"]().single.scaleType())) {
+  if(_.contains(linearScales, plot[a + "Scale"]().single.type())) {
     extent  = d3.extent(_.pluck(data, aes[a]));
     range   = extent[1] - extent[0];
   } else {
@@ -2211,7 +2258,7 @@ Geom.prototype.nest = function() {
     }
   });
   _.map(['x', 'y'], function(a) {
-    if(plot[a + "Scale"]().single.scaleType() === "ordinal"){
+    if(plot[a + "Scale"]().single.type() === "ordinal"){
       nest.key(function(d) { return d[aes[a]]; });
     }
   });
@@ -2299,7 +2346,7 @@ Bar.prototype.domain = function(data, a) {
       group, stackby,
       groupRange, stackRange,
       grouped;
-  if(!_.contains(linearScales, s.plot[a + "Scale"]().single.scaleType())) {
+  if(!_.contains(linearScales, s.plot[a + "Scale"]().single.type())) {
     var domain = _.sortBy(_.unique(_.pluck(data, s.aes[a])));
     return domain;
   }
@@ -2331,7 +2378,7 @@ Bar.prototype.domain = function(data, a) {
 };
 
 Bar.prototype.vertical = function(s){
-  return (s.plot.xScale().single.scaleType() === "ordinal" ||
+  return (s.plot.xScale().single.type() === "ordinal" ||
                       s.aes.y === "binHeight");
 };
 
@@ -2409,8 +2456,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     size = {s: "height", p: 'y'};
     width = {s: "width", p: 'x'};
   } else {
-    // horizontal bars
-    
+    // horizontal bars    
     o = scales.y.scale();
     n = scales.x.scale();
     size = {s: "width", p:'x'};
@@ -2436,7 +2482,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     rb = o.rangeBand();
     valueVar = s.aes[size.p] || "n. observations";
     categoryVar = s.aes[width.p];
-  } else if(that.name() === "histogram"){
+  } else if(this.name() === "histogram"){
     valueVar = "binHeight";
     categoryVar = s.group;
     if(vertical){
@@ -2506,21 +2552,21 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
   var calcSizeS = (function() {
     if(s.position === 'stack' && size.p === "y"){
       return function(d) {
-        return n(0) - n(d.y);
+        return Math.abs(n(0) - n(d.y));
       };
     }
     if(s.position === "stack"){
       return function(d) {
-        return n(d.y) - n(0);
+        return Math.abs(n(d.y) - n(0));
       };
     }
     if(s.position === "dodge" && size.p === "y"){
       return function(d) {
-        return n(0) - n(d.y); 
+        return Math.abs(n(0) - n(d.y)); 
       };
     }
     return function(d) {
-      return n(d[valueVar]) - n(0); 
+      return Math.abs(n(d[valueVar]) - n(0)); 
     };
   })();
   var calcSizeP = (function () {
@@ -2536,11 +2582,11 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     }
     if(s.position === "dodge" && size.p === "y") {
       return function(d) {
-        return n(d.y);
+        return d3.min([n(d.y), n(0)]);
       };
     }
     return function(d) {
-      return n(0);
+      return d3.min([n(0), n(d.y)]);
     };
   } )();
 
@@ -2643,17 +2689,19 @@ Line.prototype.lineType = function(l) {
 };
 
 Line.prototype.generator = function(aes, x, y, o2, group) {
+  if(this.name() === "linerange"){
+    pos = function() { return o2.rangeBand()/2; };
+  } else {
+    pos = function(i) { return o2.rangeBand()*i; };
+  }
   var line = d3.svg.line()
               .interpolate(this.interpolate())
-              .defined(function(d) { 
-                return (!isNaN(y(d[aes.y]))); 
-              })
               .tension(this.tension());
   if(x.hasOwnProperty('rangeBand')) {
     return line
             .x(function(d, i) { 
               return (x(d[aes.x]) + o2(d[group]) + 
-                            o2.rangeBand() * i); 
+                            pos(i)); 
             })
             .y(function(d) { return y(d[aes.y]); });
   }
@@ -2662,7 +2710,7 @@ Line.prototype.generator = function(aes, x, y, o2, group) {
             .x(function(d) { return x(d[aes.x]); })
             .y(function(d, i) { 
               return (y(d[aes.y]) + o2(d[group]) +
-                            o2.rangeBand()*i); 
+                            pos(i)); 
             });
   }
   return line
@@ -2707,7 +2755,7 @@ Line.prototype.prepareData = function(data, s) {
 Line.prototype.draw = function(sel, data, i, layerNum){
   // console.log('first line of line.draw');
   // console.log(data);
-  var s     = this.setup(),
+  var s      = this.setup(),
       scales = this.scalesAxes(sel, s, data.selector, layerNum,
                                  this.drawX(), this.drawY()),
       x = scales.x.scale(),
@@ -2720,6 +2768,12 @@ Line.prototype.draw = function(sel, data, i, layerNum){
      y.hasOwnProperty('rangeBand')){
     if(s.grouped) {
       o2 = s.plot.subScale().single.scale();
+    } else {
+      if(x.hasOwnProperty('rangeBand')){
+        o2.rangeBand = function() { return x.rangeBand(); };
+      } else {
+        o2.rangeBand = function() { return y.rangeBand(); };
+      }
     }
   }
 
@@ -2757,7 +2811,7 @@ Line.prototype.draw = function(sel, data, i, layerNum){
               .selectAll("." + this.selector(layerNum).replace(/ /g, '.'))
               .data(data);
   lines.transition().call(_.bind(this.drawLines, this), line, s, layerNum);
-  lines.enter().append(this.geom())
+  lines.enter().insert(this.geom(), "*")
     .call(_.bind(this.drawLines, this), line, s, layerNum);
   lines.exit()
     .transition()
@@ -2998,7 +3052,7 @@ Histogram.prototype.nest = function() {
     }
   });
   _.map(['x', 'y'], function(a) {
-    if(plot[a + "Scale"]().single.scaleType() === "ordinal"){
+    if(plot[a + "Scale"]().single.type() === "ordinal"){
       nest.key(function(d) { return d[aes[a]]; });
     }
   });
@@ -3042,7 +3096,7 @@ Abline.prototype.prepareData = function(d, s, scales) {
   if(!_.contains(_.keys(s.aes), "yintercept")){
     throw "geom abline requires aesthetic 'yintercept' and an optional slope.";
   }
-  if(!_.contains(linearScales, scales.x.scaleType() )){
+  if(!_.contains(linearScales, scales.x.type() )){
     throw "use geom hline or vline to draw lines on an ordinal x axis y yaxis";
   }
   if(!s.aes.slope){
@@ -3322,7 +3376,7 @@ Box.prototype.constructor = Box;
 
 Box.prototype.determineOrdinal = function(s) {
   // this is dumb, this logic needs to happen when scales are created;
-  if(s.plot.xScale().single.scaleType() === "ordinal"){
+  if(s.plot.xScale().single.type() === "ordinal"){
     return 'x';
   } else {
     return 'y';
@@ -3416,7 +3470,7 @@ Boxplot.prototype.constructor = Boxplot;
 
 Boxplot.prototype.determineOrdinal = function(s) {
   // this is dumb, this logic needs to happen when scales are created;
-  if(s.plot.xScale().single.scaleType() === "ordinal"){
+  if(s.plot.xScale().single.type() === "ordinal"){
     return 'x';
   } else {
     return 'y';
@@ -3454,7 +3508,7 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
       line,
       scales = this.scalesAxes(sel, s, data.selector, layerNum,
                                this.drawX(), this.drawY()),
-      vertical = scales.x.scaleType() === "ordinal",
+      vertical = scales.x.type() === "ordinal",
       factor = vertical ? "x": "y",
       number = vertical ? "y": "x";
 
@@ -3767,7 +3821,7 @@ Hline.prototype.prepareData = function(data, s, scales) {
       range = scale.domain(),
       p;
   if(this.grid()) {
-    if(!_.contains(linearScales, scale.scaleType())){
+    if(!_.contains(linearScales, scale.type())){
       p =  _.map(scale.scale().domain(),
                 function(i) {
                   return scale.scale()(i) + scale.scale().rangeBand()/2;
@@ -3795,7 +3849,7 @@ Hline.prototype.prepareData = function(data, s, scales) {
     // data must be array of objects with required aesthetics.
     data = Line.prototype.prepareData.call(this, data, s);
     // data are nested
-    if(_.contains(linearScales, scale.scaleType())) {
+    if(_.contains(linearScales, scale.type())) {
       data = _.map(data, function(d) {
         return _.map(d, function(r) {
           return _.map(range, function(e){
@@ -3837,9 +3891,16 @@ function Linerange(spec){
   }
   Line.apply(this);
   var attributes = {
-
+    lineType: "none",
+    name: 'linerange',
   };
+  this.attributes = _.merge(this.attributes, attributes);
 
+  for(var attr in this.attributes){
+    if((!this[attr] && this.attributes.hasOwnProperty(attr))){
+      this[attr] = createAccessor(attr);
+    }
+  }
 }
 // linerange responds to x, xmin, xmax or y, ymin, ymax and group or color
 
@@ -3848,11 +3909,12 @@ Linerange.prototype = new Line();
 Linerange.prototype.constructor = Linerange;
 
 Linerange.prototype.domain = function(data, a) {
+
   var layer   = this.layer(),
       plot    = layer.plot(),
       aes     = layer.aes(),
-      minmax  = a === "y" ? ['ymin', 'ymax']: ['xmin', 'xmax'],
-      extent = [],
+      extent  = [],
+      minmax  = a === "x" ? ['xmin', 'xmax']:['ymin', 'ymax'],
       range;
 
   _.each(minmax, function(d) {
@@ -3864,16 +3926,25 @@ Linerange.prototype.domain = function(data, a) {
       extent.push(d3.extent(_.map(data, aes[d])));
     }
   });
-  extent = _.flatten(extent);
-
+  extent = d3.extent(_.flatten(extent));
   return extent;
 };
 
+Linerange.prototype.prepareData = function(data, s){
+  var aes = _.clone(s.aes),
+      dir = !_.isUndefined(aes.ymin) ? "y": "x",
+      min = aes[dir + 'min'],
+      max = aes[dir + 'max'];
+  data = Line.prototype.prepareData.call(this, data, s);
 
-Linerange.prototype.draw = function(sel, data, i, layerNum){
-  console.log(data);
-
-
+  data = _.map(_.flatten(data), function(d) {
+    var o1 = _.clone(d),
+        o2 = _.clone(d);
+    o1[aes[dir]] = min(d);
+    o2[aes[dir]] = max(d);
+    return [o1, o2];
+  });  
+  return data;
 };
 
 ggd3.geoms.linerange = Linerange;
@@ -3943,12 +4014,12 @@ Point.prototype.positionPoint = function(s, group) {
       a = s.aesthetic(),
       shift = 0,
       aes = this.layer().aes();
-  if(s.scaleType() === "ordinal" && group){
+  if(s.type() === "ordinal" && group){
     o2 = this.layer().plot().subScale().single.scale();
     rb = o2.rangeBand()/2;
     shift = d3.sum(s.rangeBands(), function(r) {
       return r*s.scale().rangeBand();});
-  } else if(s.scaleType() === "ordinal") {
+  } else if(s.type() === "ordinal") {
     o2 = function() { 
       return s.scale().rangeBand() / 2; 
     };

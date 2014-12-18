@@ -110,6 +110,7 @@ function setDomain(data, layer) {
       }
     }
   }, this);
+
   // each facet's data rolled up according to stat
   // unnested - an array of observations.
   data.data = this.unNest(geom.compute(data.data, s));
@@ -117,13 +118,19 @@ function setDomain(data, layer) {
   // free scales
   if(!_.isEmpty(this.freeScales)){
     _.map(this.freeScales, function(k){
+      var minmax;
       if(_.contains(['xmin', 'ymin', 'xmax', 'ymax'], k)){
         // must do soemthing different for mins and maxes
+        // if a min or max is requested, send it to domain
+        // this is getting ugly...
+        minmax = k;
         k = k[0];
       }
       scale = this[k+ "Scale"]()[data.selector];
-      scale.domain(geom.domain(data.data, k));
-      scale.scale().nice();
+      scale.domain(geom.domain(data.data, k, minmax));
+      if(_.contains(linearScales, scale.type())){
+        scale.scale().nice();
+      }
     }, this);
   }
   function first(d) {
@@ -137,37 +144,49 @@ function setDomain(data, layer) {
         function(g){
     if(!_.isNull(s.aes[g])){
       if(_.contains(globalScales, g)){
-        if(_.contains(['xmin', 'ymin', 'xmax', 'ymax'], g)){
-          g = g[0];
-        }
+        // if(_.contains(['xmin', 'ymin', 'xmax', 'ymax'], g)){
+        //   g = g[0];
+        // }
         scale = this[g + "Scale"]().single;
         // scale is fill, color, alpha, etc.
         // with no padding on either side of domain.
-        if(_.contains(linearScales, scale.scaleType())){
+        if(_.contains(linearScales, scale.type())){
           domain = ggd3.tools.numericDomain(data.data, s.aes[g]);
           scale.range(this[g + 'Range']());
           scale.scale().nice();
         } else {
-          domain = _.sortBy(
-                    _.unique(
-                      ggd3.tools.categoryDomain(data.data,s.aes[g])));
+          if(_.isNull(scale.domain())){
+            domain = _.sortBy(
+                      _.unique(
+                        ggd3.tools.categoryDomain(data.data,s.aes[g])));
+          } else {
+            domain = scale.domain();
+          }
         }
+        scale.domain(domain);
       } else {
         scale = this[g + "Scale"]()[data.selector];
-        domain = geom.domain(data.data, g);
-        if(!_.contains(linearScales, scale.scaleType())){
-          domain = _.sortBy(_.unique(domain));
+        if(!_.isUndefined(scale._userOpts.scale) &&
+           !_.isUndefined(scale._userOpts.scale.domain)){
+          domain = scale._userOpts.scale.domain;
+        }else {
+          domain = geom.domain(data.data, g);
         }
-      }
-      scale.domain(domain);
-      if(_.contains(linearScales, scale.scaleType())){
-        scale.scale().nice();
+        if(!_.contains(linearScales, scale.type())){
+          // domain = _.sortBy(_.unique(domain));
+        }
+
+          scale.domain(domain);
       }
       this[g + "Scale"]()[data.selector] = scale;
+      // user-supplied scale parameters
       for(var sc in scale._userOpts.scale){
         if(scale.scale().hasOwnProperty(sc)){
           scale.scale()[sc](scale._userOpts.scale[sc]);
         }
+      }
+      if(_.contains(linearScales, scale.type())){
+        scale.scale().nice();
       }
       // weird wrapper for legend aesthetic functions
       if(_.contains(globalScales, g)) {
@@ -181,6 +200,7 @@ function setDomain(data, layer) {
       }
     }
   }, this);
+
   return data;
 }
 

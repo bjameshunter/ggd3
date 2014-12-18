@@ -11,25 +11,25 @@ function Scale(opts) {
   if(!(this instanceof Scale)){
     return new Scale(opts);
   }
-  // allow setting of orient, position, scaleType, 
+  // allow setting of orient, position, type, 
   // scale and axis settings, etc.
   var attributes = {
     aesthetic: null,
     domain: null,
     range: null,
     plot: null,
-    scaleType: null, // linear, log, ordinal, time, category, 
+    type: null, // linear, log, ordinal, time, category, 
     // maybe radial, etc.
     scale: null,
     rangeBands: [0.1, 0.1],
     opts: {},
     label: null,
     labelPosition: [0.5, 0.5],
-    offset: null,
+    offset: 55,
   };
   // store passed object
   this.attributes = attributes;
-  var getSet = ["aesthetic", "plot", "opts",
+  var getSet = ["aesthetic", "plot", 
                 "rangeBands", "label"];
   for(var attr in this.attributes){
     if(!this[attr] && _.contains(getSet, attr) ){
@@ -40,18 +40,27 @@ function Scale(opts) {
   if(!_.isUndefined(opts)){
     // opts may be updated by later functions
     // _userOpts stays fixed on initiation.
-    this.attributes.opts = opts;
-    this._userOpts = opts;
-    this.label(opts.label);
-    this.scaleType(opts.type ? opts.type:null);
-    this.offset(opts.offset ? opts.offset:attributes.offset);
+    this._userOpts = _.clone(opts);
+    this.opts(opts);
+    opts = this.opts();
+    _.each(['type', 'scale', 'label', 'offset'], function(o){
+      if(opts.hasOwnProperty(o)){
+        this[o](opts[o]);
+      }
+    }, this);
   }
 }
 
-Scale.prototype.scaleType = function(scaleType) {
-  if(!arguments.length) { return this.attributes.scaleType; }
-  this.attributes.scaleType = scaleType;
-  switch(scaleType) {
+Scale.prototype.opts = function(o) {
+  if(!(arguments.length)) { return this.attributes.opts; }
+  this.attributes.opts = o;
+  return this;
+};
+
+Scale.prototype.type = function(type) {
+  if(!arguments.length) { return this.attributes.type; }
+  this.attributes.type = type;
+  switch(type) {
     case 'linear':
       this.attributes.scale = d3.scale.linear().nice();
       break;
@@ -96,7 +105,8 @@ Scale.prototype.style = function(sel) {
 Scale.prototype.scale = function(settings){
   if(!arguments.length) { return this.attributes.scale; }
   for(var s in settings){
-    if(this.attributes.scale.hasOwnProperty(s)){
+    if(this.attributes.scale && 
+       this.attributes.scale.hasOwnProperty(s)){
       this.attributes.scale[s](settings[s]);
     }
   }
@@ -105,7 +115,7 @@ Scale.prototype.scale = function(settings){
 
 Scale.prototype.range = function(range, rb) {
   if(!arguments.length) { return this.attributes.range; }
-  if(this.scaleType() === "ordinal"){
+  if(this.type() === "ordinal"){
     if(_.isUndefined(rb)) { 
       rb = this.rangeBands(); 
     }
@@ -120,7 +130,7 @@ Scale.prototype.range = function(range, rb) {
 
 Scale.prototype.domain = function(domain) {
   if(!arguments.length) { return this.attributes.domain; }
-  if(this.scaleType() ==="log"){
+  if(this.type() ==="log"){
     if(!_.all(domain, function(d) { return d > 0;}) ){
       console.warn("domain must be greater than 0 for log scale." +
       " Scale " + this.aesthetic() + " has requested domain " +
@@ -133,21 +143,26 @@ Scale.prototype.domain = function(domain) {
     this.attributes.domain = domain; 
   } else {
     var d = this.attributes.domain;
-    if(_.contains(linearScales, this.scaleType())){
+    if(_.contains(linearScales, this.type())){
       if(domain[0] < d[0]) { this.attributes.domain[0] = domain[0];}
       if(domain[1] > d[1]) { this.attributes.domain[1] = domain[1];}
+      // this.attributes.domain = ggd3.tools
+      //                           .numericDomain(this.attributes.domain);
     } else {
-      this.attributes.domain = _.unique(_.flatten([d, domain]));
+      // this.attributes.domain = _.unique(_.flatten([d, domain]));
+      this.attributes.domain = domain;
     }
   }
-  this.scale().domain(this.attributes.domain);
+  if(!_.isNull(this.scale())){
+    this.scale().domain(this.attributes.domain);
+  }
   return this;
 };
 
 Scale.prototype.offset = function(o) {
-  if(!arguments.length && !this.attributes.offset){
-    return 45;
-  }
+  if(!arguments.length) { return this.attributes.offset; }
+  this.attributes.offset = o;
+  return this;
 };
 
 Scale.prototype.axisLabel = function(o, l) {
@@ -172,14 +187,14 @@ Scale.prototype.axisLabel = function(o, l) {
     var label = o.selectAll('.label').data([0]);
     label
       .attr('width', pd[this.aesthetic()])
-      .attr('height', "20")
+      .attr('height', "23")
       .attr('transform', tr)
       .each(function() {
         d3.select(this).select('p').text(l);
       });
     label.enter().append('foreignObject')
       .attr('width', pd[this.aesthetic()])
-      .attr('height', "20")
+      .attr('height', "23")
       .attr('transform', tr)
       .attr('class', 'label')
       .append('xhtml:body')

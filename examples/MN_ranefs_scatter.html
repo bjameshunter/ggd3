@@ -36,42 +36,33 @@ function collectData(layer) {
 var div = d3.select('#chart01'),
     chart, data,
     lr = ggd3.layer().geom('linerange')
-          .aes({xmin: function(d) {
+          .aes({ymin: function(d) {
                         return d.coef - 2*d.se;
                       },
-                xmax: function(d) {
+                ymax: function(d) {
                   return d.coef + 2*d.se;
                 }});
 
-var layers = [ggd3.layer().geom(ggd3.geoms.bar().color('none'))
-                  .stat({x: 'identity'}), lr];
+var layers = [ggd3.layer().geom(ggd3.geoms.point().color('none')), 
+                      lr];
 
-var facet = ggd3.facet({x:'coefficient', ncols: 2, type:'grid'});
+var facet = ggd3.facet({x:'coefficient', ncols: 2, type:'wrap'});
 
 var chart = ggd3.plot()
               .facet(facet)
-              .width(300)
-              .xScale({axis: {ticks: 5}, label: ""})
-              .rangePadding(0) // not working
-              .height(1000)
-              .xGrid(false)
-              .margins({top:0, bottom:30, left:130, right:10})
+              .width(500)
+              .xScale({axis: {ticks: 5}, 
+                      label: "Uranium (ppm)",
+                      offset: 30})
+              .height(200)
+              .margins({top:0, bottom:100, left:130, right:10})
               .layers(layers)
-              .aes({y:'county', x: "coef"});  
+              .aes({y:'coef', x: "Uppm"});  
 var sorted;
 d3.csv("../data/MN_ranefs.csv", function(error, d) {
   data = d;
-
-  sorted = _.filter(d, 
-                  function(d) { return d.coefficient === "intercept";})
-  sorted = _.map(sorted.sort(function(a,b) {
-    return b.coef - a.coef;
-  }), "county");
-  sorted.reverse();
-
   chart.data(data)
-       .yScale({axis:{ticks:4}, 
-                scale: {domain: sorted}, label: ""})
+       .yScale({axis:{ticks:4}})
        .draw(div);
 })
 

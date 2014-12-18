@@ -39,17 +39,19 @@ Line.prototype.lineType = function(l) {
 };
 
 Line.prototype.generator = function(aes, x, y, o2, group) {
+  if(this.name() === "linerange"){
+    pos = function() { return o2.rangeBand()/2; };
+  } else {
+    pos = function(i) { return o2.rangeBand()*i; };
+  }
   var line = d3.svg.line()
               .interpolate(this.interpolate())
-              .defined(function(d) { 
-                return (!isNaN(y(d[aes.y]))); 
-              })
               .tension(this.tension());
   if(x.hasOwnProperty('rangeBand')) {
     return line
             .x(function(d, i) { 
               return (x(d[aes.x]) + o2(d[group]) + 
-                            o2.rangeBand() * i); 
+                            pos(i)); 
             })
             .y(function(d) { return y(d[aes.y]); });
   }
@@ -58,7 +60,7 @@ Line.prototype.generator = function(aes, x, y, o2, group) {
             .x(function(d) { return x(d[aes.x]); })
             .y(function(d, i) { 
               return (y(d[aes.y]) + o2(d[group]) +
-                            o2.rangeBand()*i); 
+                            pos(i)); 
             });
   }
   return line
@@ -103,7 +105,7 @@ Line.prototype.prepareData = function(data, s) {
 Line.prototype.draw = function(sel, data, i, layerNum){
   // console.log('first line of line.draw');
   // console.log(data);
-  var s     = this.setup(),
+  var s      = this.setup(),
       scales = this.scalesAxes(sel, s, data.selector, layerNum,
                                  this.drawX(), this.drawY()),
       x = scales.x.scale(),
@@ -116,6 +118,12 @@ Line.prototype.draw = function(sel, data, i, layerNum){
      y.hasOwnProperty('rangeBand')){
     if(s.grouped) {
       o2 = s.plot.subScale().single.scale();
+    } else {
+      if(x.hasOwnProperty('rangeBand')){
+        o2.rangeBand = function() { return x.rangeBand(); };
+      } else {
+        o2.rangeBand = function() { return y.rangeBand(); };
+      }
     }
   }
 
@@ -153,7 +161,7 @@ Line.prototype.draw = function(sel, data, i, layerNum){
               .selectAll("." + this.selector(layerNum).replace(/ /g, '.'))
               .data(data);
   lines.transition().call(_.bind(this.drawLines, this), line, s, layerNum);
-  lines.enter().append(this.geom())
+  lines.enter().insert(this.geom(), "*")
     .call(_.bind(this.drawLines, this), line, s, layerNum);
   lines.exit()
     .transition()
