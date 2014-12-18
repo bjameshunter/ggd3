@@ -22,6 +22,8 @@ title: Iris
   <option value="right">y axis right</option>
 </select>    
  -->
+<style>
+</style>
 <script>
 function collectData(layer) {
   return d3.selectAll('.geom.' + layer).data();
@@ -46,6 +48,7 @@ var facet = ggd3.facet().titleSize([0,0]);
 var chart = ggd3.plot()
               .aes({x:"Sepal.Length", fill:"Species", color:"Species"})
               .margins({left: 80})
+              .yScale({offset: 65})
               .facet(facet)
               .layers(layers)
 

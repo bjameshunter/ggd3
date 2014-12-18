@@ -50,6 +50,7 @@ var chart = ggd3.plot()
               .layers(layers)
               .height(250)
               .margins({left: 50})
+              .yScale({axis: {ticks: 5}, label: ''})
               .dtypes({date: ['date', 'many']})
               .colorRange(['seagreen', 'orange'])
               .aes({x: 'date', y: 'value', color:'value',

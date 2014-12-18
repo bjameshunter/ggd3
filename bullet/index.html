@@ -59,11 +59,13 @@ var chart = ggd3.plot()
                     .yScale({axis:{ position:'left', 
                             orient:'left'},
                             scale: {domain:[0, 40]}})
-                    .xScale({axis: {ticks: 4, position: "top"}})
+                    .xScale({axis: {ticks: 4},
+                            label: "Mostly nonsense bullet chart using mtcars dataset",
+                            offset: 25})
                     .rangePadding(0)
                     .facet(facet)
                     .rangeBand(0.1)
-                    .margins({top: 5, bottom:10, left:50, right:10})
+                    .margins({top: 1, bottom:120, left:50, right:10})
                     .layers(layers);
 
 function makeOneZero(o, v) {

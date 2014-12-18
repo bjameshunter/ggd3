@@ -24,3 +24,12 @@
 
 - name: text with bar
   url: cars
+
+- name: bar with error
+  url: mn-ranefs
+
+- name: scatter with error
+  url: mn-ranefs2
+
+- name: scatter with x/y error
+  url: mn-ranefs3

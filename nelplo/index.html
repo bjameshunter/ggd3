@@ -71,10 +71,11 @@ var chart = ggd3.plot()
               .colorScale({type:'category20'})
               .fillScale({type:'category20'})
               .yScale({axis: {ticks: 4, position:'left',
-                      orient: "left"}})
-              .margins({top: 5, bottom:20, left:35, right:5})
+                      orient: "left"}, 
+                      label:''})
+              .margins({top: 5, bottom:50, left:50, right:5})
               .xScale({axis: {ticks: 4, position: "bottom",
-                      orient: "bottom"}})
+                      orient: "bottom"}, label: ''})
               .aes({x:'date', y:'value', color:'variable', fill: 'variable'})
 d3.csv("{{ site.baseurl }}/assets/data/nelplo.csv", function(error, d) {
   data = d;
