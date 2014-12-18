@@ -35,9 +35,11 @@ var chart = ggd3.plot()
               .layers(layers)
               .width(300)
               .height(300)
-              .margins({top:0, bottom:0, left:0, right:0})
-              .yScale({axis:{orient:'left', position:'right'}})
-              .xScale({axis:{orient:'bottom', position:'top'}})
+              .margins({top:0, bottom:80, left:100, right:0})
+              .yScale({axis:{orient:'left', position:'left'},
+                      offset:60})
+              .xScale({label: "1 = Drama. Action films are blue",
+                      offset: 40})
               .aes({x:"Drama", y:"rating", fill: 'Action'})
 
 d3.csv("{{ site.baseurl }}/assets/data/movies.csv", function(error, d) {
