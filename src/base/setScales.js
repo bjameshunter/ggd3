@@ -99,6 +99,7 @@ function setDomain(data, layer) {
   });
 
   this.freeScales = [];
+
   _.each(['x', 'y'], function(a) {
     // do not cycle through scales declared null.
     if(!_.isNull(s.aes[a])){
@@ -116,6 +117,10 @@ function setDomain(data, layer) {
   // free scales
   if(!_.isEmpty(this.freeScales)){
     _.map(this.freeScales, function(k){
+      if(_.contains(['xmin', 'ymin', 'xmax', 'ymax'], k)){
+        // must do soemthing different for mins and maxes
+        k = k[0];
+      }
       scale = this[k+ "Scale"]()[data.selector];
       scale.domain(geom.domain(data.data, k));
       scale.scale().nice();
@@ -132,6 +137,9 @@ function setDomain(data, layer) {
         function(g){
     if(!_.isNull(s.aes[g])){
       if(_.contains(globalScales, g)){
+        if(_.contains(['xmin', 'ymin', 'xmax', 'ymax'], g)){
+          g = g[0];
+        }
         scale = this[g + "Scale"]().single;
         // scale is fill, color, alpha, etc.
         // with no padding on either side of domain.

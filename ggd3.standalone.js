@@ -963,6 +963,7 @@ Layer.prototype.compute = function(sel, layerNum) {
   
 
 };
+// the only thing update doesn't do is removeElements.
 Layer.prototype.draw = function(sel, layerNum) {
 
   var divs = [];
@@ -1790,6 +1791,7 @@ function setDomain(data, layer) {
   });
 
   this.freeScales = [];
+
   _.each(['x', 'y'], function(a) {
     // do not cycle through scales declared null.
     if(!_.isNull(s.aes[a])){
@@ -1807,6 +1809,10 @@ function setDomain(data, layer) {
   // free scales
   if(!_.isEmpty(this.freeScales)){
     _.map(this.freeScales, function(k){
+      if(_.contains(['xmin', 'ymin', 'xmax', 'ymax'], k)){
+        // must do soemthing different for mins and maxes
+        k = k[0];
+      }
       scale = this[k+ "Scale"]()[data.selector];
       scale.domain(geom.domain(data.data, k));
       scale.scale().nice();
@@ -1823,6 +1829,9 @@ function setDomain(data, layer) {
         function(g){
     if(!_.isNull(s.aes[g])){
       if(_.contains(globalScales, g)){
+        if(_.contains(['xmin', 'ymin', 'xmax', 'ymax'], g)){
+          g = g[0];
+        }
         scale = this[g + "Scale"]().single;
         // scale is fill, color, alpha, etc.
         // with no padding on either side of domain.
@@ -3822,6 +3831,53 @@ Hline.prototype.prepareData = function(data, s, scales) {
 
 
 ggd3.geoms.hline = Hline;
+function Linerange(spec){
+  if(!(this instanceof Linerange)){
+    return new Linerange(spec);
+  }
+  Line.apply(this);
+  var attributes = {
+
+  };
+
+}
+// linerange responds to x, xmin, xmax or y, ymin, ymax and group or color
+
+Linerange.prototype = new Line();
+
+Linerange.prototype.constructor = Linerange;
+
+Linerange.prototype.domain = function(data, a) {
+  var layer   = this.layer(),
+      plot    = layer.plot(),
+      aes     = layer.aes(),
+      minmax  = a === "y" ? ['ymin', 'ymax']: ['xmin', 'xmax'],
+      extent = [],
+      range;
+
+  _.each(minmax, function(d) {
+    if(_.isFunction(aes[d])){
+      extent.push(d3.extent(_.map(data, function(r) {
+        return aes[d](r);
+      })));
+    } else if(_.isString(aes[d])){
+      extent.push(d3.extent(_.map(data, aes[d])));
+    }
+  });
+  extent = _.flatten(extent);
+
+  return extent;
+};
+
+
+Linerange.prototype.draw = function(sel, data, i, layerNum){
+  console.log(data);
+
+
+};
+
+ggd3.geoms.linerange = Linerange;
+
 // 
 function Path(spec) {
   if(!(this instanceof Geom)){

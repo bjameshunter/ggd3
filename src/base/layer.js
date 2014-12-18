@@ -181,6 +181,7 @@ Layer.prototype.compute = function(sel, layerNum) {
   
 
 };
+// the only thing update doesn't do is removeElements.
 Layer.prototype.draw = function(sel, layerNum) {
 
   var divs = [];
