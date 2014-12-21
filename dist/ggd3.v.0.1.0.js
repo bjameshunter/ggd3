@@ -14,7 +14,7 @@
   }
 ggd3.tools.arrayOfArrays = function(data) {
   // first level are all arrays
-  if(_.all(_.map(data, _.isPlainObject))) {
+  if(_.all(_.map(_.flatten(data, true), _.isPlainObject))) {
     // we shouldn't be here.
     return data;
   }
@@ -1315,12 +1315,9 @@ Plot.prototype.setFixedScale = function(a) {
                   if(k === "single") { return undefined; }
                       return v.domain();
                     }, this) )));
-    console.log("compacting ordinal domain");
-    console.log(a);
     domain = _.filter(domain, function(d) {
       return !_.isUndefined(d) && !_.isNull(d);
     });
-    console.log(domain);
   }
   // scale.scale().domain(domain);
   return scale.domain(domain);
@@ -1589,6 +1586,9 @@ Scale.prototype.range = function(range, rb) {
 
 Scale.prototype.domain = function(domain) {
   if(!arguments.length) { return this.attributes.domain; }
+  domain = _.filter(domain, function(d) {
+    return !_.isUndefined(d) && !_.isNull(d);
+  });
   if(this.type() ==="log"){
     if(!_.all(domain, function(d) { return d > 0;}) ){
       console.warn("domain must be greater than 0 for log scale." +
@@ -1600,15 +1600,15 @@ Scale.prototype.domain = function(domain) {
   }
   if(_.isNull(this.domain())){ 
     this.attributes.domain = domain; 
-  } else {
+    } else {
     var d = this.attributes.domain;
     if(_.contains(linearScales, this.type())){
       if(domain[0] < d[0]) { this.attributes.domain[0] = domain[0];}
       if(domain[1] > d[1]) { this.attributes.domain[1] = domain[1];}
-      // this.attributes.domain = ggd3.tools
-      //                           .numericDomain(this.attributes.domain);
+      this.attributes.domain = ggd3.tools
+                                .numericDomain(this.attributes.domain);
     } else {
-      // this.attributes.domain = _.unique(_.flatten([d, domain]));
+      this.attributes.domain = _.unique(_.flatten([d, domain]));
       this.attributes.domain = domain;
     }
   }
@@ -1870,6 +1870,9 @@ function setDomain(data, layer) {
           } else {
             domain = scale.domain();
           }
+          domain = _.filter(domain, function(d) {
+            return !_.isUndefined(d) && !_.isNull(d);
+          });
         }
         scale.domain(domain);
       } else {
@@ -2737,13 +2740,14 @@ Line.prototype.drawLines = function (path, line, s, layerNum) {
 Line.prototype.prepareData = function(data, s) {
   data = s.nest
           .entries(data.data) ;
+  // array of grouped data with 1 or 2 group variables
   data = _.map(data, function(d) { return this.recurseNest(d);}, this);
+  data = ggd3.tools.arrayOfArrays(data);
   return _.isArray(data[0]) ? data: [data];
 };
 
 Line.prototype.draw = function(sel, data, i, layerNum){
   // console.log('first line of line.draw');
-  // console.log(data);
   var s      = this.setup(),
       scales = this.scalesAxes(sel, s, data.selector, layerNum,
                                  this.drawX(), this.drawY()),
@@ -2806,6 +2810,7 @@ Line.prototype.draw = function(sel, data, i, layerNum){
     .transition()
     .style('opacity', 0)
     .remove();
+  return data;
 };
 // next four functions copied verbatim from http://bl.ocks.org/mbostock/4163057
 // used to add linear gradient to line.
@@ -3211,14 +3216,14 @@ Area.prototype.decorateScale = function(dir, s, sc, data) {
     this.check(s.aes, dir);
     if(a) {
       return function(m) {
-        return function(d) { console.log(sc(s.aes[m]));return sc(s.aes[m]); };
+        return function(d) { return sc(s.aes[m]); };
       };
     }else {
       return function(m) {
         return function(d) { return sc(d[s.aes[dir]] + s.aes[m]);};
       };
     }
-  } else if(_.isFunction(s.aes.ymin)) {
+  } else if(_.isFunction(s.aes[dir + "min"])) {
     this.check(s.aes, dir);
     // is trusting the order a reliable thing to do?
     var minAgg = _.map(data, function(d) { 
@@ -3230,7 +3235,7 @@ Area.prototype.decorateScale = function(dir, s, sc, data) {
     return function(m, i) {
       return function(d) {
         var v = m === (dir + 'max') ? maxAgg[i]:minAgg[i];
-        return sc(d[s.aes.y] + v) ;};
+        return sc(d[s.aes[dir]] + v) ;};
     };
   } else if (_.isString(s.aes[dir + "min"])){
     this.check(s.aes, dir);
@@ -3242,6 +3247,7 @@ Area.prototype.decorateScale = function(dir, s, sc, data) {
     };
   } else {
     // we're not going in that direction
+    console.log('no direction');
     return function() {
       return function(d) {
         return sc(d);
@@ -4113,36 +4119,34 @@ Ribbon.prototype.generator = function(aes, x, y, o2, group, n) {
   var area = d3.svg.area()
                 .interpolate(this.interpolate());
 
-  if(x.hasOwnProperty('rangeBand')) {
-    return area
-            .x0(function(d, i) { 
-              return (x(d[aes.x]) + o2(d[group]) + 
-                            o2.rangeBand() * i); 
-            })
-            .x1(function(d, i) { 
-              return (x(d[aes.x]) + o2(d[group]) + 
-                            o2.rangeBand() * (i + 1)); 
-            })
-            .y0(function(d) { return y(d[aes.ymin]); })
-            .y1(function(d) { return y(d[aes.ymax]); });
-  }
-  if(y.hasOwnProperty('rangeBand')) {
-    return area
-            .x0(function(d) { return x(d[aes.xmax]); })
-            .x1(function(d) { return x(d[aes.xmin]); })
-            .y0(function(d, i) { 
-              return (y(d[aes.y]) + o2(d[group]) +
-                            o2.rangeBand()*i); 
-            })
-            .y1(function(d, i) { 
-              return (y(d[aes.y]) + o2(d[group]) +
-                            o2.rangeBand()*(i + 1)); 
-            });
-  }
   return area
           .x(function(d, i) { return x(d[aes.x]); })
-          .y0(function(d, i) { return y('ymin', n)(d); })
-          .y1(function(d, i) { return y('ymax', n)(d); });
+          .y0(function(d, i) { 
+            // console.log(y('min', n)(d));
+            return y('ymin', n)(d); })
+          .y1(function(d, i) { 
+            // console.log(y('max', n)(d));
+            return y('ymax', n)(d); });
+};
+Ribbon.prototype.drawRibbon = function(sel, data, i, layerNum, areaGen,
+                                       s) {
+  var ribbon = sel.select('.plot')
+              .selectAll(".g" + layerNum + "geom-" + this.name())
+              .data(data),
+      that = this;
+  ribbon.transition()
+    .each(function(d, i) {
+      Area.prototype.drawArea.call(that, d3.select(this), areaGen(i), s, layerNum, i);
+    });
+  // makes sense that all area/ribbons go first.
+  ribbon.enter().insert(this.geom(), ".geom.g0")
+    .each(function(d, i) {
+      Area.prototype.drawArea.call(that, d3.select(this), areaGen(i), s, layerNum, i);
+    });
+  ribbon.exit()
+    .transition()
+    .style('opacity', 0)
+    .remove();
 };
 
 // ribbon is always an operation on ymin, ymax, and x
@@ -4163,32 +4167,28 @@ Ribbon.prototype.draw = function(sel, data, i, layerNum) {
   var areaGen = function(n) {
     return that.generator(s.aes, x, y2, o2, s.group, n);
   };
-  var ribbon = sel.select('.plot')
-              .selectAll(".g" + layerNum + "geom-" + this.name())
-              .data(data);
-  ribbon.transition()
-    .each(function(d, i) {
-      that.drawArea(d3.select(this), areaGen(i), s, layerNum, i);
-    });
-  // makes sense that all area/ribbons go first.
-  ribbon.enter().insert(this.geom(), ".geom.g0")
-    .each(function(d, i) {
-      that.drawArea(d3.select(this), areaGen(i), s, layerNum);
-    });
-  ribbon.exit()
-    .transition()
-    .style('opacity', 0)
-    .remove();
+  this.drawRibbon(sel, data, i, layerNum, areaGen, s);
 };
 
 ggd3.geoms.ribbon = Ribbon;
 // 
 function Smooth(spec) {
-  Geom.apply(this);
+  if(!(this instanceof Smooth)){
+    return new Smooth(spec);
+  }
+  Line.apply(this);
   var attributes = {
     name: "smooth",
     stat: "identity",
     position: null,
+    method: "lm",
+    lineType: 'none',
+    sigma: {},
+    errorBand: true,
+    loessAlpha: 0.5,
+    dist: 1.96,
+    strokeOpacity: 0.2,
+    ribbonAlpha: 0.2,
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -4200,9 +4200,114 @@ function Smooth(spec) {
   }
 }
 
+Smooth.prototype = new Line();
+
 Smooth.prototype.constructor = Smooth;
 
+Smooth.prototype.loess = function(data, s) {
+
+};
+
+Smooth.prototype.lm = function(data, s) {
+
+  // both should be numbers
+  // need to make this work with dates, too.
+  data = _.filter(data, function(d) {
+    return _.isNumber(d[s.aes.x]) && _.isNumber(d[s.aes.y]);
+  });
+  var aes = s.aes,
+      o1, o2, sigma,
+      ts = false,
+      prod = d3.mean(_.map(data, function(d) {
+        return d[aes.x] * d[aes.y];
+      })),
+      x2 = d3.mean(_.map(data, function(d) {
+        return Math.pow(d[aes.x], 2);
+      })),
+      xbar = d3.mean(_.pluck(data, aes.x)), 
+      ybar = d3.mean(_.pluck(data, aes.y)),
+      m = (prod - xbar*ybar) / (x2 - Math.pow(xbar, 2)),
+      b = ybar - m*xbar;
+
+  o1 = _.clone(_.min(data, aes.x));
+  o2 = _.clone(_.max(data, aes.x));
+  o1[aes.y] = b + m * o1[aes.x];
+  o2[aes.y] = b + m * o2[aes.x];
+  sigma = Math.sqrt(d3.sum(data.map(function(d, i) {
+
+    return Math.pow((d[aes.x]*m + b) - 
+                    d[aes.y], 2);
+  }))/data.length);
+  o1._error_max = this.dist() * sigma;
+  o2._error_max = this.dist() * sigma;
+  o1._error_min = -this.dist() * sigma;
+  o2._error_min = -this.dist() * sigma;
+  return [o1, o2];
+};
+
+Smooth.prototype.prepareData = function(data, s) {
+  data = s.nest.entries(data.data);
+  data = ggd3.tools.arrayOfArrays(
+          _.map(data, function(d) { 
+            return this.recurseNest(d);}, this));
+  data = _.filter(data, function(d) {
+    return _.isPlainObject(d) || d.length >=2;
+  });
+  data = _.isArray(data[0]) ? data: [data];
+  // sometimes I pass a third argument to prepareData
+  // if it's true here, we're getting the data
+  // nested to apply error bands. No need to 
+  // recalculate lines.
+  data = _.map(data, function(d) {
+    return this[this.method()](d, s);
+  }, this);
+  return data;  
+};
+
+Smooth.prototype.draw = function(sel, data, i, layerNum) {
+  var selector = data.selector;
+  data = Line.prototype.draw.call(this, sel, data, i, layerNum);
+
+  if(!this.errorBand()){
+    return null;
+  }
+  var s = this.setup(),
+      scales = this.scalesAxes(sel, s, selector, layerNum,
+                                this.drawX(), this.drawY()),
+      x = scales.x.scale(),
+      y = scales.y.scale(),
+      y2,
+      o2 = function() { return 0; };
+      o2.rangeBand = function() { return 0;};
+      r = ggd3.geoms.ribbon()
+            .color(s.color)
+            .data([data]);
+
+  if(this.method() === "loess"){
+
+  } else if(this.method() === "lm"){
+    var dist = this.dist() * this.sigma(),
+        oldAlpha = this.alpha();
+    s.aes.ymin = "_error_min";
+    s.aes.ymax = "_error_max";
+    s.alpha = d3.functor(this.ribbonAlpha());
+    y2 = r.decorateScale('y', s, y, data);
+    var areaGen = function(n) {
+      return r.generator(s.aes, x, y2, o2, s.group, n);
+    };
+
+    r.drawRibbon.call(this.name('smooth-error'), sel, 
+                      data, i, layerNum, areaGen, s);
+    this.name('smooth')
+      .alpha(oldAlpha);
+
+  }
+
+};
+
 ggd3.geoms.smooth = Smooth;
+
+
 (function() {
   var _symbol = d3.svg.symbol(),
       _line = d3.svg.line();

@@ -328,12 +328,9 @@ Plot.prototype.setFixedScale = function(a) {
                   if(k === "single") { return undefined; }
                       return v.domain();
                     }, this) )));
-    console.log("compacting ordinal domain");
-    console.log(a);
     domain = _.filter(domain, function(d) {
       return !_.isUndefined(d) && !_.isNull(d);
     });
-    console.log(domain);
   }
   // scale.scale().domain(domain);
   return scale.domain(domain);

@@ -162,6 +162,9 @@ function setDomain(data, layer) {
           } else {
             domain = scale.domain();
           }
+          domain = _.filter(domain, function(d) {
+            return !_.isUndefined(d) && !_.isNull(d);
+          });
         }
         scale.domain(domain);
       } else {

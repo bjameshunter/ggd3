@@ -130,6 +130,9 @@ Scale.prototype.range = function(range, rb) {
 
 Scale.prototype.domain = function(domain) {
   if(!arguments.length) { return this.attributes.domain; }
+  domain = _.filter(domain, function(d) {
+    return !_.isUndefined(d) && !_.isNull(d);
+  });
   if(this.type() ==="log"){
     if(!_.all(domain, function(d) { return d > 0;}) ){
       console.warn("domain must be greater than 0 for log scale." +
@@ -141,15 +144,15 @@ Scale.prototype.domain = function(domain) {
   }
   if(_.isNull(this.domain())){ 
     this.attributes.domain = domain; 
-  } else {
+    } else {
     var d = this.attributes.domain;
     if(_.contains(linearScales, this.type())){
       if(domain[0] < d[0]) { this.attributes.domain[0] = domain[0];}
       if(domain[1] > d[1]) { this.attributes.domain[1] = domain[1];}
-      // this.attributes.domain = ggd3.tools
-      //                           .numericDomain(this.attributes.domain);
+      this.attributes.domain = ggd3.tools
+                                .numericDomain(this.attributes.domain);
     } else {
-      // this.attributes.domain = _.unique(_.flatten([d, domain]));
+      this.attributes.domain = _.unique(_.flatten([d, domain]));
       this.attributes.domain = domain;
     }
   }

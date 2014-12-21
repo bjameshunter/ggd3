@@ -28,36 +28,34 @@ Ribbon.prototype.generator = function(aes, x, y, o2, group, n) {
   var area = d3.svg.area()
                 .interpolate(this.interpolate());
 
-  if(x.hasOwnProperty('rangeBand')) {
-    return area
-            .x0(function(d, i) { 
-              return (x(d[aes.x]) + o2(d[group]) + 
-                            o2.rangeBand() * i); 
-            })
-            .x1(function(d, i) { 
-              return (x(d[aes.x]) + o2(d[group]) + 
-                            o2.rangeBand() * (i + 1)); 
-            })
-            .y0(function(d) { return y(d[aes.ymin]); })
-            .y1(function(d) { return y(d[aes.ymax]); });
-  }
-  if(y.hasOwnProperty('rangeBand')) {
-    return area
-            .x0(function(d) { return x(d[aes.xmax]); })
-            .x1(function(d) { return x(d[aes.xmin]); })
-            .y0(function(d, i) { 
-              return (y(d[aes.y]) + o2(d[group]) +
-                            o2.rangeBand()*i); 
-            })
-            .y1(function(d, i) { 
-              return (y(d[aes.y]) + o2(d[group]) +
-                            o2.rangeBand()*(i + 1)); 
-            });
-  }
   return area
           .x(function(d, i) { return x(d[aes.x]); })
-          .y0(function(d, i) { return y('ymin', n)(d); })
-          .y1(function(d, i) { return y('ymax', n)(d); });
+          .y0(function(d, i) { 
+            // console.log(y('min', n)(d));
+            return y('ymin', n)(d); })
+          .y1(function(d, i) { 
+            // console.log(y('max', n)(d));
+            return y('ymax', n)(d); });
+};
+Ribbon.prototype.drawRibbon = function(sel, data, i, layerNum, areaGen,
+                                       s) {
+  var ribbon = sel.select('.plot')
+              .selectAll(".g" + layerNum + "geom-" + this.name())
+              .data(data),
+      that = this;
+  ribbon.transition()
+    .each(function(d, i) {
+      Area.prototype.drawArea.call(that, d3.select(this), areaGen(i), s, layerNum, i);
+    });
+  // makes sense that all area/ribbons go first.
+  ribbon.enter().insert(this.geom(), ".geom.g0")
+    .each(function(d, i) {
+      Area.prototype.drawArea.call(that, d3.select(this), areaGen(i), s, layerNum, i);
+    });
+  ribbon.exit()
+    .transition()
+    .style('opacity', 0)
+    .remove();
 };
 
 // ribbon is always an operation on ymin, ymax, and x
@@ -78,22 +76,7 @@ Ribbon.prototype.draw = function(sel, data, i, layerNum) {
   var areaGen = function(n) {
     return that.generator(s.aes, x, y2, o2, s.group, n);
   };
-  var ribbon = sel.select('.plot')
-              .selectAll(".g" + layerNum + "geom-" + this.name())
-              .data(data);
-  ribbon.transition()
-    .each(function(d, i) {
-      that.drawArea(d3.select(this), areaGen(i), s, layerNum, i);
-    });
-  // makes sense that all area/ribbons go first.
-  ribbon.enter().insert(this.geom(), ".geom.g0")
-    .each(function(d, i) {
-      that.drawArea(d3.select(this), areaGen(i), s, layerNum);
-    });
-  ribbon.exit()
-    .transition()
-    .style('opacity', 0)
-    .remove();
+  this.drawRibbon(sel, data, i, layerNum, areaGen, s);
 };
 
 ggd3.geoms.ribbon = Ribbon;

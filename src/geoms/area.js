@@ -85,14 +85,14 @@ Area.prototype.decorateScale = function(dir, s, sc, data) {
     this.check(s.aes, dir);
     if(a) {
       return function(m) {
-        return function(d) { console.log(sc(s.aes[m]));return sc(s.aes[m]); };
+        return function(d) { return sc(s.aes[m]); };
       };
     }else {
       return function(m) {
         return function(d) { return sc(d[s.aes[dir]] + s.aes[m]);};
       };
     }
-  } else if(_.isFunction(s.aes.ymin)) {
+  } else if(_.isFunction(s.aes[dir + "min"])) {
     this.check(s.aes, dir);
     // is trusting the order a reliable thing to do?
     var minAgg = _.map(data, function(d) { 
@@ -104,7 +104,7 @@ Area.prototype.decorateScale = function(dir, s, sc, data) {
     return function(m, i) {
       return function(d) {
         var v = m === (dir + 'max') ? maxAgg[i]:minAgg[i];
-        return sc(d[s.aes.y] + v) ;};
+        return sc(d[s.aes[dir]] + v) ;};
     };
   } else if (_.isString(s.aes[dir + "min"])){
     this.check(s.aes, dir);
@@ -116,6 +116,7 @@ Area.prototype.decorateScale = function(dir, s, sc, data) {
     };
   } else {
     // we're not going in that direction
+    console.log('no direction');
     return function() {
       return function(d) {
         return sc(d);

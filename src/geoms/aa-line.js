@@ -98,13 +98,14 @@ Line.prototype.drawLines = function (path, line, s, layerNum) {
 Line.prototype.prepareData = function(data, s) {
   data = s.nest
           .entries(data.data) ;
+  // array of grouped data with 1 or 2 group variables
   data = _.map(data, function(d) { return this.recurseNest(d);}, this);
+  data = ggd3.tools.arrayOfArrays(data);
   return _.isArray(data[0]) ? data: [data];
 };
 
 Line.prototype.draw = function(sel, data, i, layerNum){
   // console.log('first line of line.draw');
-  // console.log(data);
   var s      = this.setup(),
       scales = this.scalesAxes(sel, s, data.selector, layerNum,
                                  this.drawX(), this.drawY()),
@@ -167,6 +168,7 @@ Line.prototype.draw = function(sel, data, i, layerNum){
     .transition()
     .style('opacity', 0)
     .remove();
+  return data;
 };
 // next four functions copied verbatim from http://bl.ocks.org/mbostock/4163057
 // used to add linear gradient to line.

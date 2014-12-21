@@ -1,6 +1,6 @@
 ggd3.tools.arrayOfArrays = function(data) {
   // first level are all arrays
-  if(_.all(_.map(data, _.isPlainObject))) {
+  if(_.all(_.map(_.flatten(data, true), _.isPlainObject))) {
     // we shouldn't be here.
     return data;
   }
