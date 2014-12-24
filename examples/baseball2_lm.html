@@ -41,7 +41,7 @@ var div = d3.select('#chart01'),
 
 var layers = [ggd3.geoms.point().color('none'), 'smooth'];
 
-var facet = ggd3.facet({x:'decade',  y:'team', scales: "free"});
+var facet = ggd3.facet({x:'decade',  y:'team', scales: "free_y"});
 
 var chart = ggd3.plot()
               .facet(facet)
@@ -51,18 +51,16 @@ var chart = ggd3.plot()
               .rangePadding(0)
               .subRangePadding(0.2)
               .layers(layers)
-              .yGrid(false)
-              .xGrid(false)
-              .margins({right: 50, top:60})
+              .margins({right: 5, top:0, bottom:5, left:5})
               .xScale({axis: {ticks:4, position: 'top',
-                              orient:'top'},
+                              orient:'bottom'},
                               offset:45})
               .yScale({axis:{position:"right",
-                            orient: "right"},
+                            ticks:4,
+                            orient: "left"},
                             offset:45})
               .aes({y: "batting", x:"ab",
-                    fill: "decade",
-                    alpha: "hr"})
+                    fill: "decade", color:'decade'})
               .dtypes({"year": ['date', 'many', "%Y"],
                   "decade": ['string'],
                   "stint": ['string'],
@@ -70,6 +68,9 @@ var chart = ggd3.plot()
 
 d3.csv("../data/baseball.csv", function(error, d) {
   data = d;
+  data = _.filter(data, function(d){
+    return d.ab > 0;
+  });
   chart.data(data).draw(div);
 })
 

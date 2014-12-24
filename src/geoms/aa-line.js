@@ -8,7 +8,7 @@ function Line(spec) {
     stat: "identity",
     geom: "path",
     grid: false,
-    interpolate: 'basis',
+    interpolate: 'linear',
     lineType: null,
     lineWidth: null,
     tension: 0.7,
@@ -131,6 +131,7 @@ Line.prototype.draw = function(sel, data, i, layerNum){
   var l1 = this.generator(s.aes, x, y, o2, s.group),
       selector = data.selector;
   data = this.prepareData(data, s, scales);
+  if(_.isEmpty(_.flatten(data))) { return data; }
   // overwriting the color function messes up tooltip labeling,
   // if needed.
   s.lcolor = s.color;
