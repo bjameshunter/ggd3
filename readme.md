@@ -31,3 +31,4 @@ Roadmap:
   - doing it like this prohibits drawing 100 boxplots on a single facet
 - Introducing several layers and allowing them to map different variable names tto the same aesthetic confuses me. If layer 0 maps "foo" to 'fill' and layer 1 maps 'bar' to 'fill', do I go through both and create a fill scale based on the union? I say layer one is special and should contain all relevant catagorical scale info. Subsequent layers can expand numeric domains, only.
 - The more I do, the more the "layer" element seems to be important in theory only. As such, layer-specific features such as position, aesthetics, and even data, should be able to be set directly on the geom.
+- In general, when passing data to a layer or a plot object, dates must be explicitly declared and given a format to be interpreted.

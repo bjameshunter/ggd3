@@ -317,10 +317,11 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     };
   } )();
 
-
   var bars = sel.select('.plot')
                 .selectAll('rect.geom.g' + layerNum)
-                .data(data),
+                .data(data, function(d) {
+                  return d[s.aes[width.p]];
+                }),
       tt = ggd3.tooltip()
             .content(this.tooltip())
             .geom(this);
@@ -334,11 +335,11 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       .attr('value', function(d) { 
         return d[s.group] + "~" + d[s.aes[width.p]];
       })
+      .attr('fill', s.fill)
+      .attr('stroke', s.color)
+      .attr('stroke-width', that.lineWidth())
       .style({
-        fill: s.fill,
-        stroke: s.color,
         'fill-opacity': s.alpha,
-        'stroke-width': that.lineWidth()
       });
   }
 
@@ -354,12 +355,6 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     .attr(size.s, 0)
     .attr(size.p, function(d) {
       return n(0);
-    })
-    .style({
-      fill: s.fill,
-      stroke: s.color,
-      'fill-opacity': s.alpha,
-      'stroke-width': that.lineWidth()
     })
     .transition()
     .call(draw)

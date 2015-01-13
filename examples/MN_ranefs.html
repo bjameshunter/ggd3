@@ -71,7 +71,8 @@ d3.csv("../data/MN_ranefs.csv", function(error, d) {
 
   chart.data(data)
        .yScale({axis:{ticks:4}, 
-                scale: {domain: sorted}, label: ""})
+                scale: {domain: sorted}, 
+                label: ""})
        .draw(div);
 })
 

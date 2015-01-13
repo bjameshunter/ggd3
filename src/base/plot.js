@@ -75,6 +75,7 @@ function Plot() {
 // ["alpha", "angle", "color", "fill", "group", "height", "label", "linetype", "lower", "order", "radius", "shape", "size", "slope", "width", "x", "xmax", "xmin", "xintercept", "y", "ymax", "ymin", "yintercept"] 
   this.attributes = attributes;
   this.gridsAdded = false;
+  this.timesCleaned = 0;
   // if the data method has been handed a new dataset, 
   // newData will be true, after the plot is drawn the
   // first time, newData is set to false
@@ -248,6 +249,7 @@ Plot.prototype.layers = function(layers) {
 Plot.prototype.dtypes = function(dtypes) {
   if(!arguments.length) { return this.attributes.dtypes; }
   this.attributes.dtypes = _.merge(this.attributes.dtypes, dtypes);
+  this.updateLayers();
   return this;
 };
 
@@ -340,12 +342,6 @@ Plot.prototype.plotDim = function() {
   var margins = this.margins();
   return {x: this.width(),
    y: this.height()};
-  // if(this.facet().type() === "grid"){
-  //   return {x: this.width() - this.facet().margins().x, 
-  //     y: this.height() - this.facet().margins().y};
-  // }
-  // return {x: this.width() - margins.left - margins.right,
-  //  y: this.height() - margins.top - margins.bottom};
 };
 
 // subScale holds default settings, but
@@ -443,7 +439,7 @@ Plot.prototype.draw = function(sel) {
   if(this.yGrid()) { 
     this.hgrid
       .geom(ggd3.geoms.hline().grid(true)
-        .lineType(this.gridLineType()));
+      .lineType(this.gridLineType()));
     this.hgrid.compute(sel, 30);
     this.hgrid.draw(sel, 30);}
   if(this.xGrid()) { 

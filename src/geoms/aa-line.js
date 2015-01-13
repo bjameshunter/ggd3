@@ -12,7 +12,8 @@ function Line(spec) {
     lineType: null,
     lineWidth: null,
     tension: 0.7,
-    freeColor: false, 
+    freeColor: false,
+    position: "append" 
   };
   // freeColor is confusing. Most global aesthetics should be 
   // that way. 
@@ -64,6 +65,7 @@ Line.prototype.generator = function(aes, x, y, o2, group) {
             });
   }
   return line
+          .defined(function(d, i) { return !isNaN(y(d[aes.y])); })
           .x(function(d, i) { return x(d[aes.x]); })
           .y(function(d, i) { return y(d[aes.y]); });
 };
@@ -77,19 +79,25 @@ Line.prototype.selector = function(layerNum) {
 };
 
 Line.prototype.drawLines = function (path, line, s, layerNum) {
-  var that = this;
+  var that = this, lt;
   if(!this.lineType()){
     this.lineType(s.plot.lineType());
+    lt = s.plot.lineType();
+  } else {
+    lt = this.lineType();
   }
+  var lw = d3.functor(this.lineWidth());
   path.attr("class", this.selector(layerNum))
     .attr('d', line)
-    .attr('stroke-dasharray', this.lineType());
+    .attr('stroke-dasharray', lt);
   if(!this.grid()){
     // grid style defined in css.
     path
       .attr('opacity', function(d) { return s.alpha(d[1]) ;})
       .attr('stroke', function(d) { return s.lcolor(d[1]);})
-      .attr('stroke-width', this.lineWidth())
+      .attr('stroke-width', function(d) {
+        return lw(d[1]);
+      })
       .attr('fill',  function(d) { 
         return s.gradient ? s.lcolor(d[1]): 'none';});
   }
@@ -161,9 +169,11 @@ Line.prototype.draw = function(sel, data, i, layerNum){
   sel = this.grid() ? sel.select("." + this.direction() + 'grid'): sel.select('.plot');
   var lines = sel
               .selectAll("." + this.selector(layerNum).replace(/ /g, '.'))
-              .data(data);
+              .data(data, function(d, i) {
+                return d[0][s.group] ? d[0][s.group]: i;
+              });
   lines.transition().call(_.bind(this.drawLines, this), line, s, layerNum);
-  lines.enter().insert(this.geom(), "*")
+  lines.enter()[this.position()](this.geom(), ".geom")
     .call(_.bind(this.drawLines, this), line, s, layerNum);
   lines.exit()
     .transition()

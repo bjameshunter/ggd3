@@ -19,6 +19,7 @@ function Geom(aes) {
     groups: null, 
     subRangeBand: 0,
     subRangePadding: 0,
+    omit: null,
   };
   var r = function(d) { return ggd3.tools.round(d, 2);};
   // default tooltip
@@ -53,17 +54,49 @@ Geom.prototype.defaultPosition = function() {
     "ribbon" : "identity",
     }[n];
 };
+Geom.prototype.abbrev = function(d, s, a, i){
+  if(a === 'additional'){ 
+    a = s.aes[a][i]; 
+  } else {
+    a = s.aes[a];
+  }
+  var dtype = s.dtypes[a],
+      format;
 
-Geom.prototype._otherAesthetics = function(sel, d, s, omit){
+  if(dtype[0]==='date'){
+    format = d3.time.format(dtype[2] || "%Y-%m-%d");
+    return format(d[a]);
+  }
+  else if(dtype[0] === 'number'){
+    format = d3.format(dtype[2] || ",");
+    return format(d[a]);
+  }
+  return d[a];
+};
+
+Geom.prototype._otherAesthetics = function(sel, d, s){
+  var omit = this.omit() || [];
   omit = _.flatten([omit, s.stat.exclude]);
+  // remove 'additional' from omit
+  omit.splice(omit.indexOf('additional'), 1);
+
   _.each(_.difference(_.keys(s.aes), omit), function(k) {
+    if(k === 'additional'){
+      _.each(s.aes[k], function(a, i) {
+        sel.append('h4')
+          .text(a + ": ")
+          .append('span').text(this.abbrev(d, s, k, i));
+      }, this);
+    } else {
     if(_.isNull(s.stat[k]) || _.isNull(s.stat[k]())){ return null; }
     var stat = s.stat[k]()._name || "identity";
     stat = _.contains(["identity", "first"], stat) ? "": " (" + stat + ")";
-    sel.append('h4')
-      .text(s.aes[k] + stat + ": ")
-      .append('span').text('(' + k + ') ' + d[s.aes[k]]);
-  });
+      sel.append('h4')
+        .text(s.aes[k] + stat + ": ")
+        .append('span').text('(' + k + ') ' + 
+                             this.abbrev(d, s, k));
+    }
+  }, this);
 };
 
 Geom.prototype.tooltip = function(obj, data) {
@@ -86,6 +119,7 @@ Geom.prototype.setup = function() {
   // sometimes a geom doesn't have a layer as in 
   // compound geoms - boxplot is box and point.
   if(s.layer){
+    s.grouped   = false;
     s.plot      = s.layer.plot();
     s.stat      = s.layer.stat();
     s.nest      = this.nest();
@@ -221,17 +255,22 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
   if(layerNum === 0 && drawX){
     var xax = sel.select('.x.axis')
               .attr("transform", "translate(" + x.positionAxis(rowNum, colNum) + ")")
-              .transition().call(x.axis);
+              .attr('opacity', 1)
+              .call(x.axis);
     x.style(xax);
+    xax.attr('opacity', 1);
     if(x.label()){
       sel.select('.x.axis')
         .call(_.bind(x.axisLabel, x), x.axisLabel());
     }
   }
   if(layerNum === 0 && drawY){
-    sel.select('.y.axis')
-      .attr("transform", "translate(" + y.positionAxis(rowNum, colNum) + ")")
-      .transition().call(y.axis);
+    var yax = sel.select('.y.axis')
+              .attr("transform", "translate(" + y.positionAxis(rowNum, colNum) + ")")
+              .attr('opacity', 1)
+              .transition().call(y.axis);
+    // y.style(yax);
+    yax.attr('opacity', 1);
     if(y.label()){
       sel.select('.y.axis')
         .call(_.bind(y.axisLabel, y), y.axisLabel());

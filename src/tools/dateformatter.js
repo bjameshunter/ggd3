@@ -1,7 +1,6 @@
 ggd3.tools.dateFormatter = function(v, format) {
-  if(format === "%Y") {
-    return new Date(v, 0, 0, 0);
-  } else {
-    return new Date(v);
+  if(format === "%Y" && !_.isDate(v)) {
+    return new Date(v, 0, 1, 0);
   }
+  return new Date(v);
 };

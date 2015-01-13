@@ -65,7 +65,6 @@ Area.prototype.generator = function(aes, x, y, o2, group, n) {
             });
   }
   area[dir](function(d, i) { 
-    console.log(dirScale()(d[aes[dir]]));
     return dirScale()(d[aes[dir]]); 
     });
   area[other + "0"](function(d, i) { 
@@ -116,7 +115,6 @@ Area.prototype.decorateScale = function(dir, s, sc, data) {
     };
   } else {
     // we're not going in that direction
-    console.log('no direction');
     return function() {
       return function(d) {
         return sc(d);

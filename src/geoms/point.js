@@ -69,7 +69,9 @@ Point.prototype.draw = function(sel, data, i, layerNum, s) {
     // get rid of wrong elements if they exist.
     points = sel.select('.plot')
                 .selectAll('.geom.g' + layerNum + ".geom-" + this.name())
-                .data(data);
+                .data(_.filter(data, function(d) {
+                  return !isNaN(d[s.aes.x]) && !isNaN(d[s.aes.y]);
+                }));
   } else {
     points = sel.selectAll('.geom.g' + layerNum + ".geom-" + this.name())
                 .data(data);

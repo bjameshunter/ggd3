@@ -37,7 +37,9 @@ function Stat(setting) {
   }
   this.exclude = ["xintercept", "yintercept", "slope",
   // maybe we do want to calculate mins and maxs
-    "ymax", "ymin", "xmax", "xmin"
+    "ymax", "ymin", "xmax", "xmin", 
+    // additional column info included in tooltip
+    'additional'
     ];
 
   this.attributes = attributes;

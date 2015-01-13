@@ -23,7 +23,7 @@ ggd3.tools.arrayOfArrays = function(data) {
   // second level
   var l2 = _.flatten(l1, true),
       l2obs = _.all(_.map(l2, _.isPlainObject));
-  if(l1arrays && l2obs) {console.log(l1); return l1; }
+  if(l1arrays && l2obs) { return l1; }
   return ggd3.tools.arrayOfArrays(l1);
 };
 function Clean(data, obj) {
@@ -134,11 +134,10 @@ function DataList(data) {
 }
 
 ggd3.tools.dateFormatter = function(v, format) {
-  if(format === "%Y") {
-    return new Date(v, 0, 0, 0);
-  } else {
-    return new Date(v);
+  if(format === "%Y" && !_.isDate(v)) {
+    return new Date(v, 0, 1, 0);
   }
+  return new Date(v);
 };
 ggd3.tools.defaultScaleSettings = function(dtype, aesthetic) {
   function xyScale() {
@@ -1062,6 +1061,7 @@ function Plot() {
 // ["alpha", "angle", "color", "fill", "group", "height", "label", "linetype", "lower", "order", "radius", "shape", "size", "slope", "width", "x", "xmax", "xmin", "xintercept", "y", "ymax", "ymin", "yintercept"] 
   this.attributes = attributes;
   this.gridsAdded = false;
+  this.timesCleaned = 0;
   // if the data method has been handed a new dataset, 
   // newData will be true, after the plot is drawn the
   // first time, newData is set to false
@@ -1235,6 +1235,7 @@ Plot.prototype.layers = function(layers) {
 Plot.prototype.dtypes = function(dtypes) {
   if(!arguments.length) { return this.attributes.dtypes; }
   this.attributes.dtypes = _.merge(this.attributes.dtypes, dtypes);
+  this.updateLayers();
   return this;
 };
 
@@ -1327,12 +1328,6 @@ Plot.prototype.plotDim = function() {
   var margins = this.margins();
   return {x: this.width(),
    y: this.height()};
-  // if(this.facet().type() === "grid"){
-  //   return {x: this.width() - this.facet().margins().x, 
-  //     y: this.height() - this.facet().margins().y};
-  // }
-  // return {x: this.width() - margins.left - margins.right,
-  //  y: this.height() - margins.top - margins.bottom};
 };
 
 // subScale holds default settings, but
@@ -1430,7 +1425,7 @@ Plot.prototype.draw = function(sel) {
   if(this.yGrid()) { 
     this.hgrid
       .geom(ggd3.geoms.hline().grid(true)
-        .lineType(this.gridLineType()));
+      .lineType(this.gridLineType()));
     this.hgrid.compute(sel, 30);
     this.hgrid.draw(sel, 30);}
   if(this.xGrid()) { 
@@ -1549,7 +1544,7 @@ Scale.prototype.type = function(type) {
 };
 
 Scale.prototype.style = function(sel) {
-  var styles = ['text', 'style', 'tickFormat'],
+  var styles = ['text', 'style'],
       axis = this.opts().axis;
   _.each(styles, function(s) {
     if(axis.hasOwnProperty(s)){
@@ -1650,13 +1645,16 @@ Scale.prototype.axisLabel = function(o, l) {
       .attr('transform', tr)
       .each(function() {
         d3.select(this).select('p').text(l);
-      });
+      })
+      .select('body')
+      .style('position', 'inherit');
     label.enter().append('foreignObject')
       .attr('width', pd[this.aesthetic()])
       .attr('height', "23")
       .attr('transform', tr)
       .attr('class', 'label')
       .append('xhtml:body')
+      .style('position', 'inherit')
       .append('div')
       .append('p')
       .text(l);
@@ -1881,6 +1879,7 @@ function setDomain(data, layer) {
            !_.isUndefined(scale._userOpts.scale.domain)){
           domain = scale._userOpts.scale.domain;
         }else {
+          console.log('going this way!');
           domain = geom.domain(data.data, g);
         }
         if(!_.contains(linearScales, scale.type())){
@@ -2009,6 +2008,7 @@ function Geom(aes) {
     groups: null, 
     subRangeBand: 0,
     subRangePadding: 0,
+    omit: null,
   };
   var r = function(d) { return ggd3.tools.round(d, 2);};
   // default tooltip
@@ -2043,17 +2043,49 @@ Geom.prototype.defaultPosition = function() {
     "ribbon" : "identity",
     }[n];
 };
+Geom.prototype.abbrev = function(d, s, a, i){
+  if(a === 'additional'){ 
+    a = s.aes[a][i]; 
+  } else {
+    a = s.aes[a];
+  }
+  var dtype = s.dtypes[a],
+      format;
 
-Geom.prototype._otherAesthetics = function(sel, d, s, omit){
+  if(dtype[0]==='date'){
+    format = d3.time.format(dtype[2] || "%Y-%m-%d");
+    return format(d[a]);
+  }
+  else if(dtype[0] === 'number'){
+    format = d3.format(dtype[2] || ",");
+    return format(d[a]);
+  }
+  return d[a];
+};
+
+Geom.prototype._otherAesthetics = function(sel, d, s){
+  var omit = this.omit() || [];
   omit = _.flatten([omit, s.stat.exclude]);
+  // remove 'additional' from omit
+  omit.splice(omit.indexOf('additional'), 1);
+
   _.each(_.difference(_.keys(s.aes), omit), function(k) {
+    if(k === 'additional'){
+      _.each(s.aes[k], function(a, i) {
+        sel.append('h4')
+          .text(a + ": ")
+          .append('span').text(this.abbrev(d, s, k, i));
+      }, this);
+    } else {
     if(_.isNull(s.stat[k]) || _.isNull(s.stat[k]())){ return null; }
     var stat = s.stat[k]()._name || "identity";
     stat = _.contains(["identity", "first"], stat) ? "": " (" + stat + ")";
-    sel.append('h4')
-      .text(s.aes[k] + stat + ": ")
-      .append('span').text('(' + k + ') ' + d[s.aes[k]]);
-  });
+      sel.append('h4')
+        .text(s.aes[k] + stat + ": ")
+        .append('span').text('(' + k + ') ' + 
+                             this.abbrev(d, s, k));
+    }
+  }, this);
 };
 
 Geom.prototype.tooltip = function(obj, data) {
@@ -2076,6 +2108,7 @@ Geom.prototype.setup = function() {
   // sometimes a geom doesn't have a layer as in 
   // compound geoms - boxplot is box and point.
   if(s.layer){
+    s.grouped   = false;
     s.plot      = s.layer.plot();
     s.stat      = s.layer.stat();
     s.nest      = this.nest();
@@ -2211,17 +2244,22 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
   if(layerNum === 0 && drawX){
     var xax = sel.select('.x.axis')
               .attr("transform", "translate(" + x.positionAxis(rowNum, colNum) + ")")
-              .transition().call(x.axis);
+              .attr('opacity', 1)
+              .call(x.axis);
     x.style(xax);
+    xax.attr('opacity', 1);
     if(x.label()){
       sel.select('.x.axis')
         .call(_.bind(x.axisLabel, x), x.axisLabel());
     }
   }
   if(layerNum === 0 && drawY){
-    sel.select('.y.axis')
-      .attr("transform", "translate(" + y.positionAxis(rowNum, colNum) + ")")
-      .transition().call(y.axis);
+    var yax = sel.select('.y.axis')
+              .attr("transform", "translate(" + y.positionAxis(rowNum, colNum) + ")")
+              .attr('opacity', 1)
+              .transition().call(y.axis);
+    // y.style(yax);
+    yax.attr('opacity', 1);
     if(y.label()){
       sel.select('.y.axis')
         .call(_.bind(y.axisLabel, y), y.axisLabel());
@@ -2582,10 +2620,11 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     };
   } )();
 
-
   var bars = sel.select('.plot')
                 .selectAll('rect.geom.g' + layerNum)
-                .data(data),
+                .data(data, function(d) {
+                  return d[s.aes[width.p]];
+                }),
       tt = ggd3.tooltip()
             .content(this.tooltip())
             .geom(this);
@@ -2599,11 +2638,11 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       .attr('value', function(d) { 
         return d[s.group] + "~" + d[s.aes[width.p]];
       })
+      .attr('fill', s.fill)
+      .attr('stroke', s.color)
+      .attr('stroke-width', that.lineWidth())
       .style({
-        fill: s.fill,
-        stroke: s.color,
         'fill-opacity': s.alpha,
-        'stroke-width': that.lineWidth()
       });
   }
 
@@ -2619,12 +2658,6 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     .attr(size.s, 0)
     .attr(size.p, function(d) {
       return n(0);
-    })
-    .style({
-      fill: s.fill,
-      stroke: s.color,
-      'fill-opacity': s.alpha,
-      'stroke-width': that.lineWidth()
     })
     .transition()
     .call(draw)
@@ -2654,7 +2687,8 @@ function Line(spec) {
     lineType: null,
     lineWidth: null,
     tension: 0.7,
-    freeColor: false, 
+    freeColor: false,
+    position: "append" 
   };
   // freeColor is confusing. Most global aesthetics should be 
   // that way. 
@@ -2706,6 +2740,7 @@ Line.prototype.generator = function(aes, x, y, o2, group) {
             });
   }
   return line
+          .defined(function(d, i) { return !isNaN(y(d[aes.y])); })
           .x(function(d, i) { return x(d[aes.x]); })
           .y(function(d, i) { return y(d[aes.y]); });
 };
@@ -2719,19 +2754,25 @@ Line.prototype.selector = function(layerNum) {
 };
 
 Line.prototype.drawLines = function (path, line, s, layerNum) {
-  var that = this;
+  var that = this, lt;
   if(!this.lineType()){
     this.lineType(s.plot.lineType());
+    lt = s.plot.lineType();
+  } else {
+    lt = this.lineType();
   }
+  var lw = d3.functor(this.lineWidth());
   path.attr("class", this.selector(layerNum))
     .attr('d', line)
-    .attr('stroke-dasharray', this.lineType());
+    .attr('stroke-dasharray', lt);
   if(!this.grid()){
     // grid style defined in css.
     path
       .attr('opacity', function(d) { return s.alpha(d[1]) ;})
       .attr('stroke', function(d) { return s.lcolor(d[1]);})
-      .attr('stroke-width', this.lineWidth())
+      .attr('stroke-width', function(d) {
+        return lw(d[1]);
+      })
       .attr('fill',  function(d) { 
         return s.gradient ? s.lcolor(d[1]): 'none';});
   }
@@ -2803,9 +2844,11 @@ Line.prototype.draw = function(sel, data, i, layerNum){
   sel = this.grid() ? sel.select("." + this.direction() + 'grid'): sel.select('.plot');
   var lines = sel
               .selectAll("." + this.selector(layerNum).replace(/ /g, '.'))
-              .data(data);
+              .data(data, function(d, i) {
+                return d[0][s.group] ? d[0][s.group]: i;
+              });
   lines.transition().call(_.bind(this.drawLines, this), line, s, layerNum);
-  lines.enter().insert(this.geom(), "*")
+  lines.enter()[this.position()](this.geom(), ".geom")
     .call(_.bind(this.drawLines, this), line, s, layerNum);
   lines.exit()
     .transition()
@@ -3197,7 +3240,6 @@ Area.prototype.generator = function(aes, x, y, o2, group, n) {
             });
   }
   area[dir](function(d, i) { 
-    console.log(dirScale()(d[aes[dir]]));
     return dirScale()(d[aes[dir]]); 
     });
   area[other + "0"](function(d, i) { 
@@ -3248,7 +3290,6 @@ Area.prototype.decorateScale = function(dir, s, sc, data) {
     };
   } else {
     // we're not going in that direction
-    console.log('no direction');
     return function() {
       return function(d) {
         return sc(d);
@@ -4047,7 +4088,9 @@ Point.prototype.draw = function(sel, data, i, layerNum, s) {
     // get rid of wrong elements if they exist.
     points = sel.select('.plot')
                 .selectAll('.geom.g' + layerNum + ".geom-" + this.name())
-                .data(data);
+                .data(_.filter(data, function(d) {
+                  return !isNaN(d[s.aes.x]) && !isNaN(d[s.aes.y]);
+                }));
   } else {
     points = sel.selectAll('.geom.g' + layerNum + ".geom-" + this.name())
                 .data(data);
@@ -4625,7 +4668,9 @@ function Stat(setting) {
   }
   this.exclude = ["xintercept", "yintercept", "slope",
   // maybe we do want to calculate mins and maxs
-    "ymax", "ymin", "xmax", "xmin"
+    "ymax", "ymin", "xmax", "xmin", 
+    // additional column info included in tooltip
+    'additional'
     ];
 
   this.attributes = attributes;

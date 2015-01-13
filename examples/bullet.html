@@ -101,7 +101,7 @@ d3.csv("../data/mtcars.csv", function(error, d) {
   var d2 = _.clone(d)
   areaData = d3.nest()
                     .key(function(d) { return d.cyl; })
-                    .key(function(d) { return d.gear; })
+                    // .key(function(d) { return d.gear; })
                     .rollup(function(d) {
                       var o = {},
                       arr = _.pluck(d, "mpg"),
@@ -119,6 +119,7 @@ d3.csv("../data/mtcars.csv", function(error, d) {
                     })
   chart.data(data);
   areaData = chart.unNest(areaData.entries(data));
+  console.log(areaData);
   area1.data(_.flatten(_.pluck(areaData, 'min')));
   area2.data(_.flatten(_.pluck(areaData, 'mean')));
   area3.data(_.flatten(_.pluck(areaData, 'max')));

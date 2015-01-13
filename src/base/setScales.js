@@ -173,6 +173,7 @@ function setDomain(data, layer) {
            !_.isUndefined(scale._userOpts.scale.domain)){
           domain = scale._userOpts.scale.domain;
         }else {
+          console.log('going this way!');
           domain = geom.domain(data.data, g);
         }
         if(!_.contains(linearScales, scale.type())){

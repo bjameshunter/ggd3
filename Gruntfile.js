@@ -35,6 +35,12 @@ module.exports = function(grunt){
         ],
         dest: "../v3_site/ggd3/assets/css/ggd3style.css"
       },
+      blog_css: {
+        src: [
+          "css/*.css"
+        ],
+        dest: "../../website/viz_plugin/static/css/ggd3style.css"
+      },
       test: {
         "plot": "test/plot.js"
       }
@@ -66,7 +72,8 @@ module.exports = function(grunt){
       all: {
         files: {
           "./<%= pkg.name%>.standalone.js": ["./browserified.js"],
-          "../v3_site/ggd3/assets/js/<%= pkg.name%>.standalone.js": ['./browserified.js']
+          "../v3_site/ggd3/assets/js/<%= pkg.name%>.standalone.js": ['./browserified.js'],
+          "../../website/viz_plugin/static/js/<%= pkg.name %>.standalone.js":['./browserified.js']
         },
         options: {
           browserifyOptions: {
@@ -77,7 +84,6 @@ module.exports = function(grunt){
           debug: true
         }
       }
-
     },
     watch: {
       scripts: {

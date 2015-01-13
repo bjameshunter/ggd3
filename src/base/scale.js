@@ -93,7 +93,7 @@ Scale.prototype.type = function(type) {
 };
 
 Scale.prototype.style = function(sel) {
-  var styles = ['text', 'style', 'tickFormat'],
+  var styles = ['text', 'style'],
       axis = this.opts().axis;
   _.each(styles, function(s) {
     if(axis.hasOwnProperty(s)){
@@ -194,13 +194,16 @@ Scale.prototype.axisLabel = function(o, l) {
       .attr('transform', tr)
       .each(function() {
         d3.select(this).select('p').text(l);
-      });
+      })
+      .select('body')
+      .style('position', 'inherit');
     label.enter().append('foreignObject')
       .attr('width', pd[this.aesthetic()])
       .attr('height', "23")
       .attr('transform', tr)
       .attr('class', 'label')
       .append('xhtml:body')
+      .style('position', 'inherit')
       .append('div')
       .append('p')
       .text(l);
