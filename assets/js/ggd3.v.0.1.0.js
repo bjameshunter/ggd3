@@ -14,7 +14,7 @@
   }
 ggd3.tools.arrayOfArrays = function(data) {
   // first level are all arrays
-  if(_.all(_.map(data, _.isPlainObject))) {
+  if(_.all(_.map(_.flatten(data, true), _.isPlainObject))) {
     // we shouldn't be here.
     return data;
   }
@@ -23,7 +23,7 @@ ggd3.tools.arrayOfArrays = function(data) {
   // second level
   var l2 = _.flatten(l1, true),
       l2obs = _.all(_.map(l2, _.isPlainObject));
-  if(l1arrays && l2obs) {console.log(l1); return l1; }
+  if(l1arrays && l2obs) { return l1; }
   return ggd3.tools.arrayOfArrays(l1);
 };
 function Clean(data, obj) {
@@ -134,11 +134,10 @@ function DataList(data) {
 }
 
 ggd3.tools.dateFormatter = function(v, format) {
-  if(format === "%Y") {
-    return new Date(v, 0, 0, 0);
-  } else {
-    return new Date(v);
+  if(format === "%Y" && !_.isDate(v)) {
+    return new Date(v, 0, 1, 0);
   }
+  return new Date(v);
 };
 ggd3.tools.defaultScaleSettings = function(dtype, aesthetic) {
   function xyScale() {
@@ -1062,6 +1061,7 @@ function Plot() {
 // ["alpha", "angle", "color", "fill", "group", "height", "label", "linetype", "lower", "order", "radius", "shape", "size", "slope", "width", "x", "xmax", "xmin", "xintercept", "y", "ymax", "ymin", "yintercept"] 
   this.attributes = attributes;
   this.gridsAdded = false;
+  this.timesCleaned = 0;
   // if the data method has been handed a new dataset, 
   // newData will be true, after the plot is drawn the
   // first time, newData is set to false
@@ -1235,6 +1235,7 @@ Plot.prototype.layers = function(layers) {
 Plot.prototype.dtypes = function(dtypes) {
   if(!arguments.length) { return this.attributes.dtypes; }
   this.attributes.dtypes = _.merge(this.attributes.dtypes, dtypes);
+  this.updateLayers();
   return this;
 };
 
@@ -1315,12 +1316,9 @@ Plot.prototype.setFixedScale = function(a) {
                   if(k === "single") { return undefined; }
                       return v.domain();
                     }, this) )));
-    console.log("compacting ordinal domain");
-    console.log(a);
     domain = _.filter(domain, function(d) {
       return !_.isUndefined(d) && !_.isNull(d);
     });
-    console.log(domain);
   }
   // scale.scale().domain(domain);
   return scale.domain(domain);
@@ -1330,12 +1328,6 @@ Plot.prototype.plotDim = function() {
   var margins = this.margins();
   return {x: this.width(),
    y: this.height()};
-  // if(this.facet().type() === "grid"){
-  //   return {x: this.width() - this.facet().margins().x, 
-  //     y: this.height() - this.facet().margins().y};
-  // }
-  // return {x: this.width() - margins.left - margins.right,
-  //  y: this.height() - margins.top - margins.bottom};
 };
 
 // subScale holds default settings, but
@@ -1433,7 +1425,7 @@ Plot.prototype.draw = function(sel) {
   if(this.yGrid()) { 
     this.hgrid
       .geom(ggd3.geoms.hline().grid(true)
-        .lineType(this.gridLineType()));
+      .lineType(this.gridLineType()));
     this.hgrid.compute(sel, 30);
     this.hgrid.draw(sel, 30);}
   if(this.xGrid()) { 
@@ -1552,7 +1544,7 @@ Scale.prototype.type = function(type) {
 };
 
 Scale.prototype.style = function(sel) {
-  var styles = ['text', 'style', 'tickFormat'],
+  var styles = ['text', 'style'],
       axis = this.opts().axis;
   _.each(styles, function(s) {
     if(axis.hasOwnProperty(s)){
@@ -1589,6 +1581,9 @@ Scale.prototype.range = function(range, rb) {
 
 Scale.prototype.domain = function(domain) {
   if(!arguments.length) { return this.attributes.domain; }
+  domain = _.filter(domain, function(d) {
+    return !_.isUndefined(d) && !_.isNull(d);
+  });
   if(this.type() ==="log"){
     if(!_.all(domain, function(d) { return d > 0;}) ){
       console.warn("domain must be greater than 0 for log scale." +
@@ -1600,15 +1595,15 @@ Scale.prototype.domain = function(domain) {
   }
   if(_.isNull(this.domain())){ 
     this.attributes.domain = domain; 
-  } else {
+    } else {
     var d = this.attributes.domain;
     if(_.contains(linearScales, this.type())){
       if(domain[0] < d[0]) { this.attributes.domain[0] = domain[0];}
       if(domain[1] > d[1]) { this.attributes.domain[1] = domain[1];}
-      // this.attributes.domain = ggd3.tools
-      //                           .numericDomain(this.attributes.domain);
+      this.attributes.domain = ggd3.tools
+                                .numericDomain(this.attributes.domain);
     } else {
-      // this.attributes.domain = _.unique(_.flatten([d, domain]));
+      this.attributes.domain = _.unique(_.flatten([d, domain]));
       this.attributes.domain = domain;
     }
   }
@@ -1650,13 +1645,16 @@ Scale.prototype.axisLabel = function(o, l) {
       .attr('transform', tr)
       .each(function() {
         d3.select(this).select('p').text(l);
-      });
+      })
+      .select('body')
+      .style('position', 'inherit');
     label.enter().append('foreignObject')
       .attr('width', pd[this.aesthetic()])
       .attr('height', "23")
       .attr('transform', tr)
       .attr('class', 'label')
       .append('xhtml:body')
+      .style('position', 'inherit')
       .append('div')
       .append('p')
       .text(l);
@@ -1870,6 +1868,9 @@ function setDomain(data, layer) {
           } else {
             domain = scale.domain();
           }
+          domain = _.filter(domain, function(d) {
+            return !_.isUndefined(d) && !_.isNull(d);
+          });
         }
         scale.domain(domain);
       } else {
@@ -1878,6 +1879,7 @@ function setDomain(data, layer) {
            !_.isUndefined(scale._userOpts.scale.domain)){
           domain = scale._userOpts.scale.domain;
         }else {
+          console.log('going this way!');
           domain = geom.domain(data.data, g);
         }
         if(!_.contains(linearScales, scale.type())){
@@ -2006,6 +2008,7 @@ function Geom(aes) {
     groups: null, 
     subRangeBand: 0,
     subRangePadding: 0,
+    omit: null,
   };
   var r = function(d) { return ggd3.tools.round(d, 2);};
   // default tooltip
@@ -2040,17 +2043,49 @@ Geom.prototype.defaultPosition = function() {
     "ribbon" : "identity",
     }[n];
 };
+Geom.prototype.abbrev = function(d, s, a, i){
+  if(a === 'additional'){ 
+    a = s.aes[a][i]; 
+  } else {
+    a = s.aes[a];
+  }
+  var dtype = s.dtypes[a],
+      format;
 
-Geom.prototype._otherAesthetics = function(sel, d, s, omit){
+  if(dtype[0]==='date'){
+    format = d3.time.format(dtype[2] || "%Y-%m-%d");
+    return format(d[a]);
+  }
+  else if(dtype[0] === 'number'){
+    format = d3.format(dtype[2] || ",");
+    return format(d[a]);
+  }
+  return d[a];
+};
+
+Geom.prototype._otherAesthetics = function(sel, d, s){
+  var omit = this.omit() || [];
   omit = _.flatten([omit, s.stat.exclude]);
+  // remove 'additional' from omit
+  omit.splice(omit.indexOf('additional'), 1);
+
   _.each(_.difference(_.keys(s.aes), omit), function(k) {
+    if(k === 'additional'){
+      _.each(s.aes[k], function(a, i) {
+        sel.append('h4')
+          .text(a + ": ")
+          .append('span').text(this.abbrev(d, s, k, i));
+      }, this);
+    } else {
     if(_.isNull(s.stat[k]) || _.isNull(s.stat[k]())){ return null; }
     var stat = s.stat[k]()._name || "identity";
     stat = _.contains(["identity", "first"], stat) ? "": " (" + stat + ")";
-    sel.append('h4')
-      .text(s.aes[k] + stat + ": ")
-      .append('span').text('(' + k + ') ' + d[s.aes[k]]);
-  });
+      sel.append('h4')
+        .text(s.aes[k] + stat + ": ")
+        .append('span').text('(' + k + ') ' + 
+                             this.abbrev(d, s, k));
+    }
+  }, this);
 };
 
 Geom.prototype.tooltip = function(obj, data) {
@@ -2073,6 +2108,7 @@ Geom.prototype.setup = function() {
   // sometimes a geom doesn't have a layer as in 
   // compound geoms - boxplot is box and point.
   if(s.layer){
+    s.grouped   = false;
     s.plot      = s.layer.plot();
     s.stat      = s.layer.stat();
     s.nest      = this.nest();
@@ -2208,17 +2244,22 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
   if(layerNum === 0 && drawX){
     var xax = sel.select('.x.axis')
               .attr("transform", "translate(" + x.positionAxis(rowNum, colNum) + ")")
-              .transition().call(x.axis);
+              .attr('opacity', 1)
+              .call(x.axis);
     x.style(xax);
+    xax.attr('opacity', 1);
     if(x.label()){
       sel.select('.x.axis')
         .call(_.bind(x.axisLabel, x), x.axisLabel());
     }
   }
   if(layerNum === 0 && drawY){
-    sel.select('.y.axis')
-      .attr("transform", "translate(" + y.positionAxis(rowNum, colNum) + ")")
-      .transition().call(y.axis);
+    var yax = sel.select('.y.axis')
+              .attr("transform", "translate(" + y.positionAxis(rowNum, colNum) + ")")
+              .attr('opacity', 1)
+              .transition().call(y.axis);
+    // y.style(yax);
+    yax.attr('opacity', 1);
     if(y.label()){
       sel.select('.y.axis')
         .call(_.bind(y.axisLabel, y), y.axisLabel());
@@ -2579,10 +2620,11 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     };
   } )();
 
-
   var bars = sel.select('.plot')
                 .selectAll('rect.geom.g' + layerNum)
-                .data(data),
+                .data(data, function(d) {
+                  return d[s.aes[width.p]];
+                }),
       tt = ggd3.tooltip()
             .content(this.tooltip())
             .geom(this);
@@ -2596,11 +2638,11 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       .attr('value', function(d) { 
         return d[s.group] + "~" + d[s.aes[width.p]];
       })
+      .attr('fill', s.fill)
+      .attr('stroke', s.color)
+      .attr('stroke-width', that.lineWidth())
       .style({
-        fill: s.fill,
-        stroke: s.color,
         'fill-opacity': s.alpha,
-        'stroke-width': that.lineWidth()
       });
   }
 
@@ -2616,12 +2658,6 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     .attr(size.s, 0)
     .attr(size.p, function(d) {
       return n(0);
-    })
-    .style({
-      fill: s.fill,
-      stroke: s.color,
-      'fill-opacity': s.alpha,
-      'stroke-width': that.lineWidth()
     })
     .transition()
     .call(draw)
@@ -2647,11 +2683,12 @@ function Line(spec) {
     stat: "identity",
     geom: "path",
     grid: false,
-    interpolate: 'basis',
+    interpolate: 'linear',
     lineType: null,
     lineWidth: null,
     tension: 0.7,
-    freeColor: false, 
+    freeColor: false,
+    position: "append" 
   };
   // freeColor is confusing. Most global aesthetics should be 
   // that way. 
@@ -2703,6 +2740,7 @@ Line.prototype.generator = function(aes, x, y, o2, group) {
             });
   }
   return line
+          .defined(function(d, i) { return !isNaN(y(d[aes.y])); })
           .x(function(d, i) { return x(d[aes.x]); })
           .y(function(d, i) { return y(d[aes.y]); });
 };
@@ -2716,19 +2754,25 @@ Line.prototype.selector = function(layerNum) {
 };
 
 Line.prototype.drawLines = function (path, line, s, layerNum) {
-  var that = this;
+  var that = this, lt;
   if(!this.lineType()){
     this.lineType(s.plot.lineType());
+    lt = s.plot.lineType();
+  } else {
+    lt = this.lineType();
   }
+  var lw = d3.functor(this.lineWidth());
   path.attr("class", this.selector(layerNum))
     .attr('d', line)
-    .attr('stroke-dasharray', this.lineType());
+    .attr('stroke-dasharray', lt);
   if(!this.grid()){
     // grid style defined in css.
     path
       .attr('opacity', function(d) { return s.alpha(d[1]) ;})
       .attr('stroke', function(d) { return s.lcolor(d[1]);})
-      .attr('stroke-width', this.lineWidth())
+      .attr('stroke-width', function(d) {
+        return lw(d[1]);
+      })
       .attr('fill',  function(d) { 
         return s.gradient ? s.lcolor(d[1]): 'none';});
   }
@@ -2737,13 +2781,14 @@ Line.prototype.drawLines = function (path, line, s, layerNum) {
 Line.prototype.prepareData = function(data, s) {
   data = s.nest
           .entries(data.data) ;
+  // array of grouped data with 1 or 2 group variables
   data = _.map(data, function(d) { return this.recurseNest(d);}, this);
+  data = ggd3.tools.arrayOfArrays(data);
   return _.isArray(data[0]) ? data: [data];
 };
 
 Line.prototype.draw = function(sel, data, i, layerNum){
   // console.log('first line of line.draw');
-  // console.log(data);
   var s      = this.setup(),
       scales = this.scalesAxes(sel, s, data.selector, layerNum,
                                  this.drawX(), this.drawY()),
@@ -2769,6 +2814,7 @@ Line.prototype.draw = function(sel, data, i, layerNum){
   var l1 = this.generator(s.aes, x, y, o2, s.group),
       selector = data.selector;
   data = this.prepareData(data, s, scales);
+  if(_.isEmpty(_.flatten(data))) { return data; }
   // overwriting the color function messes up tooltip labeling,
   // if needed.
   s.lcolor = s.color;
@@ -2798,14 +2844,17 @@ Line.prototype.draw = function(sel, data, i, layerNum){
   sel = this.grid() ? sel.select("." + this.direction() + 'grid'): sel.select('.plot');
   var lines = sel
               .selectAll("." + this.selector(layerNum).replace(/ /g, '.'))
-              .data(data);
+              .data(data, function(d, i) {
+                return d[0][s.group] ? d[0][s.group]: i;
+              });
   lines.transition().call(_.bind(this.drawLines, this), line, s, layerNum);
-  lines.enter().insert(this.geom(), "*")
+  lines.enter()[this.position()](this.geom(), ".geom")
     .call(_.bind(this.drawLines, this), line, s, layerNum);
   lines.exit()
     .transition()
     .style('opacity', 0)
     .remove();
+  return data;
 };
 // next four functions copied verbatim from http://bl.ocks.org/mbostock/4163057
 // used to add linear gradient to line.
@@ -3191,7 +3240,6 @@ Area.prototype.generator = function(aes, x, y, o2, group, n) {
             });
   }
   area[dir](function(d, i) { 
-    console.log(dirScale()(d[aes[dir]]));
     return dirScale()(d[aes[dir]]); 
     });
   area[other + "0"](function(d, i) { 
@@ -3211,14 +3259,14 @@ Area.prototype.decorateScale = function(dir, s, sc, data) {
     this.check(s.aes, dir);
     if(a) {
       return function(m) {
-        return function(d) { console.log(sc(s.aes[m]));return sc(s.aes[m]); };
+        return function(d) { return sc(s.aes[m]); };
       };
     }else {
       return function(m) {
         return function(d) { return sc(d[s.aes[dir]] + s.aes[m]);};
       };
     }
-  } else if(_.isFunction(s.aes.ymin)) {
+  } else if(_.isFunction(s.aes[dir + "min"])) {
     this.check(s.aes, dir);
     // is trusting the order a reliable thing to do?
     var minAgg = _.map(data, function(d) { 
@@ -3230,7 +3278,7 @@ Area.prototype.decorateScale = function(dir, s, sc, data) {
     return function(m, i) {
       return function(d) {
         var v = m === (dir + 'max') ? maxAgg[i]:minAgg[i];
-        return sc(d[s.aes.y] + v) ;};
+        return sc(d[s.aes[dir]] + v) ;};
     };
   } else if (_.isString(s.aes[dir + "min"])){
     this.check(s.aes, dir);
@@ -4040,7 +4088,9 @@ Point.prototype.draw = function(sel, data, i, layerNum, s) {
     // get rid of wrong elements if they exist.
     points = sel.select('.plot')
                 .selectAll('.geom.g' + layerNum + ".geom-" + this.name())
-                .data(data);
+                .data(_.filter(data, function(d) {
+                  return !isNaN(d[s.aes.x]) && !isNaN(d[s.aes.y]);
+                }));
   } else {
     points = sel.selectAll('.geom.g' + layerNum + ".geom-" + this.name())
                 .data(data);
@@ -4113,36 +4163,34 @@ Ribbon.prototype.generator = function(aes, x, y, o2, group, n) {
   var area = d3.svg.area()
                 .interpolate(this.interpolate());
 
-  if(x.hasOwnProperty('rangeBand')) {
-    return area
-            .x0(function(d, i) { 
-              return (x(d[aes.x]) + o2(d[group]) + 
-                            o2.rangeBand() * i); 
-            })
-            .x1(function(d, i) { 
-              return (x(d[aes.x]) + o2(d[group]) + 
-                            o2.rangeBand() * (i + 1)); 
-            })
-            .y0(function(d) { return y(d[aes.ymin]); })
-            .y1(function(d) { return y(d[aes.ymax]); });
-  }
-  if(y.hasOwnProperty('rangeBand')) {
-    return area
-            .x0(function(d) { return x(d[aes.xmax]); })
-            .x1(function(d) { return x(d[aes.xmin]); })
-            .y0(function(d, i) { 
-              return (y(d[aes.y]) + o2(d[group]) +
-                            o2.rangeBand()*i); 
-            })
-            .y1(function(d, i) { 
-              return (y(d[aes.y]) + o2(d[group]) +
-                            o2.rangeBand()*(i + 1)); 
-            });
-  }
   return area
           .x(function(d, i) { return x(d[aes.x]); })
-          .y0(function(d, i) { return y('ymin', n)(d); })
-          .y1(function(d, i) { return y('ymax', n)(d); });
+          .y0(function(d, i) { 
+            // console.log(y('min', n)(d));
+            return y('ymin', n)(d); })
+          .y1(function(d, i) { 
+            // console.log(y('max', n)(d));
+            return y('ymax', n)(d); });
+};
+Ribbon.prototype.drawRibbon = function(sel, data, i, layerNum, areaGen,
+                                       s) {
+  var ribbon = sel.select('.plot')
+              .selectAll(".g" + layerNum + "geom-" + this.name())
+              .data(data),
+      that = this;
+  ribbon.transition()
+    .each(function(d, i) {
+      Area.prototype.drawArea.call(that, d3.select(this), areaGen(i), s, layerNum, i);
+    });
+  // makes sense that all area/ribbons go first.
+  ribbon.enter().insert(this.geom(), ".geom.g0")
+    .each(function(d, i) {
+      Area.prototype.drawArea.call(that, d3.select(this), areaGen(i), s, layerNum, i);
+    });
+  ribbon.exit()
+    .transition()
+    .style('opacity', 0)
+    .remove();
 };
 
 // ribbon is always an operation on ymin, ymax, and x
@@ -4163,32 +4211,31 @@ Ribbon.prototype.draw = function(sel, data, i, layerNum) {
   var areaGen = function(n) {
     return that.generator(s.aes, x, y2, o2, s.group, n);
   };
-  var ribbon = sel.select('.plot')
-              .selectAll(".g" + layerNum + "geom-" + this.name())
-              .data(data);
-  ribbon.transition()
-    .each(function(d, i) {
-      that.drawArea(d3.select(this), areaGen(i), s, layerNum, i);
-    });
-  // makes sense that all area/ribbons go first.
-  ribbon.enter().insert(this.geom(), ".geom.g0")
-    .each(function(d, i) {
-      that.drawArea(d3.select(this), areaGen(i), s, layerNum);
-    });
-  ribbon.exit()
-    .transition()
-    .style('opacity', 0)
-    .remove();
+  this.drawRibbon(sel, data, i, layerNum, areaGen, s);
 };
 
 ggd3.geoms.ribbon = Ribbon;
 // 
+// find better way to give up if no line is to be drawn
+
 function Smooth(spec) {
-  Geom.apply(this);
+  if(!(this instanceof Smooth)){
+    return new Smooth(spec);
+  }
+  Line.apply(this);
   var attributes = {
     name: "smooth",
     stat: "identity",
     position: null,
+    method: "loess",
+    lineType: 'none',
+    sigma: {},
+    errorBand: true,
+    loessParams: {alpha: 1, lambda: 1, m: null},
+    dist: 1,
+    interpolate: 'basis',
+    strokeOpacity: 0.2,
+    ribbonAlpha: 0.2,
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -4200,9 +4247,194 @@ function Smooth(spec) {
   }
 }
 
+Smooth.prototype = new Line();
+
 Smooth.prototype.constructor = Smooth;
 
+Smooth.prototype.validate = function(data, s){
+  data = _.filter(data, function(d) {
+    var xvalid = _.isNumber(d[s.aes.x]) || _.isDate(d[s.aes.x]);
+    var yvalid = _.isNumber(d[s.aes.y]);
+    return xvalid && yvalid;
+  });
+  return data;
+};
+
+Smooth.prototype.loess = function(data, s) {
+
+  var params = _.clone(this.loessParams()),
+      aes = s.aes,
+      vs = [],
+      size = Math.floor(params.alpha * data.length),
+      bandWidth = Math.floor(data.length/params.m),
+      points = [];
+  data = _.sortBy(this.validate(data, s), function(d) {
+            return d[aes.x];
+          });
+  if(_.isNull(params.m)){ 
+    vs = data; 
+  } else {
+    // get equally spaced points
+    vs = _.map(_.range(params.m), function(d) {
+          return data[bandWidth*d];
+        });
+    vs.push(data[data.length-1]);
+  }
+  _.each(vs, function(d, i) {
+    var vindow,
+        pos = bandWidth * i,
+        mid = Math.floor(size / 2),
+        max, min;
+    if(params.alpha === 1) {
+      vindow = data;
+    } else if ((data.length - pos) < mid) {
+      vindow = data.slice(data.length - size, data.length);
+    } else if(pos > mid){
+      vindow = data.slice(pos - mid, pos);
+      vindow = _.flatten([vindow, data.slice(pos, pos + mid)]);
+    } else {
+      vindow = data.slice(0, size);
+    }
+    max = d3.max(_.pluck(vindow, aes.x));
+    min = d3.min(_.pluck(vindow, aes.x));
+    // Thanks Jason Davies. I'll have to learn better how this actually works.
+    // https://github.com/jasondavies/science.js/blob/master/src/stats/loess.js
+    // Also, see:
+    // http://en.wikipedia.org/wiki/Least_squares#Weighted_least_squares
+    var sumWeights = 0,
+        sumX = 0,
+        sumXSquared = 0,
+        sumY = 0,
+        sumXY = 0;
+
+    _.each(vindow, function(v) {
+      var xk   = v[aes.x],
+          yk   = v[aes.y],
+          dist = d3.max([Math.abs(max - d[aes.x]), Math.abs(d[aes.x] - min)]),
+          w = Math.pow(1 - Math.abs(Math.pow((v[aes.x] - d[aes.x])/dist, 3)),3),
+          xkw  = xk * w;
+      sumWeights += w;
+      sumX += xkw;
+      sumXSquared += xk * xkw;
+      sumY += yk * w;
+      sumXY += yk * xkw;      
+    });
+    var meanX = sumX / sumWeights,
+        meanY = sumY / sumWeights,
+        meanXY = sumXY / sumWeights,
+        meanXSquared = sumXSquared / sumWeights;
+
+    var beta = (Math.sqrt(Math.abs(meanXSquared - meanX * meanX)) < 1e-12)        ? 0 : ((meanXY - meanX * meanY) / (meanXSquared - meanX * meanX));
+
+    var alpha = meanY - beta * meanX,
+        out = _.clone(d);
+
+    out[aes.y] = alpha + beta*out[aes.x];
+    points.push(out);
+
+  }, this);
+  return points;
+};
+
+Smooth.prototype.lm = function(data, s, coef, weights) {
+
+  // both should be numbers
+  // need to make this work with dates, too.
+  data = this.validate(data, s);
+  var aes = s.aes,
+      o1, o2, sigma,
+      ts = false,
+      prod = d3.mean(_.map(data, function(d) {
+        return d[aes.x] * d[aes.y];
+      })),
+      x2 = d3.mean(_.map(data, function(d) {
+        return Math.pow(d[aes.x], 2);
+      })),
+      xbar = d3.mean(_.pluck(data, aes.x)), 
+      ybar = d3.mean(_.pluck(data, aes.y)),
+      m = (prod - xbar*ybar) / (x2 - Math.pow(xbar, 2)),
+      b = ybar - m*xbar;
+  if(coef) { return {m: m, b: b}; }
+  o1 = _.clone(_.min(data, aes.x));
+  o2 = _.clone(_.max(data, aes.x));
+  if(_.any([o1, o2], function(d) {
+    return !_.isPlainObject(d);}) ){ return [];}
+  o1[aes.y] = b + m * o1[aes.x];
+  o2[aes.y] = b + m * o2[aes.x];
+  sigma = Math.sqrt(d3.sum(data.map(function(d, i) {
+
+    return Math.pow((d[aes.x]*m + b) - 
+                    d[aes.y], 2);
+  }))/data.length);
+  o1._error_max = this.dist() * sigma;
+  o2._error_max = this.dist() * sigma;
+  o1._error_min = -this.dist() * sigma;
+  o2._error_min = -this.dist() * sigma;
+  return [o1, o2];
+};
+
+Smooth.prototype.prepareData = function(data, s) {
+  data = s.nest.entries(data.data);
+  data = ggd3.tools.arrayOfArrays(
+          _.map(data, function(d) { 
+            return this.recurseNest(d);}, this));
+  data = _.filter(data, function(d) {
+    return _.isPlainObject(d) || d.length >=2;
+  });
+  data = _.isArray(data[0]) ? data: [data];
+
+  data = _.map(data, function(d) {
+    return this[this.method()](d, s);
+  }, this);
+  return data;  
+};
+
+Smooth.prototype.draw = function(sel, data, i, layerNum) {
+  var selector = data.selector;
+  data = Line.prototype.draw.call(this, sel, data, i, layerNum);
+  console.log(data);
+  if(_.isEmpty(_.flatten(data))) { return data; }
+
+  if(!this.errorBand()){
+    return null;
+  }
+  var s = this.setup(),
+      scales = this.scalesAxes(sel, s, selector, layerNum,
+                                this.drawX(), this.drawY()),
+      x = scales.x.scale(),
+      y = scales.y.scale(),
+      y2,
+      o2 = function() { return 0; };
+      o2.rangeBand = function() { return 0;};
+      r = ggd3.geoms.ribbon()
+            .color(s.color)
+            .data([data]);
+
+  if(this.method() === "loess"){
+    return null;
+  } else if(this.method() === "lm"){
+    var dist = this.dist() * this.sigma(),
+        oldAlpha = this.alpha();
+    s.aes.ymin = "_error_min";
+    s.aes.ymax = "_error_max";
+    s.alpha = d3.functor(this.ribbonAlpha());
+    y2 = r.decorateScale('y', s, y, data);
+    var areaGen = function(n) {
+      return r.generator(s.aes, x, y2, o2, s.group, n);
+    };
+
+    r.drawRibbon.call(this.name('smooth-error'), sel, 
+                      data, i, layerNum, areaGen, s);
+    this.name('smooth')
+      .alpha(oldAlpha);
+
+  }
+
+};
+
 ggd3.geoms.smooth = Smooth;
+
+
 (function() {
   var _symbol = d3.svg.symbol(),
       _line = d3.svg.line();
@@ -4436,7 +4668,9 @@ function Stat(setting) {
   }
   this.exclude = ["xintercept", "yintercept", "slope",
   // maybe we do want to calculate mins and maxs
-    "ymax", "ymin", "xmax", "xmin"
+    "ymax", "ymin", "xmax", "xmin", 
+    // additional column info included in tooltip
+    'additional'
     ];
 
   this.attributes = attributes;
