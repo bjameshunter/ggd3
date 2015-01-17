@@ -2051,16 +2051,20 @@ Geom.prototype.abbrev = function(d, s, a, i){
   }
   var dtype = s.dtypes[a],
       format;
-
-  if(dtype[0]==='date'){
-    format = d3.time.format(dtype[2] || "%Y-%m-%d");
-    return format(d[a]);
+  if(dtype){
+    if(dtype[0]==='date'){
+      format = d3.time.format(dtype[2] || "%Y-%m-%d");
+      return format(d[a]);
+    }
+    else if(dtype[0] === 'number'){
+      format = d3.format(dtype[2] || ",.2fo");
+      return format(d[a]);
+    }
+    return d[a];
+  } else {
+    // this is a computed variable. ie "binHeight"
+    return d3.format(",.2f")(d[a]);
   }
-  else if(dtype[0] === 'number'){
-    format = d3.format(dtype[2] || ",");
-    return format(d[a]);
-  }
-  return d[a];
 };
 
 Geom.prototype._otherAesthetics = function(sel, d, s){
@@ -2086,6 +2090,10 @@ Geom.prototype._otherAesthetics = function(sel, d, s){
                              this.abbrev(d, s, k));
     }
   }, this);
+};
+
+Geom.prototype.data_matcher = function(d,i){
+  return i;
 };
 
 Geom.prototype.tooltip = function(obj, data) {
@@ -2306,14 +2314,14 @@ function Bar(spec) {
   if(!(this instanceof Geom)){
     return new Bar(spec);
   }
-  
+
   Geom.apply(this);
   var attributes = {
     name: "bar",
     stat: "count",
     geom: "rect",
     position: "dodge",
-    lineWidth: 1,
+    lineWidth: 0,
     offset: 'zero',
     groupRange: 0,
     stackRange: 0,
@@ -2534,12 +2542,19 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
                 .offset(that.offset())
                 .values(function(d) { 
                   return d.values; });
+  console.log(data);
   data = _.map(stack(data),
                           function(d) {
                             return d.values ? d.values: [];
                           });
+  console.log('after mapping stack to data');
+  console.log(data);
   data = _.flatten(data, 
                    that.name() === "histogram" ? true:false);
+  data = _.filter(data, function(d) {
+    var remove = !_.any([d[s.aes[width.p]], d[s.group]], _.isNull);
+    return remove;
+  });
   if(s.position === 'dodge' && this.name() === 'bar') {
     // make ordinal scale for group
     sub = d3.scale.ordinal()
@@ -2622,13 +2637,18 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
 
   var bars = sel.select('.plot')
                 .selectAll('rect.geom.g' + layerNum)
-                .data(data, function(d) {
-                  return d[s.aes[width.p]];
+                .data(data, function(d, i) {
+                  if(d[s.aes[width.p]]){
+                    return d[s.aes[width.p]] + d[s.group];
+                  } else {
+                    return i;
+                  }
                 }),
       tt = ggd3.tooltip()
             .content(this.tooltip())
             .geom(this);
-  // add canvas and svg functions.
+
+  
   function draw(rect) {
     rect.attr('class', 'geom g' + layerNum + ' geom-bar')
       .attr(size.s, calcSizeS)
@@ -2641,9 +2661,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       .attr('fill', s.fill)
       .attr('stroke', s.color)
       .attr('stroke-width', that.lineWidth())
-      .style({
-        'fill-opacity': s.alpha,
-      });
+      .attr('fill-opacity', s.alpha);
   }
 
   bars.transition().call(draw)
@@ -2660,15 +2678,16 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       return n(0);
     })
     .transition()
-    .call(draw)
-    .each(function(d) {
-      tt.tooltip(d3.select(this));
-    });
+    .call(draw);
+
 
   bars.exit()
     .transition()
     .style('opacity', 0)
     .remove();
+  bars.each(function(d) {
+      tt.tooltip(d3.select(this));
+    });
 };
 
 ggd3.geoms.bar = Bar;
@@ -2845,7 +2864,7 @@ Line.prototype.draw = function(sel, data, i, layerNum){
   var lines = sel
               .selectAll("." + this.selector(layerNum).replace(/ /g, '.'))
               .data(data, function(d, i) {
-                return d[0][s.group] ? d[0][s.group]: i;
+                return d[1][s.group] ? d[1][s.group]: i;
               });
   lines.transition().call(_.bind(this.drawLines, this), line, s, layerNum);
   lines.enter()[this.position()](this.geom(), ".geom")
@@ -3476,6 +3495,7 @@ function Boxplot(spec) {
     lower: 0.05,
     tail: null,
     outliers: true,
+    outlierColor: null,
     mean: false,
   };
 
@@ -3486,7 +3506,7 @@ function Boxplot(spec) {
         var el = d3.select(this);
         _.mapValues(d.quantiles, function(v, k) {
           el.append('h5')
-            .text(k + ": " + r(v));
+            .text(k + ": " + d3.format(',.2')(r(v)));
         });
     });
   }
@@ -3650,14 +3670,14 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
                 .content(that.tooltip())
                 .geom(that);
     rect.call(r.drawGeom, rx, ry, rw, rh, s, layerNum);
-    rect.enter().append('rect')
+    rect.enter().insert('rect', ".upper")
       .attr('class', 'quantile-box')
       .call(r.drawGeom, rx, ry, rw, rh, s, layerNum)
       .each(function(d) {
         tt.tooltip(d3.select(this));
       });
     if(that.outliers()) {
-      var p = ggd3.geoms.point();
+      var p = ggd3.geoms.point().color(d3.functor(this.outlierColor));
       s.x = px;
       s.y = py;
       p.draw(box, d.data, i, layerNum, s);
@@ -3665,7 +3685,7 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
   }
   var boxes = sel.select('.plot')
                 .selectAll('.geom g' + layerNum)
-                .data(data);
+                .data(data, this.data_matcher);
 
   boxes.each(function(d) {
     d3.select(this).call(_.bind(draw, this));
@@ -3929,6 +3949,7 @@ function Linerange(spec){
   Line.apply(this);
   var attributes = {
     lineType: "none",
+    position: 'insert',
     name: 'linerange',
   };
   this.attributes = _.merge(this.attributes, attributes);
@@ -3995,7 +4016,7 @@ function Path(spec) {
   var attributes = {
     name: "path",
     stat: "identity",
-    position: null,
+    position: 'append',
     interpolate: "linear",
     lineWidth: 1,
     tension: 1,
@@ -4124,7 +4145,7 @@ Point.prototype.drawGeom = function (point, x, y, s, layerNum) {
       r: s.size,
       fill: s.fill
     })
-    .style({
+    .attr({
       stroke: s.color,
       "stroke-width": 1,
       "fill-opacity": s.alpha
@@ -4226,7 +4247,7 @@ function Smooth(spec) {
   var attributes = {
     name: "smooth",
     stat: "identity",
-    position: null,
+    position: 'insert',
     method: "loess",
     lineType: 'none',
     sigma: {},

@@ -9,6 +9,12 @@ d3.csv("assets/data/iris.csv", function(error, iris) {
                     .aes({x: "Sepal.Width", fill: "Species",
                             color:'Species'})
                     .layers([proportionHist, gaussian])
+                    .dtypes({"Species": ['string', 'few'],
+                            "Sepal.Width": ['number', 'many', ',.2f'],
+                            "Sepal.Length": ['number', 'many', ',.2f'],
+                            "Petal.Width": ['number', 'many', ',.2f'],
+                            "Petal.Length": ['number', 'many', ',.2f'],
+                        })
                     .data(iris)
                     .width(600)
                     .height(350);
@@ -24,7 +30,9 @@ d3.csv("assets/data/mtcars.csv", function(error, cars) {
                     .layers([carLayer, jitterLayer])
                     .width(250)
                     .facet({x:'am', nrows: 1})
-                    .dtypes({"gear": ["string"], "cyl": ["string"]})
+                    .dtypes({"gear": ["string", 'few'], 
+                            "cyl": ["string", 'few']
+                        })
                     .data(cars)
                     .aes({x: "cyl", y: "mpg", fill: "gear", 
                          alpha: "hp"});

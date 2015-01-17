@@ -23,6 +23,7 @@ title: Bar with errors
 var div = d3.select('#chart01'),
     chart, data,
     lr = ggd3.layer().geom('linerange')
+          .position('append')
           .aes({xmin: function(d) {
                         return d.coef - 2*d.se;
                       },
