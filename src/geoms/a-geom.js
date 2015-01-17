@@ -62,16 +62,20 @@ Geom.prototype.abbrev = function(d, s, a, i){
   }
   var dtype = s.dtypes[a],
       format;
-
-  if(dtype[0]==='date'){
-    format = d3.time.format(dtype[2] || "%Y-%m-%d");
-    return format(d[a]);
+  if(dtype){
+    if(dtype[0]==='date'){
+      format = d3.time.format(dtype[2] || "%Y-%m-%d");
+      return format(d[a]);
+    }
+    else if(dtype[0] === 'number'){
+      format = d3.format(dtype[2] || ",.2fo");
+      return format(d[a]);
+    }
+    return d[a];
+  } else {
+    // this is a computed variable. ie "binHeight"
+    return d3.format(",.2f")(d[a]);
   }
-  else if(dtype[0] === 'number'){
-    format = d3.format(dtype[2] || ",");
-    return format(d[a]);
-  }
-  return d[a];
 };
 
 Geom.prototype._otherAesthetics = function(sel, d, s){
@@ -97,6 +101,10 @@ Geom.prototype._otherAesthetics = function(sel, d, s){
                              this.abbrev(d, s, k));
     }
   }, this);
+};
+
+Geom.prototype.data_matcher = function(d,i){
+  return i;
 };
 
 Geom.prototype.tooltip = function(obj, data) {

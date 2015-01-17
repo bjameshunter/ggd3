@@ -9,7 +9,7 @@ function Smooth(spec) {
   var attributes = {
     name: "smooth",
     stat: "identity",
-    position: null,
+    position: 'insert',
     method: "loess",
     lineType: 'none',
     sigma: {},

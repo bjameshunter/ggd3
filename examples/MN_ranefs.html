@@ -43,7 +43,9 @@ var div = d3.select('#chart01'),
                   return d.coef + 2*d.se;
                 }});
 
-var layers = [ggd3.layer().geom(ggd3.geoms.bar().color('none'))
+var layers = [ggd3.layer().geom(ggd3.geoms.bar()
+                                .lineWidth(0)
+                                .color('blue'))
                   .stat({x: 'identity'}), lr];
 
 var facet = ggd3.facet({x:'coefficient', ncols: 2, type:'grid'});

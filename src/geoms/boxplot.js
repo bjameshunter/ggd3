@@ -12,6 +12,7 @@ function Boxplot(spec) {
     lower: 0.05,
     tail: null,
     outliers: true,
+    outlierColor: null,
     mean: false,
   };
 
@@ -22,7 +23,7 @@ function Boxplot(spec) {
         var el = d3.select(this);
         _.mapValues(d.quantiles, function(v, k) {
           el.append('h5')
-            .text(k + ": " + r(v));
+            .text(k + ": " + d3.format(',.2')(r(v)));
         });
     });
   }
@@ -186,14 +187,14 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
                 .content(that.tooltip())
                 .geom(that);
     rect.call(r.drawGeom, rx, ry, rw, rh, s, layerNum);
-    rect.enter().append('rect')
+    rect.enter().insert('rect', ".upper")
       .attr('class', 'quantile-box')
       .call(r.drawGeom, rx, ry, rw, rh, s, layerNum)
       .each(function(d) {
         tt.tooltip(d3.select(this));
       });
     if(that.outliers()) {
-      var p = ggd3.geoms.point();
+      var p = ggd3.geoms.point().color(d3.functor(this.outlierColor));
       s.x = px;
       s.y = py;
       p.draw(box, d.data, i, layerNum, s);
@@ -201,7 +202,7 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
   }
   var boxes = sel.select('.plot')
                 .selectAll('.geom g' + layerNum)
-                .data(data);
+                .data(data, this.data_matcher);
 
   boxes.each(function(d) {
     d3.select(this).call(_.bind(draw, this));

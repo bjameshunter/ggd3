@@ -105,7 +105,7 @@ Point.prototype.drawGeom = function (point, x, y, s, layerNum) {
       r: s.size,
       fill: s.fill
     })
-    .style({
+    .attr({
       stroke: s.color,
       "stroke-width": 1,
       "fill-opacity": s.alpha

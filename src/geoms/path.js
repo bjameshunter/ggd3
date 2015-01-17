@@ -7,7 +7,7 @@ function Path(spec) {
   var attributes = {
     name: "path",
     stat: "identity",
-    position: null,
+    position: 'append',
     interpolate: "linear",
     lineWidth: 1,
     tension: 1,

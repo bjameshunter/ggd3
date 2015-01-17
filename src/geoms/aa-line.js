@@ -170,7 +170,7 @@ Line.prototype.draw = function(sel, data, i, layerNum){
   var lines = sel
               .selectAll("." + this.selector(layerNum).replace(/ /g, '.'))
               .data(data, function(d, i) {
-                return d[0][s.group] ? d[0][s.group]: i;
+                return d[1][s.group] ? d[1][s.group]: i;
               });
   lines.transition().call(_.bind(this.drawLines, this), line, s, layerNum);
   lines.enter()[this.position()](this.geom(), ".geom")

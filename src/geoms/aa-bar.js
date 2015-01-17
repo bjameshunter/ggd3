@@ -3,14 +3,14 @@ function Bar(spec) {
   if(!(this instanceof Geom)){
     return new Bar(spec);
   }
-  
+
   Geom.apply(this);
   var attributes = {
     name: "bar",
     stat: "count",
     geom: "rect",
     position: "dodge",
-    lineWidth: 1,
+    lineWidth: 0,
     offset: 'zero',
     groupRange: 0,
     stackRange: 0,
@@ -231,12 +231,19 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
                 .offset(that.offset())
                 .values(function(d) { 
                   return d.values; });
+  console.log(data);
   data = _.map(stack(data),
                           function(d) {
                             return d.values ? d.values: [];
                           });
+  console.log('after mapping stack to data');
+  console.log(data);
   data = _.flatten(data, 
                    that.name() === "histogram" ? true:false);
+  data = _.filter(data, function(d) {
+    var remove = !_.any([d[s.aes[width.p]], d[s.group]], _.isNull);
+    return remove;
+  });
   if(s.position === 'dodge' && this.name() === 'bar') {
     // make ordinal scale for group
     sub = d3.scale.ordinal()
@@ -319,13 +326,18 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
 
   var bars = sel.select('.plot')
                 .selectAll('rect.geom.g' + layerNum)
-                .data(data, function(d) {
-                  return d[s.aes[width.p]];
+                .data(data, function(d, i) {
+                  if(d[s.aes[width.p]]){
+                    return d[s.aes[width.p]] + d[s.group];
+                  } else {
+                    return i;
+                  }
                 }),
       tt = ggd3.tooltip()
             .content(this.tooltip())
             .geom(this);
-  // add canvas and svg functions.
+
+  
   function draw(rect) {
     rect.attr('class', 'geom g' + layerNum + ' geom-bar')
       .attr(size.s, calcSizeS)
@@ -338,9 +350,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       .attr('fill', s.fill)
       .attr('stroke', s.color)
       .attr('stroke-width', that.lineWidth())
-      .style({
-        'fill-opacity': s.alpha,
-      });
+      .attr('fill-opacity', s.alpha);
   }
 
   bars.transition().call(draw)
@@ -357,15 +367,16 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       return n(0);
     })
     .transition()
-    .call(draw)
-    .each(function(d) {
-      tt.tooltip(d3.select(this));
-    });
+    .call(draw);
+
 
   bars.exit()
     .transition()
     .style('opacity', 0)
     .remove();
+  bars.each(function(d) {
+      tt.tooltip(d3.select(this));
+    });
 };
 
 ggd3.geoms.bar = Bar;

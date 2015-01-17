@@ -38,8 +38,7 @@ function collectData(layer) {
 }
 var div = d3.select('#chart01'),
     chart, data;
-
-var layers = [ggd3.geoms.point().color('none'), 'smooth'];
+var layers = [ggd3.geoms.point().color('none'), "smooth"];
 
 var facet = ggd3.facet({x:'decade',  y:'team', scales: "free_y"});
 
@@ -64,7 +63,7 @@ var chart = ggd3.plot()
               .dtypes({"year": ['date', 'many', "%Y"],
                   "decade": ['string'],
                   "stint": ['string'],
-                  "batting": ["number", "many"]})
+                  "batting": ["number", "many", ".3f"]})
 
 d3.csv("../data/baseball.csv", function(error, d) {
   data = d;
