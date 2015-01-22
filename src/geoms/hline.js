@@ -7,6 +7,7 @@ function Hline(spec) {
   var attributes = {
     name: "hline",
     direction: "x",
+    highlightZero: true,
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -69,6 +70,9 @@ Hline.prototype.prepareData = function(data, s, scales) {
     } 
     // disregard data grab intercepts from axis and
     // create new dataset.
+    var close_to_zero = function(val) {
+      return Math.abs(val) < 1e-6 ? true: false;
+    };
     data = [];
     _.each(p, function(intercept) {
       var o1 = {}, o2 = {};
@@ -76,8 +80,12 @@ Hline.prototype.prepareData = function(data, s, scales) {
       o2[direction] = intercept;
       o1[other] = 0;
       o2[other] = s.dim[other];
+      if(_.contains(linearScales, scale.type()) && this.highlightZero()){
+        o1.zero = close_to_zero(scale.scale().invert(intercept));
+        o2.zero = close_to_zero(scale.scale().invert(intercept));
+      }
       data.push([o1, o2]);
-    });
+    }, this);
     return data;
   }
   if(_.isUndefined(s.aes[other + "intercept"])){

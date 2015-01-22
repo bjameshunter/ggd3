@@ -35,7 +35,8 @@ function collectData(layer) {
 
 var div = d3.select('#chart01'),
     chart, data,
-    lr = ggd3.layer().geom('linerange')
+    lr = ggd3.layer().geom(ggd3.geoms.linerange()
+                           .lineWidth(3))
           .aes({xmin: function(d) {
                         return d.coef - 2*d.se;
                       },

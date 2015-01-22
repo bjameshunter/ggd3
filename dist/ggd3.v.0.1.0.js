@@ -998,6 +998,7 @@ ggd3.layer = Layer;
 // 10. Intuitive way of ordering layers with g elements
 // 11. figure out scale label offsets and foreign object height
 // 12. Allow top x-axis labeling/annotation.
+// 13. Rename "_otherAesthetics" to something more intuitive.
 
 // for much later:
 // Zoom behaviors: fixed scales get global zoom on linear axes
@@ -1035,7 +1036,7 @@ function Plot() {
     subRangeBand: 0.1,
     subRangePadding: 0.1,
     rangeBand: 0.1,
-    rangePadding: 0.0,
+    rangePadding: 0.1,
     subDomain: null,
     alpha: d3.functor(0.7),
     fill: d3.functor('steelblue'),
@@ -1043,11 +1044,13 @@ function Plot() {
     size: d3.functor(3), 
     shape: d3.functor('circle'),
     lineType: d3.functor('2,2'),
-    lineWidth: 2,
+    lineWidth: d3.functor(2),
     xAdjust: false,
     yAdjust: false,
     xGrid: true,
     yGrid: true,
+    highlightXZero: true,
+    highlightYZero: true,
     gridLineType: "1,1",
     alphaRange: [0.1, 1],
     sizeRange: [3, 20],
@@ -1057,8 +1060,7 @@ function Plot() {
     opts: {},
     theme: "ggd3",
   };
-  // aesthetics I might like to support:
-// ["alpha", "angle", "color", "fill", "group", "height", "label", "linetype", "lower", "order", "radius", "shape", "size", "slope", "width", "x", "xmax", "xmin", "xintercept", "y", "ymax", "ymin", "yintercept"] 
+
   this.attributes = attributes;
   this.gridsAdded = false;
   this.timesCleaned = 0;
@@ -1086,7 +1088,8 @@ function Plot() {
     'rangeBand', 'rangePadding', 
     'subRangeBand', 'subRangePadding', 'subDomain',
     "alphaRange", "lineWidth",
-    "xGrid", "yGrid", "gridLineType"];
+    "xGrid", "yGrid", "gridLineType",
+    "highlightXZero", "highlightYZero"];
 
   for(var attr in attributes){
     if((!this[attr] && 
@@ -1425,13 +1428,15 @@ Plot.prototype.draw = function(sel) {
   if(this.yGrid()) { 
     this.hgrid
       .geom(ggd3.geoms.hline().grid(true)
-      .lineType(this.gridLineType()));
+        .lineType(this.gridLineType())
+        .highlightZero(this.highlightYZero()));
     this.hgrid.compute(sel, 30);
     this.hgrid.draw(sel, 30);}
   if(this.xGrid()) { 
     this.vgrid
       .geom(ggd3.geoms.vline().grid(true)
-        .lineType(this.gridLineType()));
+        .lineType(this.gridLineType())
+        .highlightZero(this.highlightXZero()));
     this.vgrid.compute(sel, 30);
     this.vgrid.draw(sel, 30);}
 };
@@ -1879,7 +1884,6 @@ function setDomain(data, layer) {
            !_.isUndefined(scale._userOpts.scale.domain)){
           domain = scale._userOpts.scale.domain;
         }else {
-          console.log('going this way!');
           domain = geom.domain(data.data, g);
         }
         if(!_.contains(linearScales, scale.type())){
@@ -2775,17 +2779,21 @@ Line.prototype.selector = function(layerNum) {
 Line.prototype.drawLines = function (path, line, s, layerNum) {
   var that = this, lt;
   if(!this.lineType()){
-    this.lineType(s.plot.lineType());
     lt = s.plot.lineType();
   } else {
-    lt = this.lineType();
+    if(this.grid()){
+      lt = function(d) {
+        return d[0].zero ? 'none':that.lineType()(d);
+      };
+    }else{
+      lt = this.lineType();
+    }
   }
   var lw = d3.functor(this.lineWidth());
   path.attr("class", this.selector(layerNum))
     .attr('d', line)
     .attr('stroke-dasharray', lt);
   if(!this.grid()){
-    // grid style defined in css.
     path
       .attr('opacity', function(d) { return s.alpha(d[1]) ;})
       .attr('stroke', function(d) { return s.lcolor(d[1]);})
@@ -2846,7 +2854,7 @@ Line.prototype.draw = function(sel, data, i, layerNum){
                 .range(s.plot.colorRange())
                 .domain(d3.extent(_.pluck(_.flatten(data), s.aes.color)));
       s.lcolor = function(d) { return color(d[s.aes.color]); };
-    }
+    } 
     data = _.map(data, function(d) { 
       return this.quad(this.sample(d, l1, x, y, s.color, s.aes ), 
                        s.aes); }, this);
@@ -2863,9 +2871,7 @@ Line.prototype.draw = function(sel, data, i, layerNum){
   sel = this.grid() ? sel.select("." + this.direction() + 'grid'): sel.select('.plot');
   var lines = sel
               .selectAll("." + this.selector(layerNum).replace(/ /g, '.'))
-              .data(data, function(d, i) {
-                return d[1][s.group] ? d[1][s.group]: i;
-              });
+              .data(data, this.data_matcher);
   lines.transition().call(_.bind(this.drawLines, this), line, s, layerNum);
   lines.enter()[this.position()](this.geom(), ".geom")
     .call(_.bind(this.drawLines, this), line, s, layerNum);
@@ -3829,6 +3835,7 @@ function Hline(spec) {
   var attributes = {
     name: "hline",
     direction: "x",
+    highlightZero: true,
   };
 
   this.attributes = _.merge(this.attributes, attributes);
@@ -3891,6 +3898,9 @@ Hline.prototype.prepareData = function(data, s, scales) {
     } 
     // disregard data grab intercepts from axis and
     // create new dataset.
+    var close_to_zero = function(val) {
+      return Math.abs(val) < 1e-6 ? true: false;
+    };
     data = [];
     _.each(p, function(intercept) {
       var o1 = {}, o2 = {};
@@ -3898,8 +3908,12 @@ Hline.prototype.prepareData = function(data, s, scales) {
       o2[direction] = intercept;
       o1[other] = 0;
       o2[other] = s.dim[other];
+      if(_.contains(linearScales, scale.type()) && this.highlightZero()){
+        o1.zero = close_to_zero(scale.scale().invert(intercept));
+        o2.zero = close_to_zero(scale.scale().invert(intercept));
+      }
       data.push([o1, o2]);
-    });
+    }, this);
     return data;
   }
   if(_.isUndefined(s.aes[other + "intercept"])){
@@ -4413,7 +4427,6 @@ Smooth.prototype.prepareData = function(data, s) {
 Smooth.prototype.draw = function(sel, data, i, layerNum) {
   var selector = data.selector;
   data = Line.prototype.draw.call(this, sel, data, i, layerNum);
-  console.log(data);
   if(_.isEmpty(_.flatten(data))) { return data; }
 
   if(!this.errorBand()){

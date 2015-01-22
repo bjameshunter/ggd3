@@ -175,7 +175,6 @@ Smooth.prototype.prepareData = function(data, s) {
 Smooth.prototype.draw = function(sel, data, i, layerNum) {
   var selector = data.selector;
   data = Line.prototype.draw.call(this, sel, data, i, layerNum);
-  console.log(data);
   if(_.isEmpty(_.flatten(data))) { return data; }
 
   if(!this.errorBand()){

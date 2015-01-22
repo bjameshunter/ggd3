@@ -81,17 +81,21 @@ Line.prototype.selector = function(layerNum) {
 Line.prototype.drawLines = function (path, line, s, layerNum) {
   var that = this, lt;
   if(!this.lineType()){
-    this.lineType(s.plot.lineType());
     lt = s.plot.lineType();
   } else {
-    lt = this.lineType();
+    if(this.grid()){
+      lt = function(d) {
+        return d[0].zero ? 'none':that.lineType()(d);
+      };
+    }else{
+      lt = this.lineType();
+    }
   }
   var lw = d3.functor(this.lineWidth());
   path.attr("class", this.selector(layerNum))
     .attr('d', line)
     .attr('stroke-dasharray', lt);
   if(!this.grid()){
-    // grid style defined in css.
     path
       .attr('opacity', function(d) { return s.alpha(d[1]) ;})
       .attr('stroke', function(d) { return s.lcolor(d[1]);})
@@ -152,7 +156,7 @@ Line.prototype.draw = function(sel, data, i, layerNum){
                 .range(s.plot.colorRange())
                 .domain(d3.extent(_.pluck(_.flatten(data), s.aes.color)));
       s.lcolor = function(d) { return color(d[s.aes.color]); };
-    }
+    } 
     data = _.map(data, function(d) { 
       return this.quad(this.sample(d, l1, x, y, s.color, s.aes ), 
                        s.aes); }, this);
@@ -169,9 +173,7 @@ Line.prototype.draw = function(sel, data, i, layerNum){
   sel = this.grid() ? sel.select("." + this.direction() + 'grid'): sel.select('.plot');
   var lines = sel
               .selectAll("." + this.selector(layerNum).replace(/ /g, '.'))
-              .data(data, function(d, i) {
-                return d[1][s.group] ? d[1][s.group]: i;
-              });
+              .data(data, this.data_matcher);
   lines.transition().call(_.bind(this.drawLines, this), line, s, layerNum);
   lines.enter()[this.position()](this.geom(), ".geom")
     .call(_.bind(this.drawLines, this), line, s, layerNum);

@@ -12,6 +12,7 @@
 // 10. Intuitive way of ordering layers with g elements
 // 11. figure out scale label offsets and foreign object height
 // 12. Allow top x-axis labeling/annotation.
+// 13. Rename "_otherAesthetics" to something more intuitive.
 
 // for much later:
 // Zoom behaviors: fixed scales get global zoom on linear axes
@@ -49,7 +50,7 @@ function Plot() {
     subRangeBand: 0.1,
     subRangePadding: 0.1,
     rangeBand: 0.1,
-    rangePadding: 0.0,
+    rangePadding: 0.1,
     subDomain: null,
     alpha: d3.functor(0.7),
     fill: d3.functor('steelblue'),
@@ -57,11 +58,13 @@ function Plot() {
     size: d3.functor(3), 
     shape: d3.functor('circle'),
     lineType: d3.functor('2,2'),
-    lineWidth: 2,
+    lineWidth: d3.functor(2),
     xAdjust: false,
     yAdjust: false,
     xGrid: true,
     yGrid: true,
+    highlightXZero: true,
+    highlightYZero: true,
     gridLineType: "1,1",
     alphaRange: [0.1, 1],
     sizeRange: [3, 20],
@@ -71,8 +74,7 @@ function Plot() {
     opts: {},
     theme: "ggd3",
   };
-  // aesthetics I might like to support:
-// ["alpha", "angle", "color", "fill", "group", "height", "label", "linetype", "lower", "order", "radius", "shape", "size", "slope", "width", "x", "xmax", "xmin", "xintercept", "y", "ymax", "ymin", "yintercept"] 
+
   this.attributes = attributes;
   this.gridsAdded = false;
   this.timesCleaned = 0;
@@ -100,7 +102,8 @@ function Plot() {
     'rangeBand', 'rangePadding', 
     'subRangeBand', 'subRangePadding', 'subDomain',
     "alphaRange", "lineWidth",
-    "xGrid", "yGrid", "gridLineType"];
+    "xGrid", "yGrid", "gridLineType",
+    "highlightXZero", "highlightYZero"];
 
   for(var attr in attributes){
     if((!this[attr] && 
@@ -439,13 +442,15 @@ Plot.prototype.draw = function(sel) {
   if(this.yGrid()) { 
     this.hgrid
       .geom(ggd3.geoms.hline().grid(true)
-      .lineType(this.gridLineType()));
+        .lineType(this.gridLineType())
+        .highlightZero(this.highlightYZero()));
     this.hgrid.compute(sel, 30);
     this.hgrid.draw(sel, 30);}
   if(this.xGrid()) { 
     this.vgrid
       .geom(ggd3.geoms.vline().grid(true)
-        .lineType(this.gridLineType()));
+        .lineType(this.gridLineType())
+        .highlightZero(this.highlightXZero()));
     this.vgrid.compute(sel, 30);
     this.vgrid.draw(sel, 30);}
 };
