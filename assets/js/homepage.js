@@ -5,9 +5,12 @@ d3.csv("assets/data/iris.csv", function(error, iris) {
     proportionHist = ggd3.geoms.histogram().frequency(false);
     irisHistogram = ggd3.plot()
                     .facet({titleSize: [0,0]})
-                    .margins({left: 50})
+                    .margins({left: 40, bottom: 50})
                     .aes({x: "Sepal.Width", fill: "Species",
                             color:'Species'})
+                    .yScale({axis:{ticks: 4},
+                                offset:50, label:''})
+                    .xScale({axis:{ticks:5}, offset:20})
                     .layers([proportionHist, gaussian])
                     .dtypes({"Species": ['string', 'few'],
                             "Sepal.Width": ['number', 'many', ',.2f'],

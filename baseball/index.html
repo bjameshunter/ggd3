@@ -21,7 +21,7 @@ var layers = ggd3.layer()
                 .position('stack')
                 .stat({x:'mean', alpha: 'max'});
 
-var facet = ggd3.facet().titleSize([0,0]);
+var facet = ggd3.facet({titleSize:[0,0], vShift:40});
 
 var chart = ggd3.plot()
               .facet(facet)

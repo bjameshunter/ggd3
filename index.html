@@ -172,14 +172,20 @@
 gaussian = ggd3.geoms.density().kernel('gaussianKernel');
 proportionHist = ggd3.geoms.histogram().frequency(false);
 irisHistogram = ggd3.plot()
-                // all plots come with a 20px high title 
-                // bar and 20px wide
-                // y-title if needed. Setting both to zero.
                 .facet({titleSize: [0,0]})
-                .margins({left: 50})
+                .margins({left: 40, bottom: 50})
                 .aes({x: "Sepal.Width", fill: "Species",
                         color:'Species'})
+                .yScale({axis:{ticks: 4},
+                            offset:50, label:''})
+                .xScale({axis:{ticks:5}, offset:20})
                 .layers([proportionHist, gaussian])
+                .dtypes({"Species": ['string', 'few'],
+                        "Sepal.Width": ['number', 'many', ',.2f'],
+                        "Sepal.Length": ['number', 'many', ',.2f'],
+                        "Petal.Width": ['number', 'many', ',.2f'],
+                        "Petal.Length": ['number', 'many', ',.2f'],
+                    })
                 .data(iris)
                 .width(600)
                 .height(350);
@@ -193,7 +199,9 @@ irisHistogram.draw(d3.select('#iris'));
                 <div class="code-block">
                     <pre><code class="language-javascript">
 irisHistogram.layers()[0].position('dodge');
-irisHistogram.yScale(null) // reset yscale for resolution
+irisHistogram.yScale(null) // reset to retrain yscale
+irisHistogram.yScale({axis:{ticks: 4},
+                            offset:50, label:''});
 irisHistogram.draw(d3.select('#iris')); 
                     </code></pre>
                 </div>                           
