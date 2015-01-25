@@ -51,10 +51,10 @@ var chart = ggd3.plot()
                       orient: 'left'}})
               .xScale({axis:{position:'bottom',
                       orient: 'bottom'}})
-              .fillScale({type:'category20b'})
+              // .fillScale({type:'category20b'})
               .margins({right: 10, left:45, top:20, bottom:50})
               .color('none')
-              .aes({y:'educ'})
+              .aes({y:'educ', x: "n. observations"})
 
 d3.csv("../data/wells.csv", function(error, d) {
   data = d;

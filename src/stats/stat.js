@@ -8,9 +8,11 @@
 // In this sense, jitter goes here as well. But it probably won't.
 
 function Stat(setting) {
+
   if(!(this instanceof Stat)){
     return new Stat(setting);
   }
+
   var attributes = {
     layer: null,
     linearAgg: null,
@@ -22,8 +24,8 @@ function Stat(setting) {
     size: null,
     shape: null,
     label: null,
-    yint: null, 
-  }; 
+  };
+
   if(_.isPlainObject(setting)) {
     for(var a in setting){
       if(_.isFunction(setting[a])){
@@ -32,7 +34,7 @@ function Stat(setting) {
         attributes[a] = this[setting[a]];
       }
     }
-  } else if(_.isString(setting)){
+  } else if(_.isString(setting)) {
     attributes.linearAgg = setting;
   }
   this.exclude = ["xintercept", "yintercept", "slope",
@@ -125,12 +127,15 @@ Stat.prototype.group = aggSetter('group');
 Stat.prototype.alpha = aggSetter('alpha');
 Stat.prototype.size = aggSetter('size');
 Stat.prototype.size = aggSetter('size');
+
+// label should always be the same each element of array
 Stat.prototype.label = function() {
   return function(arr) {
     return arr[0];
   };
 };
 Stat.prototype.label._name = "label";
+
 Stat.prototype.unique = function(arr) {
   return _.unique(arr);
 };  
@@ -141,6 +146,7 @@ Stat.prototype.range = function(arr) {
 };
 Stat.prototype.range._name = "range";
 
+// median
 Stat.prototype.median = function(arr) {
   if(arr.length > 100000) { 
     console.warn("Default behavior of returning median overridden " + 
@@ -151,26 +157,32 @@ Stat.prototype.median = function(arr) {
   return d3.median(arr);
 };
 Stat.prototype.median._name = "median";
+
+// count
 Stat.prototype.count = function(arr) {
   return arr.length;
 };
 Stat.prototype.count._name = "count";
 
+// min
 Stat.prototype.min = function(arr) {
   return d3.min(arr);
 };
 Stat.prototype.min._name = "min";
 
+// max
 Stat.prototype.max = function(arr) {
   return d3.max(arr);
 };
 Stat.prototype.max._name = "max";
 
+// mean
 Stat.prototype.mean = function(arr) {
   return d3.mean(arr);
 };
 Stat.prototype.mean._name = "mean";
 
+// iqr
 Stat.prototype.iqr = function(arr) {
   // arr = _.sortBy(arr);
   return {"75th percentile": d3.quantile(arr, 0.75),

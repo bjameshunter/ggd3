@@ -47,6 +47,26 @@ Histogram.prototype = new Bar();
   
 Histogram.prototype.constructor = Histogram;
 
+// can't get histogram to match by relevent variables
+Histogram.prototype.data_matcher = function(matches){
+  return function(d, i) {
+    // if(matches.length){
+    //   // console.log(d[0]);
+    //   return _.map(matches, function(m) {
+    //     if(d.length > 0){
+    //       // match from first element in bin array
+    //       return d[0][m];
+    //     }else {
+    //       // no elements in this bin, skip
+    //       return i;
+    //     }
+    //   }).join(' ');
+    // } else {
+      return i;
+    // }
+  };
+};
+
 Histogram.prototype.domain = function(data, v) {
   var s = this.setup(),
       group, stackby,

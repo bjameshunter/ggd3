@@ -28,11 +28,13 @@ function Layer(aes) {
   }
   return this;
 }
+
 Layer.prototype.plot = function(plot) {
   if(!arguments.length) { return this.attributes.plot; }
   this.attributes.plot = plot;
   return this;
 };
+
 Layer.prototype.position = function(position){
   if(!arguments.length) { return this.attributes.position; }
   if(this.geom()){
@@ -41,11 +43,13 @@ Layer.prototype.position = function(position){
   this.attributes.position = position;
   return this;
 };
+
 Layer.prototype.updateGeom = function() {
   if(this.geom()) {
     this.geom().layer(this);
   }
 };
+
 Layer.prototype.aes = function(aes) {
   if(!arguments.length) { return this.attributes.aes; }
   this.attributes.aes = _.merge(this.attributes.aes, aes);
@@ -64,6 +68,7 @@ Layer.prototype.geom = function(geom) {
     this.stat(geom.stat());
   }
   if(!this.position()){
+    // geoms have a default position
     this.position(geom.position());
   }
   return this;
@@ -72,6 +77,7 @@ Layer.prototype.geom = function(geom) {
 Layer.prototype.stat = function(obj) {
   if(!arguments.length) { return this.attributes.stat; }
   var stat;
+  // the "stats" object concept is falling pretty flat.
   if(obj instanceof ggd3.stats){
     stat = obj;
   } else {

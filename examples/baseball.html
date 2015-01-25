@@ -45,7 +45,8 @@ var layers = ggd3.layer()
                 .position('stack')
                 .stat({x:'mean', alpha: 'max'});
 
-var facet = ggd3.facet().titleSize([0,0]);
+var facet = ggd3.facet({titleSize:[0,0], vShift:40})
+
 
 var chart = ggd3.plot()
               .facet(facet)
@@ -58,7 +59,7 @@ var chart = ggd3.plot()
               .layers(layers)
               .yGrid(false)
               .xGrid(false)
-              .margins({right: 50, top:60})
+              .margins({right: 50, top:0})
               .xScale({axis: {ticks:4, position: 'top',
                               orient:'top'},
                               offset:45})

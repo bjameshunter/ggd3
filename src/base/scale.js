@@ -211,42 +211,19 @@ Scale.prototype.axisLabel = function(o, l) {
 };
 
 Scale.prototype.positionAxis = function(rowNum, colNum) {
-  var margins = this.plot().margins(),
-      dim = this.plot().plotDim(),
-      aes = this.aesthetic(),
-      opts = this.opts().axis, 
-      facet = this.plot().facet(),
-      grid = this.plot().facet().type() === "grid",
-      ts = this.plot().facet().titleSize(),
-      y, x;
-  if(aes === "x"){
-    if(grid){ 
-      x = colNum === 0 ? margins.left: facet.margins().x;
-    } else {
-      x = margins.left;
-    }
-    if(opts.position === "bottom"){
-      if(grid){
-        y = dim.y + facet.margins().y;
-      } else {
-        y = dim.y;
-      }
-    }
-    if(opts.position === "top"){
-      y = 0;
+  var facetDims = this.plot().facet().svgDims(rowNum, colNum),
+      x = facetDims.px,
+      y = facetDims.py;
+  if(this.aesthetic() === "x"){
+    if(this.opts().axis.position === "bottom"){
+      y += facetDims.plotY;
+    } else if(this.opts().axis.orient === "top"){
+      
     }
   }
-  if(aes === "y") {
-    if(grid){
-      y = rowNum === 0 ? 0: facet.margins().y;
-    } else {
-      y = 0;
-    }
-    if(opts.position === "left"){
-      x = margins.left;
-    }
-    if(opts.position === "right"){
-      x = margins.left + dim.x;
+  if(this.aesthetic() === "y"){
+    if(this.opts().axis.position === "right"){
+      x += facetDims.plotX;
     }
   }
   return [x, y];

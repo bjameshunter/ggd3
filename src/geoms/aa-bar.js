@@ -166,9 +166,6 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
   // scales are drawn by now. return if no data.
   if(!data.data.length){ return false; }
 
-  data = data.data;
-
-
   // prep scales for vertical or horizontal use.
   // "o" is ordinal, "n" is numeric
   // width refers to scale defining rangeband of bars
@@ -189,9 +186,9 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     size = {s: "width", p:'x'};
     width = {s:"height", p: 'y'};
   }
-  s.groups = _.unique(_.pluck(data, s.group));
+  s.groups = _.unique(_.pluck(data.data, s.group));
 
-  data = this.unNest(data);
+  data = this.unNest(data.data);
   // data must be nested to go into stack algorithm
   if(s.group){
     data = d3.nest().key(function(d) { return d[s.group];})
@@ -231,19 +228,19 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
                 .offset(that.offset())
                 .values(function(d) { 
                   return d.values; });
-  console.log(data);
   data = _.map(stack(data),
                           function(d) {
                             return d.values ? d.values: [];
                           });
-  console.log('after mapping stack to data');
-  console.log(data);
   data = _.flatten(data, 
                    that.name() === "histogram" ? true:false);
+
   data = _.filter(data, function(d) {
-    var remove = !_.any([d[s.aes[width.p]], d[s.group]], _.isNull);
-    return remove;
+    var isnull = _.any([d[s.aes[width.p]], d[s.group]], _.isNull),
+        undef = _.any([d[s.aes[width.p]], d[s.group]], _.isUndefined);
+    return !(isnull || undef);
   });
+
   if(s.position === 'dodge' && this.name() === 'bar') {
     // make ordinal scale for group
     sub = d3.scale.ordinal()
@@ -324,20 +321,15 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     };
   } )();
 
+  var matched = this.merge_variables(_.keys(data[0]));
+  var data_matcher = _.bind(this.data_matcher(matched), this);
   var bars = sel.select('.plot')
                 .selectAll('rect.geom.g' + layerNum)
-                .data(data, function(d, i) {
-                  if(d[s.aes[width.p]]){
-                    return d[s.aes[width.p]] + d[s.group];
-                  } else {
-                    return i;
-                  }
-                }),
+                .data(data, data_matcher),
       tt = ggd3.tooltip()
             .content(this.tooltip())
             .geom(this);
 
-  
   function draw(rect) {
     rect.attr('class', 'geom g' + layerNum + ' geom-bar')
       .attr(size.s, calcSizeS)
@@ -368,7 +360,6 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     })
     .transition()
     .call(draw);
-
 
   bars.exit()
     .transition()

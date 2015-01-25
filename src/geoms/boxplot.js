@@ -200,9 +200,14 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
       p.draw(box, d.data, i, layerNum, s);
     }
   }
+  var matched = _.intersection(_.keys(data[0]), 
+                               _.filter(_.keys(s.dtypes), function(d) {
+                                 return s.dtypes[d][1] === 'few';
+                               }));
+  var data_matcher = _.bind(this.data_matcher(matched), this);
   var boxes = sel.select('.plot')
                 .selectAll('.geom g' + layerNum)
-                .data(data, this.data_matcher);
+                .data(data, data_matcher);
 
   boxes.each(function(d) {
     d3.select(this).call(_.bind(draw, this));

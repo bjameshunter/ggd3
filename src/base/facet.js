@@ -12,13 +12,16 @@ function Facet(spec) {
     plot: null, 
     nrows: null,
     ncols: null,
-    // if we're doing grid facets, do y labels go left or right?
     margins: {x: 5, y:5}, 
     titleSize: [20, 20],
     textAnchorX: "middle",
     textAnchorY: "middle",
     // function to label facets.
     labels: null,
+    // manual vertical shift downward of every facet
+    // in case you want top-oriented top-position x-axis
+    // maybe should be on plot object.
+    vShift: 0, 
     // inherit from plot, but allow override
     // if scales are fixed, much smaller margins
     // because scales won't be drawn for inner plots.
@@ -44,25 +47,25 @@ Facet.prototype.updateFacet = function(sel) {
   var that = this,
       data = this.plot().data(),
       nrows, ncols;
-  that.xFacets = ["single"];
-  that.yFacets = ["single"];
+  this.xFacets = ["single"];
+  this.yFacets = ["single"];
   // rules of faceting:
   // specify either x and y or an x or y with nrows or ncols
-  if( that.x() ) {
+  if( this.x() ) {
     // x is always first nest
-    that.xFacets = _.unique(_.map(data, function(d) {
+    this.xFacets = _.unique(_.map(data, function(d) {
       return d.key;
     }));
   }
-  if( that.y() ){
+  if( this.y() ){
     // if facet.y is specified, it might be the first or
     // second nest
-    if(!that.x() ){
-      that.yFacets = _.unique(_.map(data, function(d) {
+    if(!this.x() ){
+      this.yFacets = _.unique(_.map(data, function(d) {
         return d.key;
       }));
     } else {
-      that.yFacets = _.unique(
+      this.yFacets = _.unique(
                       _.flatten(
                         _.map(
                           data, function(d) {
@@ -76,62 +79,63 @@ Facet.prototype.updateFacet = function(sel) {
     }
   }
 
-  that.nFacets = that.xFacets.length * that.yFacets.length;
+  this.nFacets = this.xFacets.length * this.yFacets.length;
 
-  if( that.scales() !== "fixed" && that.type()==="grid"){
+  if( this.scales() !== "fixed" && this.type()==="grid"){
     throw ("facet type of 'grid' requires fixed scales." + 
-            " You have facet scales set to: " + that.scales());
+            " You have facet scales set to: " + this.scales());
   }
   // if only x or y is set, user should input # rows or columns
-  if( ( that.x() && that.y() ) && 
-     ( that.ncols() || that.nrows() ) ){
+  if( ( this.x() && this.y() ) && 
+     ( this.ncols() || this.nrows() ) ){
     throw ('specifying x and y facets with ncols or nrows' +
                   " is not supported");
   }
-  if( that.ncols() && that.nrows() ){
+  if( this.ncols() && this.nrows() ){
     throw ("specify only one of ncols or nrows");
   }
-  if( (that.x() && !that.y()) || (that.y() && !that.x()) ){
-    if(!that.ncols() && !that.nrows()){
+  if( (this.x() && !this.y()) || (this.y() && !this.x()) ){
+    if(!this.ncols() && !this.nrows()){
       throw("specify one of ncols or nrows if setting only" +
             " one of facet.x() or facet.y()");
     }
-    if(that.nrows() && !that.ncols()) {
-      that._ncols = Math.ceil(that.nFacets/that.nrows()); 
-      that._nrows = that.nrows();
+    if(this.nrows() && !this.ncols()) {
+      this._ncols = Math.ceil(this.nFacets/this.nrows()); 
+      this._nrows = this.nrows();
     }
-    if(that.ncols() && !that.nrows()) {
-      that._nrows = Math.ceil(that.nFacets/that.ncols());
-      that._ncols = that.ncols();
+    if(this.ncols() && !this.nrows()) {
+      this._nrows = Math.ceil(this.nFacets/this.ncols());
+      this._ncols = this.ncols();
     }
   }
-  if(!that.ncols() && !that.nrows() ) {
-    that._nrows = that.yFacets.length;
-    that._ncols = that.xFacets.length;
+  if(!this.ncols() && !this.nrows() ) {
+    this._nrows = this.yFacets.length;
+    this._ncols = this.xFacets.length;
   }
 
   var rows = sel.selectAll('div.row')
-              .data(_.range(that._nrows));
+              .data(_.range(this._nrows));
   rows
     .attr('id', function(d) { return "row-" + d; })
     .each(function(d, i) {
-      that.makeDIV(d3.select(this), d, that._ncols);
+      that.makeDIV(d3.select(this), d);
     });
-
   rows.enter()
     .append('div')
     .attr('class', 'row')
     .attr('id', function(d) { return "row-" + d; })
     .each(function(d, i) {
-      that.makeDIV(d3.select(this), d, that._ncols);
+      that.makeDIV(d3.select(this), d);
     });
   rows.exit().remove();
 };
 
-Facet.prototype.makeDIV = function(selection, rowNum, ncols) {
-  var remainder = this.nFacets % ncols,
+// makes appropriate number of divs required by the row.
+Facet.prototype.makeDIV = function(sel, rowNum) {
+  var ncols = this._ncols,
+      remainder = this.nFacets % ncols,
       that = this;
-  row = selection.selectAll('div.plot-div')
+  row = sel.selectAll('div.plot-div')
            .data(_.range((this.nFacets - this.nSVGs) > remainder ? 
                  ncols: remainder));
   row
@@ -150,24 +154,70 @@ Facet.prototype.makeDIV = function(selection, rowNum, ncols) {
   row.exit().remove();
 };
 
+// makes SVG and calls makeTitle, makeCell and makeClip
+Facet.prototype.makeSVG = function(sel, rowNum, colNum) {
+  var that = this,
+      plot = this.plot(),
+      x = sel.data()[0], 
+      dim = this.svgDims(rowNum, colNum),
+      svg = sel.attr('id', function(d) {
+                return that.id(d, rowNum);
+               })
+              .selectAll('svg.svg-wrap')
+              .data([0]);
+
+  svg
+    .attr('width', dim.x)
+    .attr('height', dim.y)
+    .each(function(d) {
+      that.makeTitle(d3.select(this), colNum, rowNum);
+      var sel = d3.select(this).select('.plot-svg');
+      sel.attr({col: colNum, row: rowNum});
+      that.makeCell(sel, x, rowNum, that._ncols);
+      that.makeClip(sel, x, rowNum);
+    });
+  svg.enter().append('svg')
+    .attr('class', 'svg-wrap')
+    .attr('width', dim.x)
+    .attr('height', dim.y)
+    .each(function(d) {
+      that.makeTitle(d3.select(this), colNum, rowNum);
+      var sel = d3.select(this).selectAll('.plot-svg')
+                  .data([0]);
+      sel
+        .attr({col: colNum, row: rowNum});
+      sel.enter().append('svg')
+        .attr({col: colNum, row: rowNum})
+        .attr('class', 'plot-svg');
+      that.makeCell(sel, x, rowNum, that._ncols);
+      that.makeClip(sel, x, rowNum);
+    });
+  svg.exit().remove();
+  that.nSVGs += 1;
+};
+
+/* 
+  decides how big the svg-wrap needs to be based on 
+  rowNum and colNum. Grid style facet only needs additional 
+  room on the left most column and bottom most row.
+  Wrap style facets need each to be the same size.
+*/
 Facet.prototype.svgDims = function(rowNum, colNum) {
   var pd = this.plot().plotDim(),
       m = this.plot().margins(),
       fm = this.margins(),
+      vShift = this.vShift(),
       dim = {
         // outer svg width and height
         x: pd.x,
         y: pd.y,
         // facet title shift left and down
-        fty: 0,
         ftx: 0,
-        // plot-svg shifts
-        psvgx: 0,
-        psvgy: 0,
+        fty: 0,
         // plot g elements shifts left and down
         px: 0,
         py: 0,
-        // plot dimensions - straight from ggd3.plot()[width|height]()...
+        // plot dimensions - straight from ggd3.plot()[width|height]()
         plotX: pd.x,
         plotY: pd.y,
       }, 
@@ -184,68 +234,27 @@ Facet.prototype.svgDims = function(rowNum, colNum) {
       dim.x += ts[1] + m.right + fm.x;
     }
     if(rowNum === 0){
-      dim.y += ts[0];
-      dim.psvgy += ts[0];
-      dim.fty += ts[0];
+      // if titleSize[0] is zero, give a little room
+      // for the y-axis to be visible.
+      dim.y += (ts[0] + vShift) || 10;
+      dim.py += (ts[0] + vShift) || 10;
+      dim.fty += (ts[0] + vShift) || 10;
     } else {
-      dim.y += fm.y;
-      dim.py += fm.y;
-      dim.fty += fm.y;
+      dim.y += fm.y + vShift;
+      dim.py += fm.y + vShift;
+      dim.fty += fm.y + vShift;
     }
     if(rowNum === (this._nrows - 1)){
-      dim.y += m.bottom + fm.y; 
+      dim.y += m.bottom + fm.y + vShift; 
     }
   } else {
     dim.x += m.left + m.right;
-    dim.y += ts[0] + m.top + m.bottom;
+    dim.y += ts[0] + m.top + m.bottom  + vShift;
     dim.ftx += m.left;
     dim.px += m.left;
-    dim.psvgy += ts[0];
+    dim.py += (ts[0] + vShift) || 10;
   }
   return dim;
-};
-
-Facet.prototype.makeSVG = function(selection, rowNum, colNum) {
-  var that = this,
-      plot = this.plot(),
-      x = selection.data()[0], // isn't this colNum?
-      dim = this.svgDims(rowNum, colNum),
-      svg = selection
-              .attr('id', function(d) {
-                return that.id(d, rowNum);
-               })
-              .selectAll('svg.svg-wrap')
-              .data([0]);
-
-  svg
-    .attr('width', dim.x)
-    .attr('height', dim.y)
-    .each(function(d) {
-      that.makeTitle(d3.select(this), colNum, rowNum);
-      var sel = d3.select(this).select('.plot-svg');
-      sel
-        .attr({col: colNum, row: rowNum, x: 0, y:dim.psvgy});
-      that.makeCell(sel, x, rowNum, that._ncols);
-      that.makeClip(sel, x, rowNum);
-    });
-  svg.enter().append('svg')
-    .attr('class', 'svg-wrap')
-    .attr('width', dim.x)
-    .attr('height', dim.y)
-    .each(function(d) {
-      that.makeTitle(d3.select(this), colNum, rowNum);
-      var sel = d3.select(this).selectAll('.plot-svg')
-                  .data([0]);
-      sel
-        .attr({col: colNum, row: rowNum, x: 0, y:dim.psvgy});
-      sel.enter().append('svg')
-        .attr({col: colNum, row: rowNum, x: 0, y:dim.psvgy})
-        .attr('class', 'plot-svg');
-      that.makeCell(sel, x, rowNum, that._ncols);
-      that.makeClip(sel, x, rowNum);
-    });
-  svg.exit().remove();
-  that.nSVGs += 1;
 };
 
 Facet.prototype.makeClip = function(selection, x, y) {
@@ -298,7 +307,9 @@ Facet.prototype.makeCell = function(selection, colNum, rowNum,
   var margins = this.plot().margins(),
       dim = this.svgDims(rowNum, colNum),
       that = this,
+      // are we on the last row?
       gridX = this.type() === "grid" && rowNum === (this._nrows -1),
+      // are we on the first column?
       gridY = this.type() === "grid" && colNum === 0;
 
   this.makeG(selection, "xgrid", "")
@@ -316,13 +327,10 @@ Facet.prototype.makeCell = function(selection, colNum, rowNum,
   plot.enter().append('g')
     .attr('class', 'plot')
     .attr("transform", "translate(" + [dim.px,dim.py] + ")")
-    .each(function() {
-      var sel = d3.select(this);
-      sel.append('rect')
-        .attr('class', 'background')
-        .attr({x: 0, y:0, 
-          width: dim.plotX, height:dim.plotY});
-    });
+    .append('rect')
+    .attr('class', 'background')
+    .attr({x: 0, y:0, 
+      width: dim.plotX, height:dim.plotY});
   plot.exit().remove();
 
   if(gridX){
@@ -340,7 +348,7 @@ Facet.prototype.makeCell = function(selection, colNum, rowNum,
     .attr("transform", "translate(" + [dim.px,dim.py] + ")");
   }
 };
-
+// make a g element with the given classes
 Facet.prototype.makeG = function (sel, cls, cls2) {
   var both = cls + cls2;
   var g = sel.selectAll('g.' + both.replace(/ /g, "."))
@@ -351,32 +359,30 @@ Facet.prototype.makeG = function (sel, cls, cls2) {
   return g;
 };
 
-Facet.prototype.makeTitle = function(selection, colNum, rowNum) {
+Facet.prototype.makeTitle = function(sel, colNum, rowNum) {
   var that = this,
       ts = this.titleSize(),
       dim = this.svgDims(rowNum, colNum);
-  var xlab = selection
-              .selectAll('svg.facet-title-x')
+  var xlab = sel.selectAll('svg.facet-title-x')
               .data([that.x() + " - " + that.xFacets[colNum]]);
-  var ylab = selection
-              .selectAll('svg.facet-title-y')
+  var ylab = sel.selectAll('svg.facet-title-y')
               .data([that.y() + " - " + that.yFacets[rowNum]]);
   if(this.type() !== "grid" || rowNum === 0 && this.x()){
     xlab.enter().append('svg')
         .attr('class', 'facet-title-x')
-        .attr({width: dim.x, 
+        .attr({width: dim.x - dim.ftx, x:dim.ftx,
           height: ts[0]})
         .each(function() {
           d3.select(this).append('rect')
             .attr('class', 'facet-label-x')
-            .attr({width: dim.plotX, x: dim.ftx,
+            .attr({width: dim.plotX, //x: dim.ftx,
               height: ts[0]});
           d3.select(this).append('text');
         });
     xlab.select('text')
         .attr({fill: 'black',
           opacity: 1,
-          x: dim.plotX/2 + dim.ftx,
+          x: (dim.x - dim.ftx)/2,
           y: ts[0] * 0.8,
           "text-anchor": that.textAnchorX()})
         .text(_.identity);
@@ -410,7 +416,7 @@ Facet.prototype.makeTitle = function(selection, colNum, rowNum) {
   if(this.type() === "wrap"){
     xlab.select('text')
         .text(that.wrapLabel(rowNum, colNum));
-    selection.select('.facet-title-y')
+    sel.select('.facet-title-y')
       .remove();
   }
 };

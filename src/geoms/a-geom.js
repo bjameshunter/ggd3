@@ -20,6 +20,7 @@ function Geom(aes) {
     subRangeBand: 0,
     subRangePadding: 0,
     omit: null,
+    mergeOn: null,
   };
   var r = function(d) { return ggd3.tools.round(d, 2);};
   // default tooltip
@@ -103,8 +104,29 @@ Geom.prototype._otherAesthetics = function(sel, d, s){
   }, this);
 };
 
-Geom.prototype.data_matcher = function(d,i){
-  return i;
+Geom.prototype.merge_variables = function(variables){
+  if(!_.isNull(this.mergeOn())){
+    return this.mergeOn();
+  }
+  var s = this.setup(),
+      matched = _.intersection(variables,
+                   _.filter(_.keys(s.dtypes), function(d) {
+                       return (s.dtypes[d][1] === 'few' ||
+                               s.dtypes[d][0] === 'string');
+                     }));
+  return matched;
+};
+
+Geom.prototype.data_matcher = function(matches){
+  return function(d, i) {
+    if(matches.length){
+      return _.map(matches, function(m) {
+        return d[m];
+      }).join(' ');
+    } else {
+      return i;
+    }
+  };
 };
 
 Geom.prototype.tooltip = function(obj, data) {

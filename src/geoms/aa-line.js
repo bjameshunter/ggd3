@@ -171,9 +171,12 @@ Line.prototype.draw = function(sel, data, i, layerNum){
     line = l1;
   }
   sel = this.grid() ? sel.select("." + this.direction() + 'grid'): sel.select('.plot');
+  var matched = this.merge_variables(_.keys(data[0]));
+  var data_matcher = _.bind(this.data_matcher(matched), this);
+
   var lines = sel
               .selectAll("." + this.selector(layerNum).replace(/ /g, '.'))
-              .data(data, this.data_matcher);
+              .data(data, data_matcher);
   lines.transition().call(_.bind(this.drawLines, this), line, s, layerNum);
   lines.enter()[this.position()](this.geom(), ".geom")
     .call(_.bind(this.drawLines, this), line, s, layerNum);
