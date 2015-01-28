@@ -281,7 +281,7 @@ Facet.prototype.makeClip = function(selection, x, y) {
       .attr('width', dim.x)
       .attr('height', dim.y);
   selection.select('g.plot')
-    .attr('clip-path', "url(#" + id + ")");
+    .attr('clip-path', "url(~#" + id + ")");
 };
 // if x and y [and "by"] are specified, return id like:
 // x-y[-by], otherwise return xFacet or yFacet

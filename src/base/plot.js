@@ -252,6 +252,7 @@ Plot.prototype.layers = function(layers) {
 Plot.prototype.dtypes = function(dtypes) {
   if(!arguments.length) { return this.attributes.dtypes; }
   this.attributes.dtypes = _.merge(this.attributes.dtypes, dtypes);
+  this.data(this.data());
   this.updateLayers();
   return this;
 };
@@ -388,6 +389,8 @@ Plot.prototype.setSubScale = function(order) {
 
 Plot.prototype.draw = function(sel) {
   // draw/update facets
+  console.log('inside plot.draw()');
+  console.log(this.dtypes());
   this.facet().updateFacet(sel);
   
   // reset nSVGs after they're drawn.

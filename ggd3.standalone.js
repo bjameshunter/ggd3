@@ -103,6 +103,11 @@ function Clean(data, obj) {
       return ["string", "few"];
     }
   }
+  if(obj instanceof ggd3.plot){
+    console.log('object is a plot');
+    console.log(obj.dtypes());
+    console.log(dtypes);
+  }
   return {data: data, dtypes: dtypes};
 }
 
@@ -151,26 +156,27 @@ ggd3.tools.dateFormatter = function(v, format) {
   return new Date(v);
 };
 ggd3.tools.defaultScaleSettings = function(dtype, aesthetic) {
+  var defaultAxis = {tickSize:[6,0]};
   function xyScale() {
     if(dtype[0] === "number") {
       if(dtype[1] === "many"){
         return {type: 'linear',
-                  axis: {},
+                  axis: defaultAxis,
                   scale: {}};
       } else {
         return {type: 'ordinal',
-                  axis: {},
+                  axis: defaultAxis,
                   scale: {}};
       }
     }
     if(dtype[0] === "date"){
         return {type: 'time',
-                  axis: {},
+                  axis: defaultAxis,
                   scale: {}};
     }
     if(dtype[0] === "string"){
         return {type: 'ordinal',
-                  axis: {},
+                  axis: defaultAxis,
                   scale: {}};
     }
   }
@@ -629,7 +635,7 @@ Facet.prototype.makeClip = function(selection, x, y) {
       .attr('width', dim.x)
       .attr('height', dim.y);
   selection.select('g.plot')
-    .attr('clip-path', "url(#" + id + ")");
+    .attr('clip-path', "url(~#" + id + ")");
 };
 // if x and y [and "by"] are specified, return id like:
 // x-y[-by], otherwise return xFacet or yFacet
@@ -1261,6 +1267,7 @@ Plot.prototype.layers = function(layers) {
 Plot.prototype.dtypes = function(dtypes) {
   if(!arguments.length) { return this.attributes.dtypes; }
   this.attributes.dtypes = _.merge(this.attributes.dtypes, dtypes);
+  this.data(this.data());
   this.updateLayers();
   return this;
 };
@@ -1397,6 +1404,8 @@ Plot.prototype.setSubScale = function(order) {
 
 Plot.prototype.draw = function(sel) {
   // draw/update facets
+  console.log('inside plot.draw()');
+  console.log(this.dtypes());
   this.facet().updateFacet(sel);
   
   // reset nSVGs after they're drawn.
@@ -2572,11 +2581,11 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
   data = _.flatten(data, 
                    that.name() === "histogram" ? true:false);
 
-  data = _.filter(data, function(d) {
-    var isnull = _.any([d[s.aes[width.p]], d[s.group]], _.isNull),
-        undef = _.any([d[s.aes[width.p]], d[s.group]], _.isUndefined);
-    return !(isnull || undef);
-  });
+  // data = _.filter(data, function(d) {
+  //   var isnull = _.any([d[s.aes[width.p]], d[s.group]], _.isNull),
+  //       undef = _.any([d[s.aes[width.p]], d[s.group]], _.isUndefined);
+  //   return !(isnull || undef);
+  // });
 
   if(s.position === 'dodge' && this.name() === 'bar') {
     // make ordinal scale for group

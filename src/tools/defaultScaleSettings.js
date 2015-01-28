@@ -1,24 +1,25 @@
 ggd3.tools.defaultScaleSettings = function(dtype, aesthetic) {
+  var defaultAxis = {tickSize:[6,0]};
   function xyScale() {
     if(dtype[0] === "number") {
       if(dtype[1] === "many"){
         return {type: 'linear',
-                  axis: {},
+                  axis: defaultAxis,
                   scale: {}};
       } else {
         return {type: 'ordinal',
-                  axis: {},
+                  axis: defaultAxis,
                   scale: {}};
       }
     }
     if(dtype[0] === "date"){
         return {type: 'time',
-                  axis: {},
+                  axis: defaultAxis,
                   scale: {}};
     }
     if(dtype[0] === "string"){
         return {type: 'ordinal',
-                  axis: {},
+                  axis: defaultAxis,
                   scale: {}};
     }
   }

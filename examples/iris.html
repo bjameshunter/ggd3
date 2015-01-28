@@ -53,6 +53,9 @@ var chart = ggd3.plot()
               .margins({left: 80})
               .facet(facet)
               .layers(layers)
+              .yScale({axis:{
+                ticks: 4,
+              }})
 
 d3.csv("../data/iris.csv", function(error, d) {
   data = d;
