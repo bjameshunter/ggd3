@@ -129,10 +129,11 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       vertical = this.vertical(s);
 
   if(_.contains(['wiggle', 'silhouette'], that.offset()) ){
+    var parentSVG = d3.select(sel.node().parentNode.parentNode);
     if(vertical){
       // x is bars, don't draw Y axis
       drawY = false;
-      sel.select('.y.axis')
+      parentSVG.select('.y.axis')
         .selectAll('*')
         .transition()
         .style('opacity', 0)
@@ -140,7 +141,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     } else {
       // y is ordinal, don't draw X.
       drawX = false;
-      sel.select('.x.axis')
+      parentSVG.select('.x.axis')
         .selectAll('*')
         .transition()
         .style('opacity', 0)
@@ -323,8 +324,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
 
   var matched = this.merge_variables(_.keys(data[0]));
   var data_matcher = _.bind(this.data_matcher(matched), this);
-  var bars = sel.select('.plot')
-                .selectAll('rect.geom.g' + layerNum)
+  var bars = sel.selectAll('rect.geom.g' + layerNum)
                 .data(data, data_matcher),
       tt = ggd3.tooltip()
             .content(this.tooltip())

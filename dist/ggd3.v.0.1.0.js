@@ -246,17 +246,6 @@ ggd3.tools.categoryDomain = function(data, variable) {
   return _.sortBy(_.compact(_.unique(_.pluck(data, variable))));
 };
 
-ggd3.tools.removeElements = function(sel, layerNum, clss) {
-  var remove = sel
-                .select('.plot')
-                .selectAll('.geom.g' + layerNum)
-                .filter(function() {
-                  return d3.select(this)[0][0].classList !== clss;
-                });
-  remove.transition()
-    .style('opacity', 0)
-    .remove();
-};
 
 ggd3.tools.round = function round(value, decimals) {
     return Number(Math.round(value+'e'+decimals)+'e-'+decimals);
@@ -932,7 +921,7 @@ Layer.prototype.data = function(data, fromPlot) {
   return this;
 };
 
-Layer.prototype.compute = function(sel, layerNum) {
+Layer.prototype.compute = function(sel) {
   this.setStat();
   var plot = this.plot(),
       dlist;
@@ -967,25 +956,37 @@ Layer.prototype.compute = function(sel, layerNum) {
     if(_.isEmpty(d)) { d = {selector: id, data: []}; }
     this.geom().data().push(d);
   }, this);
-  
-
 };
 // the only thing update doesn't do is removeElements.
 Layer.prototype.draw = function(sel, layerNum) {
-
-  var divs = [];
+  var divs = [],
+      g;
   sel.selectAll('.plot-div')
     .each(function(d) {
       divs.push(d3.select(this).attr('id'));
     });
   _.each(divs, function(id, i){
     // cycle through all divs, drawing data if it exists.
-    var s = sel.select("#" + id),
-        d = this.geom().data().filter(function(d) {
+    var selection = sel.select("#" + id),
+        data = this.geom().data().filter(function(d) {
           return d.selector === id;
         })[0];
-    ggd3.tools.removeElements(s, layerNum, "geom-" + this.geom().name());
-    this.geom().draw(s, d, i, layerNum);
+    if(!_.isUndefined(layerNum)){
+      if(selection.select('.plot g.g' + layerNum).empty()) {
+
+        g = selection.select('.plot')[this.geom().gPlacement()]('g', 'g')
+              .attr('class', 'g' + layerNum);
+      } else {
+        g = selection.select('g.g' + layerNum);
+      }
+    } else {
+      // if it's a grid, just pass first g to it
+      // the geom will get the proper vgrid or hgrid selection
+      g = selection.select('g');
+    }
+    this.geom().removeElements(g, layerNum, "geom-" + 
+                               this.geom().name());
+    this.geom().draw(g, data, i, layerNum);
   }, this);
 };
 
@@ -1002,8 +1003,6 @@ Layer.prototype.recurseNest = recurseNest;
 
 ggd3.layer = Layer;
 
-// 1. Fix tooltip details with 'identity' and special stats.
-   // who cares about inheriting for this. Just write custom per geom
 // 2. Label facets better and provide option to label with function.
 // 3. Better details on boxplot tooltip
 // 4. Make annotation object
@@ -1013,11 +1012,10 @@ ggd3.layer = Layer;
 // 7. Add 5 number option to boxplot
 // 8. update numeric scale domains, they get bigger but not smaller.
       // - resetting a scale with null also works
-// 10. Intuitive way of ordering layers with g elements
 // 11. figure out scale label offsets and foreign object height
 // 12. Allow top x-axis labeling/annotation.
-// 13. Rename "_otherAesthetics" to something more intuitive.
-
+// 13. Function placing tooltip wrt border of plot
+// 14. Function to position tooltip that does not follow mouse.
 // for much later:
 // Zoom behaviors: fixed scales get global zoom on linear axes
     // free scales get their own zoom;
@@ -1393,8 +1391,6 @@ Plot.prototype.setSubScale = function(order) {
 
 Plot.prototype.draw = function(sel) {
   // draw/update facets
-  console.log('inside plot.draw()');
-  console.log(this.dtypes());
   this.facet().updateFacet(sel);
   
   // reset nSVGs after they're drawn.
@@ -1409,8 +1405,8 @@ Plot.prototype.draw = function(sel) {
 
   this.setScale('single', this.aes());
 
-  _.each(this.layers(), function(l, layerNum) {
-    l.compute(sel, layerNum);
+  _.each(this.layers(), function(l) {
+    l.compute(sel);
   });
   // make global scales
   this.setFixedScale('x'); 
@@ -1427,12 +1423,13 @@ Plot.prototype.draw = function(sel) {
   _.each(this.layers(), function(l, layerNum) {
     l.draw(sel, layerNum);
   });
-  sel.selectAll('.geom')
+  sel.selectAll('g.geom')
     .filter(function() {
       var cl = d3.select(this).attr('class').split(' ');
       return !_.contains(classes, cl[1]);
     })
-    .transition().style('opacity', 0)
+    .transition() // add custom remove function here.
+    .style('opacity', 0)
     .remove();
   // if any of the layers had a jitter, it has
   // been added to each facet's dataset
@@ -1451,15 +1448,15 @@ Plot.prototype.draw = function(sel) {
       .geom(ggd3.geoms.hline().grid(true)
         .lineType(this.gridLineType())
         .highlightZero(this.highlightYZero()));
-    this.hgrid.compute(sel, 30);
-    this.hgrid.draw(sel, 30);}
+    this.hgrid.compute(sel);
+    this.hgrid.draw(sel);}
   if(this.xGrid()) { 
     this.vgrid
       .geom(ggd3.geoms.vline().grid(true)
         .lineType(this.gridLineType())
         .highlightZero(this.highlightXZero()));
-    this.vgrid.compute(sel, 30);
-    this.vgrid.draw(sel, 30);}
+    this.vgrid.compute(sel);
+    this.vgrid.draw(sel);}
 };
 
 Plot.prototype.nest = Nest;
@@ -1564,7 +1561,7 @@ Scale.prototype.type = function(type) {
       break;
     case "category20c":
       this.attributes.scale = d3.scale.category20c();
-      break;
+    break;
   }
   return this;
 };
@@ -1990,6 +1987,8 @@ Tooltip.prototype.hide = function(data, sel) {
 
 ggd3.tooltip = Tooltip;
 // Base geom from which all geoms inherit
+// tooltip gets passed the selection, data, geom.setup() and "opts"
+// whatever those are.
 function Geom(aes) {
   if(!(this instanceof Geom)){
     return new Geom(aes);
@@ -2002,6 +2001,7 @@ function Geom(aes) {
     color: null,
     size: null,
     position: null,
+    gPlacement: 'append',
     drawX: true,
     drawY: true,
     data: [],
@@ -2017,17 +2017,49 @@ function Geom(aes) {
   // default tooltip
   // done here because setting a big long
   // default function on attributes is messy.
-  function tooltip(sel, s, opts) {
-    var that = this;
-    sel.each(function(d) {
-        var el = d3.select(this);
-        that._otherAesthetics(el, d, s, []);
-    });
+  function tooltip(sel, s, opts){
+    var omit = this.omit() || [],
+        d = sel.data()[0];
+    omit = _.flatten([omit, s.stat.exclude]);
+    // if 'additional' aesthetics are declared, they are wanted regardless.
+    // remove them from the omit array
+    omit.splice(omit.indexOf('additional'), 1);
+
+    _.each(_.difference(_.keys(s.aes), omit), function(k) {
+      if(k === 'additional'){
+        _.each(s.aes[k], function(a, i) {
+          sel.append('h4')
+            .text(a + ": ")
+            .append('span').text(this.abbrev(d, s, k, i));
+        }, this);
+      } else {
+      if(_.isNull(s.stat[k]) || _.isNull(s.stat[k]())){ return null; }
+      var stat = s.stat[k]()._name || "identity";
+      stat = _.contains(["identity", "first"], stat) ? "": " (" + stat + ")";
+        sel.append('h4')
+          .text(s.aes[k] + stat + ": ")
+          .append('span').text('(' + k + ') ' + 
+                               this.abbrev(d, s, k));
+      }
+    }, this);
   }
   this.attributes = attributes;
 
   this.attributes.tooltip = _.bind(tooltip, this);
 }
+
+Geom.prototype.tooltip = function(tooltip) {
+  if(!arguments.length) { return this.attributes.tooltip; }
+  var wrapper = function(sel, s, opts) {
+    sel.each(function(d) {
+      var el = d3.select(this);
+      tooltip(el, d, s, opts);
+    });
+  };
+  this.attributes.tooltip = wrapper;
+  return this;
+};
+
 Geom.prototype.defaultPosition = function() {
   var n = this.name();
   return {
@@ -2070,31 +2102,6 @@ Geom.prototype.abbrev = function(d, s, a, i){
   }
 };
 
-Geom.prototype._otherAesthetics = function(sel, d, s){
-  var omit = this.omit() || [];
-  omit = _.flatten([omit, s.stat.exclude]);
-  // remove 'additional' from omit
-  omit.splice(omit.indexOf('additional'), 1);
-
-  _.each(_.difference(_.keys(s.aes), omit), function(k) {
-    if(k === 'additional'){
-      _.each(s.aes[k], function(a, i) {
-        sel.append('h4')
-          .text(a + ": ")
-          .append('span').text(this.abbrev(d, s, k, i));
-      }, this);
-    } else {
-    if(_.isNull(s.stat[k]) || _.isNull(s.stat[k]())){ return null; }
-    var stat = s.stat[k]()._name || "identity";
-    stat = _.contains(["identity", "first"], stat) ? "": " (" + stat + ")";
-      sel.append('h4')
-        .text(s.aes[k] + stat + ": ")
-        .append('span').text('(' + k + ') ' + 
-                             this.abbrev(d, s, k));
-    }
-  }, this);
-};
-
 Geom.prototype.merge_variables = function(variables){
   if(!_.isNull(this.mergeOn())){
     return this.mergeOn();
@@ -2118,17 +2125,6 @@ Geom.prototype.data_matcher = function(matches){
       return i;
     }
   };
-};
-
-Geom.prototype.tooltip = function(obj, data) {
-  if(!arguments.length) { return this.attributes.tooltip; }
-  if(_.isFunction(obj)){
-    this.attributes.tooltip = _.bind(obj, this);
-    return this;
-  } else {
-    console.warn("tooltips should be a function accepting a selection with data attached and an optional object of options.");
-  }
-  return this;
 };
 
 Geom.prototype.setup = function() {
@@ -2248,9 +2244,10 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
                                      layerNum, drawX, drawY){
 
   var x, y,
+      parentSVG = d3.select(sel.node().parentNode.parentNode), 
       plot = this.layer().plot(),
-      rowNum = parseInt(sel.select('.plot-svg').attr('row')),
-      colNum = parseInt(sel.select('.plot-svg').attr('col'));
+      rowNum = parseInt(parentSVG.attr('row')),
+      colNum = parseInt(parentSVG.attr('col'));
   // choosing scales based on facet rule
 
   if(!_.contains(["free", "free_x"], setup.facet.scales()) || 
@@ -2269,31 +2266,28 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
     y = setup.plot.yScale()[selector];
     yfree = true;
   }
-  // think this need not be here.
-  // x.axis.scale(x.scale());
-  // y.axis.scale(y.scale());
 
   if(layerNum === 0 && drawX){
-    var xax = sel.select('.x.axis')
+    var xax = parentSVG.select('.x.axis')
               .attr("transform", "translate(" + x.positionAxis(rowNum, colNum) + ")")
               .attr('opacity', 1)
               .call(x.axis);
     x.style(xax);
     xax.attr('opacity', 1);
     if(x.label()){
-      sel.select('.x.axis')
+      parentSVG.select('.x.axis')
         .call(_.bind(x.axisLabel, x), x.axisLabel());
     }
   }
   if(layerNum === 0 && drawY){
-    var yax = sel.select('.y.axis')
+    var yax = parentSVG.select('.y.axis')
               .attr("transform", "translate(" + y.positionAxis(rowNum, colNum) + ")")
               .attr('opacity', 1)
               .transition().call(y.axis);
-    // y.style(yax);
+    y.style(yax);
     yax.attr('opacity', 1);
     if(y.label()){
-      sel.select('.y.axis')
+      parentSVG.select('.y.axis')
         .call(_.bind(y.axisLabel, y), y.axisLabel());
     }
   }
@@ -2326,6 +2320,18 @@ Geom.prototype.nest = function() {
   });
   return nest;
 };
+Geom.prototype.removeElements = function(sel, layerNum, clss) {
+  var remove = sel
+                .select('.plot')
+                .selectAll('.geom.g' + layerNum)
+                .filter(function() {
+                  return d3.select(this)[0][0].classList !== clss;
+                });
+  remove.transition()
+    .style('opacity', 0)
+    .remove();
+};
+
 
 ggd3.geom = Geom;
 
@@ -2464,10 +2470,11 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       vertical = this.vertical(s);
 
   if(_.contains(['wiggle', 'silhouette'], that.offset()) ){
+    var parentSVG = d3.select(sel.node().parentNode.parentNode);
     if(vertical){
       // x is bars, don't draw Y axis
       drawY = false;
-      sel.select('.y.axis')
+      parentSVG.select('.y.axis')
         .selectAll('*')
         .transition()
         .style('opacity', 0)
@@ -2475,7 +2482,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     } else {
       // y is ordinal, don't draw X.
       drawX = false;
-      sel.select('.x.axis')
+      parentSVG.select('.x.axis')
         .selectAll('*')
         .transition()
         .style('opacity', 0)
@@ -2658,8 +2665,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
 
   var matched = this.merge_variables(_.keys(data[0]));
   var data_matcher = _.bind(this.data_matcher(matched), this);
-  var bars = sel.select('.plot')
-                .selectAll('rect.geom.g' + layerNum)
+  var bars = sel.selectAll('rect.geom.g' + layerNum)
                 .data(data, data_matcher),
       tt = ggd3.tooltip()
             .content(this.tooltip())
@@ -2832,6 +2838,7 @@ Line.prototype.draw = function(sel, data, i, layerNum){
                                  this.drawX(), this.drawY()),
       x = scales.x.scale(),
       y = scales.y.scale(),
+      parentSVG = d3.select(sel.node().parentNode.parentNode),
       o2 = function() { return 0; };
       o2.rangeBand = function() { return 0; };
       s.gradient = false;
@@ -2879,15 +2886,15 @@ Line.prototype.draw = function(sel, data, i, layerNum){
   } else {
     line = l1;
   }
-  sel = this.grid() ? sel.select("." + this.direction() + 'grid'): sel.select('.plot');
+  sel = this.grid() ? parentSVG.select("." + this.direction() + 'grid'): sel;
   var matched = this.merge_variables(_.keys(data[0]));
   var data_matcher = _.bind(this.data_matcher(matched), this);
 
-  var lines = sel
-              .selectAll("." + this.selector(layerNum).replace(/ /g, '.'))
+  var lines = sel.selectAll("." + 
+                            this.selector(layerNum).replace(/ /g, '.'))
               .data(data, data_matcher);
   lines.transition().call(_.bind(this.drawLines, this), line, s, layerNum);
-  lines.enter()[this.position()](this.geom(), ".geom")
+  lines.enter().append(this.geom(), ".geom")
     .call(_.bind(this.drawLines, this), line, s, layerNum);
   lines.exit()
     .transition()
@@ -3008,7 +3015,6 @@ function Histogram(spec) {
         el.append('h4')
           .text("bin size: " )
           .append("span").text(r(d.binHeight));
-        that._otherAesthetics(el, d, s, ['x', 'y']);
         el.append('h4')
           .text("n: " )
           .append("span").text(d.length);
@@ -3242,7 +3248,7 @@ function Area(spec) {
     name: "area",
     stat: "identity",
     geom: "path",
-    position: null,
+    gPlacement: 'insert',
     interpolate: 'linear',
     alpha: 0.2,
     strokeOpacity: 0.1
@@ -3425,15 +3431,13 @@ Area.prototype.draw = function(sel, data, i, layerNum){
   }
   var areaGen = that.generator(s.aes, x2, y2, o2, s.group);
 
-  var area = sel.select('.plot')
-              .selectAll(".g" + layerNum + "geom-" + this.name())
+  var area = sel.selectAll(".g" + layerNum + ".geom-" + this.name())
               .data(data); // one area per geom
   area.transition()
     .each(function(d, i) {
       that.drawArea(d3.select(this), areaGen, s, layerNum);
     });
-  // makes sense that all area/ribbons go first.
-  area.enter().insert(this.geom(), "*")
+  area.enter().append(this.geom(), "*")
     .each(function(d, i) {
       that.drawArea(d3.select(this), areaGen, s, layerNum);
     });
@@ -3441,8 +3445,6 @@ Area.prototype.draw = function(sel, data, i, layerNum){
     .transition()
     .style('opacity', 0)
     .remove();
-
-
 };
 
 ggd3.geoms.area = Area;
@@ -3728,8 +3730,7 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
                                  return s.dtypes[d][1] === 'few';
                                }));
   var data_matcher = _.bind(this.data_matcher(matched), this);
-  var boxes = sel.select('.plot')
-                .selectAll('.geom g' + layerNum)
+  var boxes = sel.selectAll('.geom g' + layerNum)
                 .data(data, data_matcher);
 
   boxes.each(function(d) {
@@ -3852,9 +3853,8 @@ Density.prototype.draw = function(sel, data, i, layerNum){
   line[n](function(v) { return scales[n].scale()(v[s.aes[n]]); } );
   line[d](function(v) { return scales[d].scale()(v[s.aes[d]]); } );
   // need to calculate the densities to draw proper domains.
-  ggd3.tools.removeElements(sel, layerNum, this.geom());
-  var path = sel.select('.plot')
-                .selectAll('.geom.g' + layerNum)
+  this.removeElements(sel, layerNum, this.geom());
+  var path = sel.selectAll('.geom.g' + layerNum)
                 .data(data);
   path.transition().call(drawDensity);
   path.enter().append(this.geom()).call(drawDensity);
@@ -4002,7 +4002,7 @@ function Linerange(spec){
   Line.apply(this);
   var attributes = {
     lineType: "none",
-    position: 'insert',
+    gPlacement: 'insert',
     name: 'linerange',
   };
   this.attributes = _.merge(this.attributes, attributes);
@@ -4152,7 +4152,7 @@ Point.prototype.draw = function(sel, data, i, layerNum, s) {
   var x, y, scales, points;
   // other functions that call geom point will supply an "s" object
   if(_.isUndefined(s)) {
-    s     = this.setup();
+    s = this.setup();
     scales = this.scalesAxes(sel, s, data.selector, layerNum,
                                  true, true);
     // point should have both canvas and svg functions.
@@ -4160,8 +4160,7 @@ Point.prototype.draw = function(sel, data, i, layerNum, s) {
     y = this.positionPoint(scales.y, s.group);
     data = this.unNest(data.data);
     // get rid of wrong elements if they exist.
-    points = sel.select('.plot')
-                .selectAll('.geom.g' + layerNum + ".geom-" + this.name())
+    points = sel.selectAll('.geom.g' + layerNum + ".geom-" + this.name())
                 .data(_.filter(data, function(d) {
                   return !isNaN(d[s.aes.x]) && !isNaN(d[s.aes.y]);
                 }));
@@ -4248,8 +4247,7 @@ Ribbon.prototype.generator = function(aes, x, y, o2, group, n) {
 };
 Ribbon.prototype.drawRibbon = function(sel, data, i, layerNum, areaGen,
                                        s) {
-  var ribbon = sel.select('.plot')
-              .selectAll(".g" + layerNum + "geom-" + this.name())
+  var ribbon = sel.selectAll(".g" + layerNum + "geom-" + this.name())
               .data(data),
       that = this;
   ribbon.transition()
@@ -4639,8 +4637,6 @@ Text.prototype.draw = function (sel, data, i, layerNum) {
   var positionX = this.positionPoint(scales.x, s.group),
       positionY = this.positionPoint(scales.y, s.group);
 
-  ggd3.tools.removeElements(sel, layerNum, "geom-text");
-
   function drawText(text) {
     text
       .attr('class', 'geom g' + layerNum + " geom-text")
@@ -4659,8 +4655,7 @@ Text.prototype.draw = function (sel, data, i, layerNum) {
             .content(this.tooltip())
             .geom(this);
 
-  var text = sel.select('.plot')
-                .selectAll('text.geom.g' + layerNum)
+  var text = sel.selectAll('text.geom.g' + layerNum)
                 .data(data.data);
   text.transition().call(drawText);
   text.enter().append('text').call(drawText);

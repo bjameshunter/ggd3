@@ -5,7 +5,7 @@ function Linerange(spec){
   Line.apply(this);
   var attributes = {
     lineType: "none",
-    position: 'insert',
+    gPlacement: 'insert',
     name: 'linerange',
   };
   this.attributes = _.merge(this.attributes, attributes);

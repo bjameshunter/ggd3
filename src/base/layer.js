@@ -150,7 +150,7 @@ Layer.prototype.data = function(data, fromPlot) {
   return this;
 };
 
-Layer.prototype.compute = function(sel, layerNum) {
+Layer.prototype.compute = function(sel) {
   this.setStat();
   var plot = this.plot(),
       dlist;
@@ -185,25 +185,37 @@ Layer.prototype.compute = function(sel, layerNum) {
     if(_.isEmpty(d)) { d = {selector: id, data: []}; }
     this.geom().data().push(d);
   }, this);
-  
-
 };
 // the only thing update doesn't do is removeElements.
 Layer.prototype.draw = function(sel, layerNum) {
-
-  var divs = [];
+  var divs = [],
+      g;
   sel.selectAll('.plot-div')
     .each(function(d) {
       divs.push(d3.select(this).attr('id'));
     });
   _.each(divs, function(id, i){
     // cycle through all divs, drawing data if it exists.
-    var s = sel.select("#" + id),
-        d = this.geom().data().filter(function(d) {
+    var selection = sel.select("#" + id),
+        data = this.geom().data().filter(function(d) {
           return d.selector === id;
         })[0];
-    ggd3.tools.removeElements(s, layerNum, "geom-" + this.geom().name());
-    this.geom().draw(s, d, i, layerNum);
+    if(!_.isUndefined(layerNum)){
+      if(selection.select('.plot g.g' + layerNum).empty()) {
+
+        g = selection.select('.plot')[this.geom().gPlacement()]('g', 'g')
+              .attr('class', 'g' + layerNum);
+      } else {
+        g = selection.select('g.g' + layerNum);
+      }
+    } else {
+      // if it's a grid, just pass first g to it
+      // the geom will get the proper vgrid or hgrid selection
+      g = selection.select('g');
+    }
+    this.geom().removeElements(g, layerNum, "geom-" + 
+                               this.geom().name());
+    this.geom().draw(g, data, i, layerNum);
   }, this);
 };
 

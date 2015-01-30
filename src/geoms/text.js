@@ -30,8 +30,6 @@ Text.prototype.draw = function (sel, data, i, layerNum) {
   var positionX = this.positionPoint(scales.x, s.group),
       positionY = this.positionPoint(scales.y, s.group);
 
-  ggd3.tools.removeElements(sel, layerNum, "geom-text");
-
   function drawText(text) {
     text
       .attr('class', 'geom g' + layerNum + " geom-text")
@@ -50,8 +48,7 @@ Text.prototype.draw = function (sel, data, i, layerNum) {
             .content(this.tooltip())
             .geom(this);
 
-  var text = sel.select('.plot')
-                .selectAll('text.geom.g' + layerNum)
+  var text = sel.selectAll('text.geom.g' + layerNum)
                 .data(data.data);
   text.transition().call(drawText);
   text.enter().append('text').call(drawText);

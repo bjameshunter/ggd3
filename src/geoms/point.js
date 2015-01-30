@@ -59,7 +59,7 @@ Point.prototype.draw = function(sel, data, i, layerNum, s) {
   var x, y, scales, points;
   // other functions that call geom point will supply an "s" object
   if(_.isUndefined(s)) {
-    s     = this.setup();
+    s = this.setup();
     scales = this.scalesAxes(sel, s, data.selector, layerNum,
                                  true, true);
     // point should have both canvas and svg functions.
@@ -67,8 +67,7 @@ Point.prototype.draw = function(sel, data, i, layerNum, s) {
     y = this.positionPoint(scales.y, s.group);
     data = this.unNest(data.data);
     // get rid of wrong elements if they exist.
-    points = sel.select('.plot')
-                .selectAll('.geom.g' + layerNum + ".geom-" + this.name())
+    points = sel.selectAll('.geom.g' + layerNum + ".geom-" + this.name())
                 .data(_.filter(data, function(d) {
                   return !isNaN(d[s.aes.x]) && !isNaN(d[s.aes.y]);
                 }));

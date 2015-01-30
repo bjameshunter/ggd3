@@ -1,5 +1,3 @@
-// 1. Fix tooltip details with 'identity' and special stats.
-   // who cares about inheriting for this. Just write custom per geom
 // 2. Label facets better and provide option to label with function.
 // 3. Better details on boxplot tooltip
 // 4. Make annotation object
@@ -9,11 +7,10 @@
 // 7. Add 5 number option to boxplot
 // 8. update numeric scale domains, they get bigger but not smaller.
       // - resetting a scale with null also works
-// 10. Intuitive way of ordering layers with g elements
 // 11. figure out scale label offsets and foreign object height
 // 12. Allow top x-axis labeling/annotation.
-// 13. Rename "_otherAesthetics" to something more intuitive.
-
+// 13. Function placing tooltip wrt border of plot
+// 14. Function to position tooltip that does not follow mouse.
 // for much later:
 // Zoom behaviors: fixed scales get global zoom on linear axes
     // free scales get their own zoom;
@@ -389,8 +386,6 @@ Plot.prototype.setSubScale = function(order) {
 
 Plot.prototype.draw = function(sel) {
   // draw/update facets
-  console.log('inside plot.draw()');
-  console.log(this.dtypes());
   this.facet().updateFacet(sel);
   
   // reset nSVGs after they're drawn.
@@ -405,8 +400,8 @@ Plot.prototype.draw = function(sel) {
 
   this.setScale('single', this.aes());
 
-  _.each(this.layers(), function(l, layerNum) {
-    l.compute(sel, layerNum);
+  _.each(this.layers(), function(l) {
+    l.compute(sel);
   });
   // make global scales
   this.setFixedScale('x'); 
@@ -423,12 +418,13 @@ Plot.prototype.draw = function(sel) {
   _.each(this.layers(), function(l, layerNum) {
     l.draw(sel, layerNum);
   });
-  sel.selectAll('.geom')
+  sel.selectAll('g.geom')
     .filter(function() {
       var cl = d3.select(this).attr('class').split(' ');
       return !_.contains(classes, cl[1]);
     })
-    .transition().style('opacity', 0)
+    .transition() // add custom remove function here.
+    .style('opacity', 0)
     .remove();
   // if any of the layers had a jitter, it has
   // been added to each facet's dataset
@@ -447,15 +443,15 @@ Plot.prototype.draw = function(sel) {
       .geom(ggd3.geoms.hline().grid(true)
         .lineType(this.gridLineType())
         .highlightZero(this.highlightYZero()));
-    this.hgrid.compute(sel, 30);
-    this.hgrid.draw(sel, 30);}
+    this.hgrid.compute(sel);
+    this.hgrid.draw(sel);}
   if(this.xGrid()) { 
     this.vgrid
       .geom(ggd3.geoms.vline().grid(true)
         .lineType(this.gridLineType())
         .highlightZero(this.highlightXZero()));
-    this.vgrid.compute(sel, 30);
-    this.vgrid.draw(sel, 30);}
+    this.vgrid.compute(sel);
+    this.vgrid.draw(sel);}
 };
 
 Plot.prototype.nest = Nest;

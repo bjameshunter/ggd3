@@ -87,7 +87,7 @@ Scale.prototype.type = function(type) {
       break;
     case "category20c":
       this.attributes.scale = d3.scale.category20c();
-      break;
+    break;
   }
   return this;
 };

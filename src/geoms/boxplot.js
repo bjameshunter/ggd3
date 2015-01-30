@@ -205,8 +205,7 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
                                  return s.dtypes[d][1] === 'few';
                                }));
   var data_matcher = _.bind(this.data_matcher(matched), this);
-  var boxes = sel.select('.plot')
-                .selectAll('.geom g' + layerNum)
+  var boxes = sel.selectAll('.geom g' + layerNum)
                 .data(data, data_matcher);
 
   boxes.each(function(d) {

@@ -8,7 +8,7 @@ function Area(spec) {
     name: "area",
     stat: "identity",
     geom: "path",
-    position: null,
+    gPlacement: 'insert',
     interpolate: 'linear',
     alpha: 0.2,
     strokeOpacity: 0.1
@@ -191,15 +191,13 @@ Area.prototype.draw = function(sel, data, i, layerNum){
   }
   var areaGen = that.generator(s.aes, x2, y2, o2, s.group);
 
-  var area = sel.select('.plot')
-              .selectAll(".g" + layerNum + "geom-" + this.name())
+  var area = sel.selectAll(".g" + layerNum + ".geom-" + this.name())
               .data(data); // one area per geom
   area.transition()
     .each(function(d, i) {
       that.drawArea(d3.select(this), areaGen, s, layerNum);
     });
-  // makes sense that all area/ribbons go first.
-  area.enter().insert(this.geom(), "*")
+  area.enter().append(this.geom(), "*")
     .each(function(d, i) {
       that.drawArea(d3.select(this), areaGen, s, layerNum);
     });
@@ -207,8 +205,6 @@ Area.prototype.draw = function(sel, data, i, layerNum){
     .transition()
     .style('opacity', 0)
     .remove();
-
-
 };
 
 ggd3.geoms.area = Area;

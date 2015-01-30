@@ -39,8 +39,7 @@ Ribbon.prototype.generator = function(aes, x, y, o2, group, n) {
 };
 Ribbon.prototype.drawRibbon = function(sel, data, i, layerNum, areaGen,
                                        s) {
-  var ribbon = sel.select('.plot')
-              .selectAll(".g" + layerNum + "geom-" + this.name())
+  var ribbon = sel.selectAll(".g" + layerNum + "geom-" + this.name())
               .data(data),
       that = this;
   ribbon.transition()

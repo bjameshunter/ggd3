@@ -28,7 +28,6 @@ function Histogram(spec) {
         el.append('h4')
           .text("bin size: " )
           .append("span").text(r(d.binHeight));
-        that._otherAesthetics(el, d, s, ['x', 'y']);
         el.append('h4')
           .text("n: " )
           .append("span").text(d.length);

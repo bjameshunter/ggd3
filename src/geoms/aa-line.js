@@ -123,6 +123,7 @@ Line.prototype.draw = function(sel, data, i, layerNum){
                                  this.drawX(), this.drawY()),
       x = scales.x.scale(),
       y = scales.y.scale(),
+      parentSVG = d3.select(sel.node().parentNode.parentNode),
       o2 = function() { return 0; };
       o2.rangeBand = function() { return 0; };
       s.gradient = false;
@@ -170,15 +171,15 @@ Line.prototype.draw = function(sel, data, i, layerNum){
   } else {
     line = l1;
   }
-  sel = this.grid() ? sel.select("." + this.direction() + 'grid'): sel.select('.plot');
+  sel = this.grid() ? parentSVG.select("." + this.direction() + 'grid'): sel;
   var matched = this.merge_variables(_.keys(data[0]));
   var data_matcher = _.bind(this.data_matcher(matched), this);
 
-  var lines = sel
-              .selectAll("." + this.selector(layerNum).replace(/ /g, '.'))
+  var lines = sel.selectAll("." + 
+                            this.selector(layerNum).replace(/ /g, '.'))
               .data(data, data_matcher);
   lines.transition().call(_.bind(this.drawLines, this), line, s, layerNum);
-  lines.enter()[this.position()](this.geom(), ".geom")
+  lines.enter().append(this.geom(), ".geom")
     .call(_.bind(this.drawLines, this), line, s, layerNum);
   lines.exit()
     .transition()

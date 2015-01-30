@@ -1,4 +1,6 @@
 // Base geom from which all geoms inherit
+// tooltip gets passed the selection, data, geom.setup() and "opts"
+// whatever those are.
 function Geom(aes) {
   if(!(this instanceof Geom)){
     return new Geom(aes);
@@ -11,6 +13,7 @@ function Geom(aes) {
     color: null,
     size: null,
     position: null,
+    gPlacement: 'append',
     drawX: true,
     drawY: true,
     data: [],
@@ -26,17 +29,49 @@ function Geom(aes) {
   // default tooltip
   // done here because setting a big long
   // default function on attributes is messy.
-  function tooltip(sel, s, opts) {
-    var that = this;
-    sel.each(function(d) {
-        var el = d3.select(this);
-        that._otherAesthetics(el, d, s, []);
-    });
+  function tooltip(sel, s, opts){
+    var omit = this.omit() || [],
+        d = sel.data()[0];
+    omit = _.flatten([omit, s.stat.exclude]);
+    // if 'additional' aesthetics are declared, they are wanted regardless.
+    // remove them from the omit array
+    omit.splice(omit.indexOf('additional'), 1);
+
+    _.each(_.difference(_.keys(s.aes), omit), function(k) {
+      if(k === 'additional'){
+        _.each(s.aes[k], function(a, i) {
+          sel.append('h4')
+            .text(a + ": ")
+            .append('span').text(this.abbrev(d, s, k, i));
+        }, this);
+      } else {
+      if(_.isNull(s.stat[k]) || _.isNull(s.stat[k]())){ return null; }
+      var stat = s.stat[k]()._name || "identity";
+      stat = _.contains(["identity", "first"], stat) ? "": " (" + stat + ")";
+        sel.append('h4')
+          .text(s.aes[k] + stat + ": ")
+          .append('span').text('(' + k + ') ' + 
+                               this.abbrev(d, s, k));
+      }
+    }, this);
   }
   this.attributes = attributes;
 
   this.attributes.tooltip = _.bind(tooltip, this);
 }
+
+Geom.prototype.tooltip = function(tooltip) {
+  if(!arguments.length) { return this.attributes.tooltip; }
+  var wrapper = function(sel, s, opts) {
+    sel.each(function(d) {
+      var el = d3.select(this);
+      tooltip(el, d, s, opts);
+    });
+  };
+  this.attributes.tooltip = wrapper;
+  return this;
+};
+
 Geom.prototype.defaultPosition = function() {
   var n = this.name();
   return {
@@ -79,31 +114,6 @@ Geom.prototype.abbrev = function(d, s, a, i){
   }
 };
 
-Geom.prototype._otherAesthetics = function(sel, d, s){
-  var omit = this.omit() || [];
-  omit = _.flatten([omit, s.stat.exclude]);
-  // remove 'additional' from omit
-  omit.splice(omit.indexOf('additional'), 1);
-
-  _.each(_.difference(_.keys(s.aes), omit), function(k) {
-    if(k === 'additional'){
-      _.each(s.aes[k], function(a, i) {
-        sel.append('h4')
-          .text(a + ": ")
-          .append('span').text(this.abbrev(d, s, k, i));
-      }, this);
-    } else {
-    if(_.isNull(s.stat[k]) || _.isNull(s.stat[k]())){ return null; }
-    var stat = s.stat[k]()._name || "identity";
-    stat = _.contains(["identity", "first"], stat) ? "": " (" + stat + ")";
-      sel.append('h4')
-        .text(s.aes[k] + stat + ": ")
-        .append('span').text('(' + k + ') ' + 
-                             this.abbrev(d, s, k));
-    }
-  }, this);
-};
-
 Geom.prototype.merge_variables = function(variables){
   if(!_.isNull(this.mergeOn())){
     return this.mergeOn();
@@ -127,17 +137,6 @@ Geom.prototype.data_matcher = function(matches){
       return i;
     }
   };
-};
-
-Geom.prototype.tooltip = function(obj, data) {
-  if(!arguments.length) { return this.attributes.tooltip; }
-  if(_.isFunction(obj)){
-    this.attributes.tooltip = _.bind(obj, this);
-    return this;
-  } else {
-    console.warn("tooltips should be a function accepting a selection with data attached and an optional object of options.");
-  }
-  return this;
 };
 
 Geom.prototype.setup = function() {
@@ -257,9 +256,10 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
                                      layerNum, drawX, drawY){
 
   var x, y,
+      parentSVG = d3.select(sel.node().parentNode.parentNode), 
       plot = this.layer().plot(),
-      rowNum = parseInt(sel.select('.plot-svg').attr('row')),
-      colNum = parseInt(sel.select('.plot-svg').attr('col'));
+      rowNum = parseInt(parentSVG.attr('row')),
+      colNum = parseInt(parentSVG.attr('col'));
   // choosing scales based on facet rule
 
   if(!_.contains(["free", "free_x"], setup.facet.scales()) || 
@@ -278,31 +278,28 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
     y = setup.plot.yScale()[selector];
     yfree = true;
   }
-  // think this need not be here.
-  // x.axis.scale(x.scale());
-  // y.axis.scale(y.scale());
 
   if(layerNum === 0 && drawX){
-    var xax = sel.select('.x.axis')
+    var xax = parentSVG.select('.x.axis')
               .attr("transform", "translate(" + x.positionAxis(rowNum, colNum) + ")")
               .attr('opacity', 1)
               .call(x.axis);
     x.style(xax);
     xax.attr('opacity', 1);
     if(x.label()){
-      sel.select('.x.axis')
+      parentSVG.select('.x.axis')
         .call(_.bind(x.axisLabel, x), x.axisLabel());
     }
   }
   if(layerNum === 0 && drawY){
-    var yax = sel.select('.y.axis')
+    var yax = parentSVG.select('.y.axis')
               .attr("transform", "translate(" + y.positionAxis(rowNum, colNum) + ")")
               .attr('opacity', 1)
               .transition().call(y.axis);
-    // y.style(yax);
+    y.style(yax);
     yax.attr('opacity', 1);
     if(y.label()){
-      sel.select('.y.axis')
+      parentSVG.select('.y.axis')
         .call(_.bind(y.axisLabel, y), y.axisLabel());
     }
   }
@@ -335,6 +332,18 @@ Geom.prototype.nest = function() {
   });
   return nest;
 };
+Geom.prototype.removeElements = function(sel, layerNum, clss) {
+  var remove = sel
+                .select('.plot')
+                .selectAll('.geom.g' + layerNum)
+                .filter(function() {
+                  return d3.select(this)[0][0].classList !== clss;
+                });
+  remove.transition()
+    .style('opacity', 0)
+    .remove();
+};
+
 
 ggd3.geom = Geom;
 

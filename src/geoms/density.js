@@ -100,9 +100,8 @@ Density.prototype.draw = function(sel, data, i, layerNum){
   line[n](function(v) { return scales[n].scale()(v[s.aes[n]]); } );
   line[d](function(v) { return scales[d].scale()(v[s.aes[d]]); } );
   // need to calculate the densities to draw proper domains.
-  ggd3.tools.removeElements(sel, layerNum, this.geom());
-  var path = sel.select('.plot')
-                .selectAll('.geom.g' + layerNum)
+  this.removeElements(sel, layerNum, this.geom());
+  var path = sel.selectAll('.geom.g' + layerNum)
                 .data(data);
   path.transition().call(drawDensity);
   path.enter().append(this.geom()).call(drawDensity);
