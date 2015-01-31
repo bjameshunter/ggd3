@@ -261,8 +261,7 @@ Facet.prototype.makeClip = function(selection, x, y) {
     // if either xAdjust or yAdjust are present
   var clip = selection.selectAll('defs')
               .data([0]),
-      that = this,
-      id = that.id(x, y) + "-clip",
+      id = this.id(x, y) + this.plot().id() + "-clip",
       dim = this.plot().plotDim();
   clip.select('.clip')
       .attr('id', id)
@@ -281,13 +280,13 @@ Facet.prototype.makeClip = function(selection, x, y) {
       .attr('width', dim.x)
       .attr('height', dim.y);
   selection.select('g.plot')
-    .attr('clip-path', "url(~#" + id + ")");
+    .attr('clip-path', "url(#" + id + ")");
 };
-// if x and y [and "by"] are specified, return id like:
-// x-y[-by], otherwise return xFacet or yFacet
+
 function rep(s) {
   return s.replace(' ', '-');
 }
+
 Facet.prototype.id = function(x, y) {
 
   if(this.x() && this.y()) {

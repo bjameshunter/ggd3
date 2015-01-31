@@ -70,6 +70,9 @@ function Plot() {
     shapeRange: d3.superformulaTypes,
     opts: {},
     theme: "ggd3",
+    // currently just used to ensure clip-paths are unique
+    // on pages with more than one single faceted plot.
+    id: parseInt(_.random(0, 1, true)*10000)
   };
 
   this.attributes = attributes;
@@ -91,7 +94,7 @@ function Plot() {
                 .plot(this); 
   // explicitly declare which attributes get a basic
   // getter/setter
-  var getSet = ["opts", "theme", 
+  var getSet = ["opts", "theme", "id",
     "width", "height", "xAdjust", "yAdjust", 
     "xDomain", "yDomain", 
     'colorRange', 'sizeRange',

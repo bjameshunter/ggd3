@@ -156,9 +156,9 @@ function setDomain(data, layer) {
           scale.scale().nice();
         } else {
           if(_.isNull(scale.domain())){
-            domain = _.sortBy(
+            domain = _.compact(_.sortBy(
                       _.unique(
-                        ggd3.tools.categoryDomain(data.data,s.aes[g])));
+                        ggd3.tools.categoryDomain(data.data,s.aes[g]))));
           } else {
             domain = scale.domain();
           }
@@ -176,7 +176,7 @@ function setDomain(data, layer) {
           domain = geom.domain(data.data, g);
         }
         if(!_.contains(linearScales, scale.type())){
-          // domain = _.sortBy(_.unique(domain));
+          domain = _.sortBy(_.unique(domain));
         }
 
           scale.domain(domain);
@@ -196,8 +196,10 @@ function setDomain(data, layer) {
         var aesScale = _.bind(function(d) {
           // if a plot doesn't use a particular
           // aesthetic, it will trip up here, 
-          // choosing to pass null instead.
-          return this.scale()(d[s.aes[g]] || null);
+          // test if it exists.
+          if(d[s.aes[g]]){
+            return this.scale()(d[s.aes[g]]);
+          }
         }, scale);
         this[g](aesScale);
       }
