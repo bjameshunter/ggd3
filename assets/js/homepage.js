@@ -32,6 +32,9 @@ d3.csv("assets/data/mtcars.csv", function(error, cars) {
     carChart = ggd3.plot()
                     .layers([carLayer, jitterLayer])
                     .width(250)
+                    // .fillScale({scale:{
+                    //     range:["blue", "green", "yellow"],
+                    //     domain:["3", "4", "5"]}})
                     .facet({x:'am', nrows: 1})
                     .dtypes({"gear": ["string", 'few'], 
                             "cyl": ["string", 'few']

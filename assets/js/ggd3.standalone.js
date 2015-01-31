@@ -604,8 +604,7 @@ Facet.prototype.makeClip = function(selection, x, y) {
     // if either xAdjust or yAdjust are present
   var clip = selection.selectAll('defs')
               .data([0]),
-      that = this,
-      id = that.id(x, y) + "-clip",
+      id = this.id(x, y) + this.plot().id() + "-clip",
       dim = this.plot().plotDim();
   clip.select('.clip')
       .attr('id', id)
@@ -624,13 +623,13 @@ Facet.prototype.makeClip = function(selection, x, y) {
       .attr('width', dim.x)
       .attr('height', dim.y);
   selection.select('g.plot')
-    .attr('clip-path', "url(~#" + id + ")");
+    .attr('clip-path', "url(#" + id + ")");
 };
-// if x and y [and "by"] are specified, return id like:
-// x-y[-by], otherwise return xFacet or yFacet
+
 function rep(s) {
   return s.replace(' ', '-');
 }
+
 Facet.prototype.id = function(x, y) {
 
   if(this.x() && this.y()) {
@@ -1086,6 +1085,9 @@ function Plot() {
     shapeRange: d3.superformulaTypes,
     opts: {},
     theme: "ggd3",
+    // currently just used to ensure clip-paths are unique
+    // on pages with more than one single faceted plot.
+    id: parseInt(_.random(0, 1, true)*10000)
   };
 
   this.attributes = attributes;
@@ -1107,7 +1109,7 @@ function Plot() {
                 .plot(this); 
   // explicitly declare which attributes get a basic
   // getter/setter
-  var getSet = ["opts", "theme", 
+  var getSet = ["opts", "theme", "id",
     "width", "height", "xAdjust", "yAdjust", 
     "xDomain", "yDomain", 
     'colorRange', 'sizeRange',
@@ -1628,7 +1630,7 @@ Scale.prototype.domain = function(domain) {
     }
   }
   if(_.isNull(this.domain())){ 
-    this.attributes.domain = domain; 
+    this.attributes.domain = _.compact(domain); 
     } else {
     var d = this.attributes.domain;
     if(_.contains(linearScales, this.type())){
@@ -1637,8 +1639,7 @@ Scale.prototype.domain = function(domain) {
       this.attributes.domain = ggd3.tools
                                 .numericDomain(this.attributes.domain);
     } else {
-      this.attributes.domain = _.unique(_.flatten([d, domain]));
-      this.attributes.domain = domain;
+      this.attributes.domain = _.compact(_.unique(_.flatten([d, domain])));
     }
   }
   if(!_.isNull(this.scale())){
@@ -1873,9 +1874,9 @@ function setDomain(data, layer) {
           scale.scale().nice();
         } else {
           if(_.isNull(scale.domain())){
-            domain = _.sortBy(
+            domain = _.compact(_.sortBy(
                       _.unique(
-                        ggd3.tools.categoryDomain(data.data,s.aes[g])));
+                        ggd3.tools.categoryDomain(data.data,s.aes[g]))));
           } else {
             domain = scale.domain();
           }
@@ -1893,7 +1894,7 @@ function setDomain(data, layer) {
           domain = geom.domain(data.data, g);
         }
         if(!_.contains(linearScales, scale.type())){
-          // domain = _.sortBy(_.unique(domain));
+          domain = _.sortBy(_.unique(domain));
         }
 
           scale.domain(domain);
@@ -1913,8 +1914,10 @@ function setDomain(data, layer) {
         var aesScale = _.bind(function(d) {
           // if a plot doesn't use a particular
           // aesthetic, it will trip up here, 
-          // choosing to pass null instead.
-          return this.scale()(d[s.aes[g]] || null);
+          // test if it exists.
+          if(d[s.aes[g]]){
+            return this.scale()(d[s.aes[g]]);
+          }
         }, scale);
         this[g](aesScale);
       }

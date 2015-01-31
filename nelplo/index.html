@@ -58,7 +58,8 @@ var layers = [ggd3.geoms.line()
                 .size(4),
               ggd3.layer()
                 .geom(ggd3.geoms.ribbon()
-                      .color('black'))
+                      .color('black')
+                      .gPlacement('insert'))
                 .aes({ymin: sd, ymax: sd, fill: 'variable'})
                 ];
 
