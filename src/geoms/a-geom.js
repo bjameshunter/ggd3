@@ -164,7 +164,6 @@ Geom.prototype.setup = function() {
     s.nest.rollup(function(d) {
       return s.stat.compute(d);
     });
-
     if(s.aes.fill) {
       s.grouped = true;
       s.group = s.aes.fill;

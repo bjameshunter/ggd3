@@ -1,4 +1,6 @@
 #!/usr/bin/env node
 
-require("grunt").npmTasks("grunt-vows").cli();
+var grunt = require("grunt");
+grunt.loadTasks("../tasks");
+grunt.cli();
 

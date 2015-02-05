@@ -35,6 +35,11 @@ module.exports = function(grunt){
         ],
         dest: "../v3_site/ggd3/assets/css/ggd3style.css"
       },
+      delta_css: {
+        src: [ "css/*.css"],
+        dest: "../../../flaskenv/delta/delta/static/css/ggd3style.css"
+      }
+      ,
       blog_css: {
         src: [
           "css/*.css"
@@ -73,7 +78,8 @@ module.exports = function(grunt){
         files: {
           "./<%= pkg.name%>.standalone.js": ["./browserified.js"],
           "../v3_site/ggd3/assets/js/<%= pkg.name%>.standalone.js": ['./browserified.js'],
-          "../../website/viz_plugin/static/js/<%= pkg.name %>.standalone.js":['./browserified.js']
+          "../../website/viz_plugin/static/js/<%= pkg.name %>.standalone.js":['./browserified.js'],
+          "../../../flaskenv/delta/delta/static/js/<%= pkg.name %>.standalone.js":['./browserified.js'],
         },
         options: {
           browserifyOptions: {

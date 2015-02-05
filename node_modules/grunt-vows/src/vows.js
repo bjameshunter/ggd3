@@ -8,7 +8,6 @@
 "use strict";
 
 var fs = require("fs"),
-    path = require("path"),
     reporters = ["spec", "json", "dot-matrix", "tap", "xunit"],
     coverageFormats = ["plain", "html", "json", "xml"];
 

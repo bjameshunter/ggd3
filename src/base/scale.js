@@ -143,7 +143,10 @@ Scale.prototype.domain = function(domain) {
     }
   }
   if(_.isNull(this.domain())){ 
-    this.attributes.domain = _.compact(domain); 
+    this.attributes.domain = _.filter(domain,
+                                function(d) {
+                                  return !_.isNull(d) && !_.isUndefined(d);
+                                });
     } else {
     var d = this.attributes.domain;
     if(_.contains(linearScales, this.type())){
@@ -152,7 +155,10 @@ Scale.prototype.domain = function(domain) {
       this.attributes.domain = ggd3.tools
                                 .numericDomain(this.attributes.domain);
     } else {
-      this.attributes.domain = _.compact(_.unique(_.flatten([d, domain])));
+      this.attributes.domain = _.filter(_.unique(_.flatten([d, domain])),
+                                function(d) {
+                                  return !_.isNull(d) && !_.isUndefined(d);
+                                });
     }
   }
   if(!_.isNull(this.scale())){

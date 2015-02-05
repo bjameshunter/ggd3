@@ -204,9 +204,9 @@ Layer.prototype.draw = function(sel, layerNum) {
       if(selection.select('.plot g.g' + layerNum).empty()) {
 
         g = selection.select('.plot')[this.geom().gPlacement()]('g', 'g')
-              .attr('class', 'g' + layerNum);
+              .attr('class', 'g g' + layerNum);
       } else {
-        g = selection.select('g.g' + layerNum);
+        g = selection.select('g.g.g' + layerNum);
       }
     } else {
       // if it's a grid, just pass first g to it

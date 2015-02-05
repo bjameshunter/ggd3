@@ -112,9 +112,8 @@ Bar.prototype.vertical = function(s){
 Bar.prototype.draw = function(sel, data, i, layerNum) {
 
   var s     = this.setup(),
-      that  = this;
-
-  var o, // original value or ordinal scale
+      that  = this,
+      o, // original value or ordinal scale
       n, // numeric agg scale
       rb, // final range band
       o2, // used to calculate rangeband if histogram
@@ -187,6 +186,9 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     size = {s: "width", p:'x'};
     width = {s:"height", p: 'y'};
   }
+  if(!s.group){
+    s.group = s.aes[size.p];
+  }
   s.groups = _.unique(_.pluck(data.data, s.group));
 
   data = this.unNest(data.data);
@@ -236,11 +238,11 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
   data = _.flatten(data, 
                    that.name() === "histogram" ? true:false);
 
-  // data = _.filter(data, function(d) {
-  //   var isnull = _.any([d[s.aes[width.p]], d[s.group]], _.isNull),
-  //       undef = _.any([d[s.aes[width.p]], d[s.group]], _.isUndefined);
-  //   return !(isnull || undef);
-  // });
+  data = _.filter(data, function(d) {
+    var isnull = _.any([d[s.aes[width.p]], d[s.group]], _.isNull),
+        undef = _.any([d[s.aes[width.p]], d[s.group]], _.isUndefined);
+    return !(isnull || undef);
+  });
 
   if(s.position === 'dodge' && this.name() === 'bar') {
     // make ordinal scale for group

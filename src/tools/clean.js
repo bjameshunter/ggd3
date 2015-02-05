@@ -64,11 +64,6 @@ function Clean(data, obj) {
       return ["string", "few"];
     }
   }
-  if(obj instanceof ggd3.plot){
-    console.log('object is a plot');
-    console.log(obj.dtypes());
-    console.log(dtypes);
-  }
   return {data: data, dtypes: dtypes};
 }
 
