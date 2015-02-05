@@ -92,11 +92,6 @@ function Clean(data, obj) {
       return ["string", "few"];
     }
   }
-  if(obj instanceof ggd3.plot){
-    console.log('object is a plot');
-    console.log(obj.dtypes());
-    console.log(dtypes);
-  }
   return {data: data, dtypes: dtypes};
 }
 
@@ -974,9 +969,9 @@ Layer.prototype.draw = function(sel, layerNum) {
       if(selection.select('.plot g.g' + layerNum).empty()) {
 
         g = selection.select('.plot')[this.geom().gPlacement()]('g', 'g')
-              .attr('class', 'g' + layerNum);
+              .attr('class', 'g g' + layerNum);
       } else {
-        g = selection.select('g.g' + layerNum);
+        g = selection.select('g.g.g' + layerNum);
       }
     } else {
       // if it's a grid, just pass first g to it
@@ -1619,7 +1614,10 @@ Scale.prototype.domain = function(domain) {
     }
   }
   if(_.isNull(this.domain())){ 
-    this.attributes.domain = _.compact(domain); 
+    this.attributes.domain = _.filter(domain,
+                                function(d) {
+                                  return !_.isNull(d) && !_.isUndefined(d);
+                                });
     } else {
     var d = this.attributes.domain;
     if(_.contains(linearScales, this.type())){
@@ -1628,7 +1626,10 @@ Scale.prototype.domain = function(domain) {
       this.attributes.domain = ggd3.tools
                                 .numericDomain(this.attributes.domain);
     } else {
-      this.attributes.domain = _.compact(_.unique(_.flatten([d, domain])));
+      this.attributes.domain = _.filter(_.unique(_.flatten([d, domain])),
+                                function(d) {
+                                  return !_.isNull(d) && !_.isUndefined(d);
+                                });
     }
   }
   if(!_.isNull(this.scale())){
@@ -2155,7 +2156,6 @@ Geom.prototype.setup = function() {
     s.nest.rollup(function(d) {
       return s.stat.compute(d);
     });
-
     if(s.aes.fill) {
       s.grouped = true;
       s.group = s.aes.fill;
@@ -2456,9 +2456,8 @@ Bar.prototype.vertical = function(s){
 Bar.prototype.draw = function(sel, data, i, layerNum) {
 
   var s     = this.setup(),
-      that  = this;
-
-  var o, // original value or ordinal scale
+      that  = this,
+      o, // original value or ordinal scale
       n, // numeric agg scale
       rb, // final range band
       o2, // used to calculate rangeband if histogram
@@ -2531,6 +2530,9 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     size = {s: "width", p:'x'};
     width = {s:"height", p: 'y'};
   }
+  if(!s.group){
+    s.group = s.aes[size.p];
+  }
   s.groups = _.unique(_.pluck(data.data, s.group));
 
   data = this.unNest(data.data);
@@ -2580,11 +2582,11 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
   data = _.flatten(data, 
                    that.name() === "histogram" ? true:false);
 
-  // data = _.filter(data, function(d) {
-  //   var isnull = _.any([d[s.aes[width.p]], d[s.group]], _.isNull),
-  //       undef = _.any([d[s.aes[width.p]], d[s.group]], _.isUndefined);
-  //   return !(isnull || undef);
-  // });
+  data = _.filter(data, function(d) {
+    var isnull = _.any([d[s.aes[width.p]], d[s.group]], _.isNull),
+        undef = _.any([d[s.aes[width.p]], d[s.group]], _.isUndefined);
+    return !(isnull || undef);
+  });
 
   if(s.position === 'dodge' && this.name() === 'bar') {
     // make ordinal scale for group
