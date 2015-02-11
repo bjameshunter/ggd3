@@ -32,18 +32,18 @@ function Scale(opts) {
   var getSet = ["aesthetic", "plot", 
                 "rangeBands", "label"];
   for(var attr in this.attributes){
-    if(!this[attr] && _.contains(getSet, attr) ){
+    if(!this[attr] && contains(getSet, attr) ){
       this[attr] = createAccessor(attr);
     }
   }
   this._userOpts = {};
-  if(!_.isUndefined(opts)){
+  if(opts !== undefined){
     // opts may be updated by later functions
     // _userOpts stays fixed on initiation.
-    this._userOpts = _.clone(opts);
+    this._userOpts = clone(opts, true);
     this.opts(opts);
     opts = this.opts();
-    _.each(['type', 'scale', 'label', 'offset'], function(o){
+    ['type', 'scale', 'label', 'offset'].forEach(function(o){
       if(opts.hasOwnProperty(o)){
         this[o](opts[o]);
       }
@@ -95,7 +95,7 @@ Scale.prototype.type = function(type) {
 Scale.prototype.style = function(sel) {
   var styles = ['text', 'style'],
       axis = this.opts().axis;
-  _.each(styles, function(s) {
+  styles.forEach(function(s) {
     if(axis.hasOwnProperty(s)){
       sel.call(axis[s]);
     }
@@ -116,7 +116,7 @@ Scale.prototype.scale = function(settings){
 Scale.prototype.range = function(range, rb) {
   if(!arguments.length) { return this.attributes.range; }
   if(this.type() === "ordinal"){
-    if(_.isUndefined(rb)) { 
+    if(rb === undefined) { 
       rb = this.rangeBands(); 
     }
     this.attributes.scale
@@ -130,11 +130,11 @@ Scale.prototype.range = function(range, rb) {
 
 Scale.prototype.domain = function(domain) {
   if(!arguments.length) { return this.attributes.domain; }
-  domain = _.filter(domain, function(d) {
-    return !_.isUndefined(d) && !_.isNull(d);
+  domain = domain.filter(function(d) {
+    return d !== undefined && d !== null && d !== "";
   });
   if(this.type() ==="log"){
-    if(!_.all(domain, function(d) { return d > 0;}) ){
+    if(!all(domain, function(d) { return d > 0;}) ){
       console.warn("domain must be greater than 0 for log scale." +
       " Scale " + this.aesthetic() + " has requested domain " +
       domain[0] + " - " + domain[1] + ". Setting lower " +
@@ -142,26 +142,31 @@ Scale.prototype.domain = function(domain) {
       domain[0] = 1;
     }
   }
-  if(_.isNull(this.domain())){ 
-    this.attributes.domain = _.filter(domain,
-                                function(d) {
-                                  return !_.isNull(d) && !_.isUndefined(d);
+  if(this.domain() === null){ 
+    this.attributes.domain = domain.filter(function(d) {
+                              return d !== null && d !== undefined && d !== "";
                                 });
     } else {
     var d = this.attributes.domain;
-    if(_.contains(linearScales, this.type())){
+    if(contains(linearScales, this.type())){
       if(domain[0] < d[0]) { this.attributes.domain[0] = domain[0];}
       if(domain[1] > d[1]) { this.attributes.domain[1] = domain[1];}
       this.attributes.domain = ggd3.tools
                                 .numericDomain(this.attributes.domain);
     } else {
-      this.attributes.domain = _.filter(_.unique(_.flatten([d, domain])),
-                                function(d) {
-                                  return !_.isNull(d) && !_.isUndefined(d);
-                                });
+      var newDomain = [];
+      flatten([d, domain]).map(function(d) {
+        if(!contains(newDomain, d)){
+          newDomain.push(d);
+        }
+      });
+      newDomain.sort();
+      this.attributes.domain = newDomain.filter(function(d) {
+        return d !== null && d !== undefined && d !== "";
+      });
     }
   }
-  if(!_.isNull(this.scale())){
+  if(this.scale() !== null){
     this.scale().domain(this.attributes.domain);
   }
   return this;
@@ -173,13 +178,8 @@ Scale.prototype.offset = function(o) {
   return this;
 };
 
-Scale.prototype.axisLabel = function(o, l) {
-  if(!arguments.length) { return this.attributes.label; }
-  // o is the label
-  if(_.isString(o)){ 
-    this.attributes.label = o; 
-    return this;
-  }
+Scale.prototype.axisLabel = function(o) {
+  var l = this.label();
   if(o instanceof d3.selection){
     var pd = this.plot().plotDim(),
         tr, offset,
@@ -191,7 +191,7 @@ Scale.prototype.axisLabel = function(o, l) {
       offset = this.opts().axis.position === "top" ? -this.offset():this.offset();
       tr = "translate(0," + offset + ")";
     }
-    // make the label
+
     var label = o.selectAll('.label').data([0]);
     label
       .attr('width', pd[this.aesthetic()])

@@ -16,7 +16,7 @@ function Bar(spec) {
     stackRange: 0,
   };
 
-  this.attributes = _.merge(this.attributes, attributes);
+  this.attributes = merge(this.attributes, attributes);
 
   for(var attr in this.attributes){
     if((!this[attr] && this.attributes.hasOwnProperty(attr))){
@@ -35,33 +35,31 @@ Bar.prototype.fillEmptyStackGroups = function(data, v) {
   // this should be usable for histograms as well
   // but currently is not.
   if(!data.length) { return data; }
-  var keys = _.unique(_.flatten(_.map(data, function(d) {
-    return _.map(d.values, function(e) {
+  var keys = unique(flatten(data.map(function(d) {
+    return d.values.map(function(e) {
       return e[v];
     });
   })));
   // get an example object and set it's values to null;
-  var filler = _.clone(data[0].values[0]);
-  _.mapValues(filler, function(v,k) {
+  var filler = clone(data[0].values[0]);
+  for(var k in filler){
     filler[k] = null;
-  });
-  _.each(data, function(d) {
+  }
+  data.forEach(function(d) {
     var dkey, missing;
-    dkeys = _.map(d.values, function(e) { return e[v]; });
-    missing = _.compact(_.filter(keys, function(k) {
-      return !_.contains(dkeys, k);
+    dkeys = pluck(d.values, v);
+    missing = compact(keys.filter(function(k) {
+      return !contains(dkeys, k);
     }));
-    if(!_.isEmpty(missing)) {
-      _.each(missing, function(m) {
+    if(missing.length !== 0) {
+      missing.forEach(function(m) {
         // must fill other values, too.
-        var e = _.clone(filler);
+        var e = clone(filler);
         e[v] = m;
         d.values.push(e);
       });
     }
-    d.values = _.sortBy(d.values, function(e) {
-      return e[v];
-    });
+    d.values = merge_sort(d.values, v);
   });
 
   return data;
@@ -73,24 +71,25 @@ Bar.prototype.domain = function(data, a) {
       group, stackby,
       groupRange, stackRange,
       grouped;
-  if(!_.contains(linearScales, s.plot[a + "Scale"]().single.type())) {
-    var domain = _.sortBy(_.unique(_.pluck(data, s.aes[a])));
+  if(!contains(linearScales, s.plot[a + "Scale"]().single.type())) {
+    var domain = unique(pluck(data, s.aes[a])).sort();
     return domain;
   }
   group = s.aes.fill || s.aes.color || s.aes.group;
   stackby = a === "x" ? s.aes.y: s.aes.x;
 
-  grouped = _.groupBy(data, function(d) {
-    return d[stackby];
-  });
+  grouped = d3.nest()
+              .key(function(d) {
+                return d[stackby];
+              })
+              .entries(data);
 
-  stackRange = _.mapValues(grouped, function(v, k) {
-    return _.reduce(_.pluck(v, valueVar), function(a,b) {
-      return a + b;
+  stackRange = grouped.map(function(d) {
+    return d.values.reduce(function(a, b) {
+      return a[valueVar] + b[valueVar];
     });
   });
-  stackRange = d3.extent(_.map(stackRange, 
-                         function(v, k) { return v; }));
+  stackRange = d3.extent(stackRange);
   groupRange = d3.extent(data, function(d) {
     return d[valueVar];
   });
@@ -127,7 +126,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       drawY     = this.drawY(),
       vertical = this.vertical(s);
 
-  if(_.contains(['wiggle', 'silhouette'], that.offset()) ){
+  if(contains(['wiggle', 'silhouette'], that.offset()) ){
     var parentSVG = d3.select(sel.node().parentNode.parentNode);
     if(vertical){
       // x is bars, don't draw Y axis
@@ -149,14 +148,15 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
   }
   // gotta do something to reset domains if offset is expand
   if(that.offset() === "expand"){
+    var k;
     if(vertical){
-      _.mapValues(s.plot.yScale(), function(v, k) {
-        v.domain([-0.02,1.02]);
-      });
+      for (k in s.plot.yScale()){
+        s.plot.yScale()[k].domain([-0.02,1.02]);
+      }
     } else {
-      _.mapValues(s.plot.xScale(), function(v, k) {
-        v.domain([-0.02,1.02]);
-      });  
+      for (k in s.plot.xScale()){
+        s.plot.xScale()[k].domain([-0.02,1.02]);
+      }
     }
   }
 
@@ -189,7 +189,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
   if(!s.group){
     s.group = s.aes[size.p];
   }
-  s.groups = _.unique(_.pluck(data.data, s.group));
+  s.groups = unique(pluck(data.data, s.group));
 
   data = this.unNest(data.data);
   // data must be nested to go into stack algorithm
@@ -203,7 +203,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
   // with histograms, if a bin is empty, it's key comes
   // back 'undefined'. This causes bars to be drawn
   // from the top (or right). They should be removed
-  data = _.filter(data, function(d) { 
+  data = data.filter(function(d) { 
     return d.key !== "undefined" ;});
   if(this.name() === "bar"){
     rb = o.rangeBand();
@@ -219,7 +219,7 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     }
   }
   if(s.grouped && 
-     _.contains([s.aes.x, s.aes.y], s.group)){
+     contains([s.aes.x, s.aes.y], s.group)){
     console.log('grouping is already shown by facets' +
                 ' unnecessary color scales probably generated');
   }
@@ -231,17 +231,17 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
                 .offset(that.offset())
                 .values(function(d) { 
                   return d.values; });
-  data = _.map(stack(data),
-                          function(d) {
+  data = stack(data).map(function(d) {
                             return d.values ? d.values: [];
                           });
-  data = _.flatten(data, 
-                   that.name() === "histogram" ? true:false);
 
-  data = _.filter(data, function(d) {
-    var isnull = _.any([d[s.aes[width.p]], d[s.group]], _.isNull),
-        undef = _.any([d[s.aes[width.p]], d[s.group]], _.isUndefined);
-    return !(isnull || undef);
+  data = flatten(data, this.name() === 'bar' ? true:false);
+
+  data = data.filter(function(d) {
+    var isnull = any([d[s.aes[width.p]], d[s.group]], function(x) {
+      return (x === null) || (x === undefined);
+    });
+    return !isnull;
   });
 
   if(s.position === 'dodge' && this.name() === 'bar') {
@@ -250,8 +250,8 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
             .domain(pSub.domain());
     var rrb = pSub.rangeExtent();
     rb = [];
-    rb[0] = _.isNumber(this.subRangeBand()) ? this.subRangeBand(): s.plot.subRangeBand();
-    rb[1] = _.isNumber(this.subRangePadding()) ? this.subRangePadding(): s.plot.subRangePadding();
+    rb[0] = typeof this.subRangeBand() ==='number' ? this.subRangeBand(): s.plot.subRangeBand();
+    rb[1] = typeof this.subRangePadding() ==='number' ? this.subRangePadding(): s.plot.subRangePadding();
     sub.rangeRoundBands(rrb, rb[0], rb[1]);
     rb = sub.rangeBand();
   } else {
@@ -324,8 +324,8 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     };
   } )();
 
-  var matched = this.merge_variables(_.keys(data[0]));
-  var data_matcher = _.bind(this.data_matcher(matched), this);
+  var matched = this.merge_variables(Object.keys(data[0]));
+  var data_matcher = this.data_matcher(matched).bind(this);
   var bars = sel.selectAll('rect.geom.g' + layerNum)
                 .data(data, data_matcher),
       tt = ggd3.tooltip()

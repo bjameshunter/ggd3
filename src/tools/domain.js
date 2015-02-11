@@ -1,5 +1,5 @@
 ggd3.tools.numericDomain = function(data, variable, rule, zero) {
-  var extent = d3.extent(_.pluck(data, variable)),
+  var extent = d3.extent(pluck(data, variable)),
       range = extent[1] - extent[0];
   if(rule === "left" || rule === "both"){
     extent[0] -= 0.1 * range;
@@ -16,5 +16,5 @@ ggd3.tools.numericDomain = function(data, variable, rule, zero) {
   return extent;
 };
 ggd3.tools.categoryDomain = function(data, variable) {
-  return _.sortBy(_.compact(_.unique(_.pluck(data, variable))));
+  return compact(unique(pluck(data, variable))).sort();
 };

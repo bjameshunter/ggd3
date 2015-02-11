@@ -17,7 +17,7 @@ function Density(spec) {
     lineWidth: null
   };
 
-  this.attributes = _.merge(this.attributes, attributes);
+  this.attributes = merge(this.attributes, attributes);
 
   for(var attr in this.attributes){
     if((!this[attr] && this.attributes.hasOwnProperty(attr))){

@@ -8,9 +8,10 @@ function Ribbon(spec) {
     name: "ribbon",
     stat: "identity",
     position: null,
+    gPosition: 'insert'
   };
 
-  this.attributes = _.merge(this.attributes, attributes);
+  this.attributes = merge(this.attributes, attributes);
 
   for(var attr in this.attributes){
     if((!this[attr] && this.attributes.hasOwnProperty(attr))){
@@ -31,15 +32,13 @@ Ribbon.prototype.generator = function(aes, x, y, o2, group, n) {
   return area
           .x(function(d, i) { return x(d[aes.x]); })
           .y0(function(d, i) { 
-            // console.log(y('min', n)(d));
             return y('ymin', n)(d); })
           .y1(function(d, i) { 
-            // console.log(y('max', n)(d));
             return y('ymax', n)(d); });
 };
 Ribbon.prototype.drawRibbon = function(sel, data, i, layerNum, areaGen,
                                        s) {
-  var ribbon = sel.selectAll(".g" + layerNum + "geom-" + this.name())
+  var ribbon = sel.selectAll(".geom.g" + layerNum + ".geom-" + this.name())
               .data(data),
       that = this;
   ribbon.transition()
@@ -47,7 +46,7 @@ Ribbon.prototype.drawRibbon = function(sel, data, i, layerNum, areaGen,
       Area.prototype.drawArea.call(that, d3.select(this), areaGen(i), s, layerNum, i);
     });
   // makes sense that all area/ribbons go first.
-  ribbon.enter().insert(this.geom(), ".geom.g0")
+  ribbon.enter()[this.gPosition()](this.geom(), "*")
     .each(function(d, i) {
       Area.prototype.drawArea.call(that, d3.select(this), areaGen(i), s, layerNum, i);
     });

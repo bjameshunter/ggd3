@@ -13,7 +13,7 @@ function Point(spec) {
     position: "identity",
   };
 
-  this.attributes = _.merge(this.attributes, attributes);
+  this.attributes = merge(this.attributes, attributes);
 
   for(var attr in this.attributes){
     if((!this[attr] && this.attributes.hasOwnProperty(attr))){
@@ -58,7 +58,8 @@ Point.prototype.draw = function(sel, data, i, layerNum, s) {
   // if a different geom wants to create a point object.
   var x, y, scales, points;
   // other functions that call geom point will supply an "s" object
-  if(_.isUndefined(s)) {
+  // such as boxplot
+  if(s === undefined) {
     s = this.setup();
     scales = this.scalesAxes(sel, s, data.selector, layerNum,
                                  true, true);
@@ -68,7 +69,7 @@ Point.prototype.draw = function(sel, data, i, layerNum, s) {
     data = this.unNest(data.data);
     // get rid of wrong elements if they exist.
     points = sel.selectAll('.geom.g' + layerNum + ".geom-" + this.name())
-                .data(_.filter(data, function(d) {
+                .data(data.filter(function(d) {
                   return !isNaN(d[s.aes.x]) && !isNaN(d[s.aes.y]);
                 }));
   } else {

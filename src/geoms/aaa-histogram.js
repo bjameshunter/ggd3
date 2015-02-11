@@ -13,7 +13,7 @@ function Histogram(spec) {
     frequency: true,
   };
   var r = function(d) { return ggd3.tools.round(d, 2);};
-  this.attributes = _.merge(this.attributes, attributes);
+  this.attributes = merge(this.attributes, attributes);
 
   function tooltip(sel, opts) {
     var s = this.setup(),
@@ -33,7 +33,7 @@ function Histogram(spec) {
           .append("span").text(d.length);
     });
   }
-  this.attributes.tooltip = _.bind(tooltip, this);
+  this.attributes.tooltip = tooltip.bind(this);
 
   for(var attr in this.attributes){
     if((!this[attr] && this.attributes.hasOwnProperty(attr))){
@@ -73,15 +73,17 @@ Histogram.prototype.domain = function(data, v) {
       grouped;
 
   if(s.aes[v] === "binHeight") {
-    grouped = _.groupBy(data, function(d) {
-      return d.x;
+    grouped = d3.nest()
+                .key(function(d) {
+                  return d.x;
+                })
+                .entries(data);
+    stackSum = grouped.map(function(d) {
+      return d.values.reduce(function(pre, val) {
+        return val.y + pre;
+      }, 0);
     });
-    stackSum = _.mapValues(grouped, function(v, k) {
-      return _.reduce(_.pluck(v, "y"), function(a,b) {
-        return a + b;
-      });
-    });
-    stackSum = d3.extent(_.map(stackSum, function(v, k) { return v; }));
+    stackSum = d3.extent(stackSum.map(function(v, k) { return v; }));
     groupSum = d3.extent(data, function(d) {
       return d.y;
     });
@@ -89,7 +91,7 @@ Histogram.prototype.domain = function(data, v) {
     range = extent[1] - extent[0];
     extent[0] -= 0.05*range;
   } else {
-    extent = d3.extent(_.pluck(data, 'x'));
+    extent = d3.extent(pluck(data, 'x'));
     range = extent[1] - extent[0];
     extent[0] -= 0.1*range;
   }
@@ -109,7 +111,7 @@ Histogram.prototype.compute = function(data, s) {
   }
   this.breaks(this.bins());
   var unNested = s.stat.compute(data),
-      breaks = _.map(unNested, "x");
+      breaks = pluck(unNested, "x");
   // this is the problem
   // there should be a 'fixed bins' flag
   this.breaks(breaks);
@@ -118,9 +120,9 @@ Histogram.prototype.compute = function(data, s) {
 
 Histogram.prototype.fillEmptyStackGroups = function(data, v) {
 
-  var keys = _.unique(_.map(data, function(d) { return d.key; })),
-      vals = _.unique(_.flatten(_.map(data, function(d) {
-        return _.map(d.values, 'x');
+  var keys = unique(pluck(data, function(d) { return d.key; })),
+      vals = unique(flatten(pluck(data, function(d) {
+        return pluck(d.values, 'x');
       }))),
       empty = {},
       n = d3.nest()
@@ -128,22 +130,22 @@ Histogram.prototype.fillEmptyStackGroups = function(data, v) {
   empty.y = 0;
   empty.binHeight = 0;
   empty.dx = data[0].dx;
-  _.each(data, function(d) {
+  data.forEach(function(d) {
     var dkey, missing;
-    dkeys = _.map(d.values, 'x');
-    missing = _.compact(_.filter(vals, function(k) {
-      return !_.contains(dkeys, k);
+    dkeys = pluck(d.values, 'x');
+    missing = compact(vals.filter(function(k) {
+      return !contains(dkeys, k);
     }));
-    if(!_.isEmpty(missing)) {
-      _.each(missing, function(m) {
+    if(missing.length !== 0) {
+      missing.forEach(function(m) {
         // must fill other values, too.
-        var e = _.clone(empty);
+        var e = clone(empty);
         e.x = m;
         d.values.push(e);
       });
     }
-    d.values = _.sortBy(d.values, function(e) {
-      return e.x;
+    d.values = d.values.sort(function(a, b) {
+      return b.x - a.x;
     });
   });
   return data;
@@ -160,14 +162,14 @@ Histogram.prototype.nest = function() {
       plot = this.layer().plot(),
       nest = d3.nest(),
       dtypes = plot.dtypes(),
-      nestVars = _.unique(_.compact([aes.group, aes.fill, aes.color]));
+      nestVars = unique(compact([aes.group, aes.fill, aes.color]));
 
-  _.each(nestVars, function(n) {
+  nestVars.forEach(function(n) {
     if(dtypes[n][1] !== "many") {
       nest.key(function(d) { return d[n]; });
     }
   });
-  _.map(['x', 'y'], function(a) {
+  ['x', 'y'].forEach(function(a) {
     if(plot[a + "Scale"]().single.type() === "ordinal"){
       nest.key(function(d) { return d[aes[a]]; });
     }

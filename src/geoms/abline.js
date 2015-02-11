@@ -6,10 +6,9 @@ function Abline(spec) {
   Line.apply(this);
   var attributes = {
     name: "abline",
-    // color: d3.functor("black")
   };
 
-  this.attributes = _.merge(_.clone(this.attributes), attributes);
+  this.attributes = merge(this.attributes, attributes);
 
   for(var attr in this.attributes){
     if((!this[attr] && this.attributes.hasOwnProperty(attr))){
@@ -31,10 +30,10 @@ Abline.prototype.domain = function(data, a) {
 
 Abline.prototype.prepareData = function(d, s, scales) {
 
-  if(!_.contains(_.keys(s.aes), "yintercept")){
+  if(!contains(Object.keys(s.aes), "yintercept")){
     throw "geom abline requires aesthetic 'yintercept' and an optional slope.";
   }
-  if(!_.contains(linearScales, scales.x.type() )){
+  if(!contains(linearScales, scales.x.type() )){
     throw "use geom hline or vline to draw lines on an ordinal x axis y yaxis";
   }
   if(!s.aes.slope){
@@ -42,13 +41,13 @@ Abline.prototype.prepareData = function(d, s, scales) {
   }
   var xdomain = scales.x.scale().domain(),
       data;
-  if(_.isNumber(s.aes.yintercept)){
+  if(typeof s.aes.yintercept === 'number'){
     s.aes.yintercept = [s.aes.yintercept];
   }
-  if(_.isArray(s.aes.yintercept)){
+  if(Array.isArray(s.aes.yintercept)){
     // yints and slopes are drawn on every facet.
-    data = _.map(s.aes.yintercept, function(y) {
-      return _.map(xdomain, function(x, i) {
+    data = s.aes.yintercept.map(function(y) {
+      return xdomain.map(function(x, i) {
         var o = {};
         o[s.aes.x] = x;
         o[s.aes.y] = y + s.aes.slope * x;
@@ -56,14 +55,14 @@ Abline.prototype.prepareData = function(d, s, scales) {
       });
     });
   }
-  if(_.isString(s.aes.yintercept)){
+  if(typeof s.aes.yintercept === 'string'){
     data = [];
-    _.each(d.data, function(row) {
-      data.push(_.map(xdomain, function(x) {
+    d.data.forEach(function(row) {
+      data.push(xdomain.map(function(x) {
         var o = {};
         o[s.aes.x] = x;
         o[s.aes.y] = row[s.aes.yintercept] + row[s.aes.slope] * x;
-        o = _.merge(_.clone(row), o);
+        o = merge(clone(row), o);
         return o;
       }));
     }); 

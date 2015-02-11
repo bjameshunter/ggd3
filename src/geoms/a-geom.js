@@ -17,6 +17,7 @@ function Geom(aes) {
     drawX: true,
     drawY: true,
     data: [],
+    ownData: false,
     style: "", // optional class attributes for css 
     tooltip: null,
     groups: null, 
@@ -24,6 +25,9 @@ function Geom(aes) {
     subRangePadding: 0,
     omit: null,
     mergeOn: null,
+    enter: null,
+    exit: null,
+    initial: null,
   };
   var r = function(d) { return ggd3.tools.round(d, 2);};
   // default tooltip
@@ -31,23 +35,26 @@ function Geom(aes) {
   // default function on attributes is messy.
   function tooltip(sel, s, opts){
     var omit = this.omit() || [],
-        d = sel.data()[0];
-    omit = _.flatten([omit, s.stat.exclude]);
+        d = sel.data()[0],
+        diff;
+    omit = flatten([omit, s.stat.exclude]);
     // if 'additional' aesthetics are declared, they are wanted regardless.
     // remove them from the omit array
     omit.splice(omit.indexOf('additional'), 1);
-
-    _.each(_.difference(_.keys(s.aes), omit), function(k) {
+    diff = Object.keys(s.aes).filter(function(d) {
+            return !contains(omit, d);
+          });
+    diff.forEach(function(k) {
       if(k === 'additional'){
-        _.each(s.aes[k], function(a, i) {
+        s.aes[k].forEach(function(a, i) {
           sel.append('h4')
             .text(a + ": ")
             .append('span').text(this.abbrev(d, s, k, i));
         }, this);
       } else {
-      if(_.isNull(s.stat[k]) || _.isNull(s.stat[k]())){ return null; }
+      if(s.stat[k] === null || s.stat[k]() === null){ return null; }
       var stat = s.stat[k]()._name || "identity";
-      stat = _.contains(["identity", "first"], stat) ? "": " (" + stat + ")";
+      stat = contains(["identity", "first"], stat) ? "": " (" + stat + ")";
         sel.append('h4')
           .text(s.aes[k] + stat + ": ")
           .append('span').text('(' + k + ') ' + 
@@ -56,8 +63,7 @@ function Geom(aes) {
     }, this);
   }
   this.attributes = attributes;
-
-  this.attributes.tooltip = _.bind(tooltip, this);
+  this.attributes.tooltip = tooltip.bind(this);
 }
 
 Geom.prototype.tooltip = function(tooltip) {
@@ -90,6 +96,7 @@ Geom.prototype.defaultPosition = function() {
     "ribbon" : "identity",
     }[n];
 };
+
 Geom.prototype.abbrev = function(d, s, a, i){
   if(a === 'additional'){ 
     a = s.aes[a][i]; 
@@ -115,12 +122,12 @@ Geom.prototype.abbrev = function(d, s, a, i){
 };
 
 Geom.prototype.merge_variables = function(variables){
-  if(!_.isNull(this.mergeOn())){
+  if(this.mergeOn() !== null){
     return this.mergeOn();
   }
   var s = this.setup(),
-      matched = _.intersection(variables,
-                   _.filter(_.keys(s.dtypes), function(d) {
+      matched = intersection(variables,
+                   Object.keys(s.dtypes).filter(function(d) {
                        return (s.dtypes[d][1] === 'few' ||
                                s.dtypes[d][0] === 'string');
                      }));
@@ -130,7 +137,7 @@ Geom.prototype.merge_variables = function(variables){
 Geom.prototype.data_matcher = function(matches){
   return function(d, i) {
     if(matches.length){
-      return _.map(matches, function(m) {
+      return matches.map(function(m) {
         return d[m];
       }).join(' ');
     } else {
@@ -175,7 +182,7 @@ Geom.prototype.setup = function() {
       s.group = s.aes.group;
     }
     // not convinced this is a good idea.
-    // if(_.contains([s.facet.x(), s.facet.y()], 
+    // if(contains([s.facet.x(), s.facet.y()], 
     //               s.group)) {
     //   // uninteresting grouping, get rid of it.
     //   s.grouped = false;
@@ -203,10 +210,10 @@ Geom.prototype.collectGroups = function() {
     group = aes.group;
   }
   if(grouped) {
-    groups = _.unique(
-                _.pluck(
-                  _.flatten(
-                    _.map(this.data(), 'data')), group));
+    groups = unique(
+                pluck(
+                  flatten(
+                    this.data().map(getItem('data'))), group));
     this.groups(groups);
   }
   return groups;
@@ -223,20 +230,20 @@ Geom.prototype.domain = function(data, a) {
       extent,
       range;
 
-  if(_.contains(linearScales, plot[a + "Scale"]().single.type())) {
-    extent  = d3.extent(_.pluck(data, aes[a]));
+  if(contains(linearScales, plot[a + "Scale"]().single.type())) {
+    extent  = d3.extent(pluck(data, aes[a]));
     range   = extent[1] - extent[0];
   } else {
-    var domain = _.sortBy(_.unique(_.pluck(data, aes[a])));
-    return domain;
+    var domain = unique(data, aes[a]);
+    return domain.sort();
   }
   // done if date
   // and not a calculated aesthetic
   var skip = ['binHeight', 'density', 'n. observations', undefined],
       skip2 = ['yintercept', 'xintercept', 'slope'];
 
-  if(!_.contains(skip, aes[a]) && !_.contains(skip2, a)){
-    if(_.contains(["date", "time"], plot.dtypes()[aes[a]][0]) ){
+  if(!contains(skip, aes[a]) && !contains(skip2, a)){
+    if(contains(["date", "time"], plot.dtypes()[aes[a]][0]) ){
       return extent;
     }
   }
@@ -261,16 +268,16 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
       colNum = parseInt(parentSVG.attr('col'));
   // choosing scales based on facet rule
 
-  if(!_.contains(["free", "free_x"], setup.facet.scales()) || 
-     _.isUndefined(setup.plot.xScale()[selector])){
+  if(!contains(["free", "free_x"], setup.facet.scales()) || 
+     setup.plot.xScale()[selector] === undefined){
     x = setup.plot.xScale().single;
     xfree = false;
   } else {
     x = setup.plot.xScale()[selector];
     xfree = true;
   }
-  if(!_.contains(["free", "free_y"], setup.facet.scales()) || 
-     _.isUndefined(setup.plot.xScale()[selector])){
+  if(!contains(["free", "free_y"], setup.facet.scales()) || 
+     setup.plot.xScale()[selector] === undefined){
     y = setup.plot.yScale().single;
     yfree = false;
   } else {
@@ -287,7 +294,7 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
     xax.attr('opacity', 1);
     if(x.label()){
       parentSVG.select('.x.axis')
-        .call(_.bind(x.axisLabel, x), x.axisLabel());
+        .call(x.axisLabel.bind(x));
     }
   }
   if(layerNum === 0 && drawY){
@@ -299,7 +306,7 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
     yax.attr('opacity', 1);
     if(y.label()){
       parentSVG.select('.y.axis')
-        .call(_.bind(y.axisLabel, y), y.axisLabel());
+        .call(y.axisLabel.bind(y));
     }
   }
   return {
@@ -317,23 +324,23 @@ Geom.prototype.nest = function() {
       plot = this.layer().plot(),
       nest = d3.nest(),
       dtypes = plot.dtypes(),
-      nestVars = _.unique(_.compact([aes.group, aes.fill, aes.color]));
+      nestVars = unique(compact([aes.group, aes.fill, aes.color]));
 
-  _.each(nestVars, function(n) {
+  nestVars.forEach(function(n) {
     if(dtypes[n][1] !== "many") {
       nest.key(function(d) { return d[n]; });
     }
   });
-  _.map(['x', 'y'], function(a) {
+  ['x', 'y'].forEach(function(a) {
     if(plot[a + "Scale"]().single.type() === "ordinal"){
       nest.key(function(d) { return d[aes[a]]; });
     }
   });
   return nest;
 };
+
 Geom.prototype.removeElements = function(sel, layerNum, clss) {
   var remove = sel
-                .select('.plot')
                 .selectAll('.geom.g' + layerNum)
                 .filter(function() {
                   return d3.select(this)[0][0].classList !== clss;
@@ -341,6 +348,7 @@ Geom.prototype.removeElements = function(sel, layerNum, clss) {
   remove.transition()
     .style('opacity', 0)
     .remove();
+  
 };
 
 

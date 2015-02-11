@@ -14,7 +14,7 @@ function Path(spec) {
   };
   // path is just line drawn in order, so probably doesn't need anything.
 
-  this.attributes = _.merge(this.attributes, attributes);
+  this.attributes = merge(this.attributes, attributes);
 
   for(var attr in this.attributes){
     if((!this[attr] && this.attributes.hasOwnProperty(attr))){

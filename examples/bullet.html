@@ -54,12 +54,18 @@ var min = ggd3.geoms.hline()
               .lineType("none")
               .lineWidth(3)
               .alpha(0.5);
-var area1 = ggd3.layer().geom(ggd3.geoms.area()
-                                .alpha(0.5))
-var area2 = ggd3.layer().geom(ggd3.geoms.area()
-                                .alpha(0.3))
-var area3 = ggd3.layer().geom(ggd3.geoms.area()
-                                .alpha(0.1))
+var area1 = ggd3.geoms.area()
+                .alpha(0.5)
+                .ownData(true)
+                .mergeOn(['cyl', 'gear']);
+var area2 = ggd3.geoms.area()
+                .alpha(0.3)
+                .ownData(true)
+                .mergeOn(['cyl', 'gear']);
+var area3 = ggd3.geoms.area()
+                .alpha(0.1)
+                .ownData(true)
+                .mergeOn(['cyl', 'gear']);
 var areaData;
 var bar = ggd3.geoms.bar()
             .subRangePadding(0.4)
@@ -87,6 +93,11 @@ var chart = ggd3.plot()
                             offset: 25})
                     .rangePadding(0)
                     .facet(facet)
+                    .dtypes({
+                      cyl: ['number', 'few', ',.0d'],
+                      gear:['number', 'few', ',.0d'],
+                      mpg: ['number', 'many', ',.1f']
+                    })
                     .rangeBand(0.1)
                     .margins({top: 50, bottom:10, left:50, right:10})
                     .layers(layers);
@@ -101,7 +112,7 @@ d3.csv("../data/mtcars.csv", function(error, d) {
   var d2 = _.clone(d)
   areaData = d3.nest()
                     .key(function(d) { return d.cyl; })
-                    // .key(function(d) { return d.gear; })
+                    .key(function(d) { return d.gear; })
                     .rollup(function(d) {
                       var o = {},
                       arr = _.pluck(d, "mpg"),
@@ -119,7 +130,6 @@ d3.csv("../data/mtcars.csv", function(error, d) {
                     })
   chart.data(data);
   areaData = chart.unNest(areaData.entries(data));
-  console.log(areaData);
   area1.data(_.flatten(_.pluck(areaData, 'min')));
   area2.data(_.flatten(_.pluck(areaData, 'mean')));
   area3.data(_.flatten(_.pluck(areaData, 'max')));

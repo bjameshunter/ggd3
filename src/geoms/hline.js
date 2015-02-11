@@ -10,7 +10,7 @@ function Hline(spec) {
     highlightZero: true,
   };
 
-  this.attributes = _.merge(this.attributes, attributes);
+  this.attributes = merge(this.attributes, attributes);
 
   for(var attr in this.attributes){
     if((!this[attr] && this.attributes.hasOwnProperty(attr))){
@@ -57,14 +57,12 @@ Hline.prototype.prepareData = function(data, s, scales) {
       range = scale.domain(),
       p;
   if(this.grid()) {
-    if(!_.contains(linearScales, scale.type())){
-      p =  _.map(scale.scale().domain(),
-                function(i) {
+    if(!contains(linearScales, scale.type())){
+      p =  scale.scale().domain().map(function(i) {
                   return scale.scale()(i) + scale.scale().rangeBand()/2;
                 });
     } else {
-      p = _.map(scales[direction].scale().ticks(4),
-                function(i) {
+      p = scales[direction].scale().ticks(4).map(function(i) {
                   return scale.scale()(i);
                 });
     } 
@@ -74,13 +72,13 @@ Hline.prototype.prepareData = function(data, s, scales) {
       return Math.abs(val) < 1e-6 ? true: false;
     };
     data = [];
-    _.each(p, function(intercept) {
+    p.forEach(function(intercept) {
       var o1 = {}, o2 = {};
       o1[direction] = intercept;
       o2[direction] = intercept;
       o1[other] = 0;
       o2[other] = s.dim[other];
-      if(_.contains(linearScales, scale.type()) && this.highlightZero()){
+      if(contains(linearScales, scale.type()) && this.highlightZero()){
         o1.zero = close_to_zero(scale.scale().invert(intercept));
         o2.zero = close_to_zero(scale.scale().invert(intercept));
       }
@@ -88,30 +86,30 @@ Hline.prototype.prepareData = function(data, s, scales) {
     }, this);
     return data;
   }
-  if(_.isUndefined(s.aes[other + "intercept"])){
+  if(s.aes[other + "intercept"] === undefined){
     // data must be array of objects with required aesthetics.
     data = Line.prototype.prepareData.call(this, data, s);
     // data are nested
-    if(_.contains(linearScales, scale.type())) {
-      data = _.map(data, function(d) {
-        return _.map(d, function(r) {
-          return _.map(range, function(e){
-            var o = _.clone(r);
+    if(contains(linearScales, scale.type())) {
+      data = data.map(function(d) {
+        return d.map(function(r) {
+          return range.map(function(e){
+            var o = clone(r);
             o[s.aes[direction]] = e;
             return o;
           });
         });
       });
-      data = _.flatten(data, true);
+      data = flatten(data, false);
     } else {
-      data = _.map(_.flatten(data), function(d) {
+      data = flatten(data).map(function(d) {
         return [d, d];
       });
     }
   } else {
     // there should be an array of intercepts on 
     // s.aes.yintercept or s.aes.xintercept
-    data = _.map(s.aes[other + "intercept"], function(i) {
+    data = s.aes[other + "intercept"].map(function(i) {
       var o1 = {},
           o2 = {};
       o1[s.aes[other]] = i;

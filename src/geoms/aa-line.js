@@ -19,7 +19,7 @@ function Line(spec) {
   // that way. 
   // My example is faceted by decade, meaning the color variable
   // "date", doesn't change much within a facet. With "freeColor" it does.
-  this.attributes = _.merge(this.attributes, attributes);
+  this.attributes = merge(this.attributes, attributes);
 
   for(var attr in this.attributes){
     if((!this[attr] && this.attributes.hasOwnProperty(attr))){
@@ -111,9 +111,9 @@ Line.prototype.prepareData = function(data, s) {
   data = s.nest
           .entries(data.data) ;
   // array of grouped data with 1 or 2 group variables
-  data = _.map(data, function(d) { return this.recurseNest(d);}, this);
+  data = data.map(function(d) { return this.recurseNest(d);}, this);
   data = ggd3.tools.arrayOfArrays(data);
-  return _.isArray(data[0]) ? data: [data];
+  return Array.isArray(data[0]) ? data: [data];
 };
 
 Line.prototype.draw = function(sel, data, i, layerNum){
@@ -144,43 +144,43 @@ Line.prototype.draw = function(sel, data, i, layerNum){
   var l1 = this.generator(s.aes, x, y, o2, s.group),
       selector = data.selector;
   data = this.prepareData(data, s, scales);
-  if(_.isEmpty(_.flatten(data))) { return data; }
+  if(flatten(data).length === 0) { return data; }
   // overwriting the color function messes up tooltip labeling,
   // if needed.
   s.lcolor = s.color;
 
   // if color gradient
-  if(s.aes.color && _.contains(['number', 'date', 'time'], s.dtypes[s.aes.color][0]) && s.dtypes[s.aes.color][1] === "many"){
+  if(s.aes.color && contains(['number', 'date', 'time'], s.dtypes[s.aes.color][0]) && s.dtypes[s.aes.color][1] === "many"){
     s.gradient = true;
     if(this.freeColor()){
       var color = d3.scale.linear()
                 .range(s.plot.colorRange())
-                .domain(d3.extent(_.pluck(_.flatten(data), s.aes.color)));
+                .domain(d3.extent(pluck(flatten(data), s.aes.color)));
       s.lcolor = function(d) { return color(d[s.aes.color]); };
     } 
-    data = _.map(data, function(d) { 
+    data = data.map(function(d) { 
       return this.quad(this.sample(d, l1, x, y, s.color, s.aes ), 
                        s.aes); }, this);
-    data = _.flatten(data, true);
+    data = flatten(data, false);
     // alpha must be constant
     var lw = this.lineWidth();
     s.alpha = s.plot.alpha();
-    line = _.bind(function(d) {
+    line = function(d) {
       return this.lineJoin(d[0], d[1], d[2], d[3], lw);
-    }, this);
+    }.bind(this);
   } else {
     line = l1;
   }
   sel = this.grid() ? parentSVG.select("." + this.direction() + 'grid'): sel;
-  var matched = this.merge_variables(_.keys(data[0]));
-  var data_matcher = _.bind(this.data_matcher(matched), this);
+  var matched = this.merge_variables(Object.keys(data[0]));
+  var data_matcher = this.data_matcher(matched).bind(this);
 
   var lines = sel.selectAll("." + 
                             this.selector(layerNum).replace(/ /g, '.'))
               .data(data, data_matcher);
-  lines.transition().call(_.bind(this.drawLines, this), line, s, layerNum);
+  lines.transition().call(this.drawLines.bind(this), line, s, layerNum);
   lines.enter().append(this.geom(), ".geom")
-    .call(_.bind(this.drawLines, this), line, s, layerNum);
+    .call(this.drawLines.bind(this), line, s, layerNum);
   lines.exit()
     .transition()
     .style('opacity', 0)
@@ -194,7 +194,7 @@ Line.prototype.draw = function(sel, data, i, layerNum){
 // continuous change of color for many
 Line.prototype.sample = function(d, l, x, y, color, aes) {
   var n = d.length;
-  d = _.map(d, function(r, i) {
+  d = d.map(function(r, i) {
         var o = [];
         o[aes.color] = r[aes.color];
         o[0] = x(r[aes.x]);

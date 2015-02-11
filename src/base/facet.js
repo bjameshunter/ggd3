@@ -8,7 +8,8 @@ function Facet(spec) {
     by: null, // add another 
     type: "wrap", // grid or wrap?
     scales: "fixed", // "free_x", "free_y"
-    space: "fixed", // eventually "free_x" and "free_y"
+    // not even close with free space.
+    // space: "fixed", // eventually "free_x" and "free_y"
     plot: null, 
     nrows: null,
     ncols: null,
@@ -53,7 +54,7 @@ Facet.prototype.updateFacet = function(sel) {
   // specify either x and y or an x or y with nrows or ncols
   if( this.x() ) {
     // x is always first nest
-    this.xFacets = _.unique(_.map(data, function(d) {
+    this.xFacets = unique(data.map(function(d) {
       return d.key;
     }));
   }
@@ -61,21 +62,15 @@ Facet.prototype.updateFacet = function(sel) {
     // if facet.y is specified, it might be the first or
     // second nest
     if(!this.x() ){
-      this.yFacets = _.unique(_.map(data, function(d) {
+      this.yFacets = unique(data.map(function(d) {
         return d.key;
       }));
     } else {
-      this.yFacets = _.unique(
-                      _.flatten(
-                        _.map(
-                          data, function(d) {
-                            return _.map(d.values, 
-                              function(v) {
+      this.yFacets = unique(flatten(data.map(function(d) {
+                            return d.values.map(function(v) {
                                 return v.key;
                               });
-                        })
-                      )
-                    );
+                        })));
     }
   }
 
@@ -114,7 +109,7 @@ Facet.prototype.updateFacet = function(sel) {
   }
 
   var rows = sel.selectAll('div.row')
-              .data(_.range(this._nrows));
+              .data(d3.range(this._nrows));
   rows
     .attr('id', function(d) { return "row-" + d; })
     .each(function(d, i) {
@@ -136,7 +131,7 @@ Facet.prototype.makeDIV = function(sel, rowNum) {
       remainder = this.nFacets % ncols,
       that = this;
   row = sel.selectAll('div.plot-div')
-           .data(_.range((this.nFacets - this.nSVGs) > remainder ? 
+           .data(d3.range((this.nFacets - this.nSVGs) > remainder ? 
                  ncols: remainder));
   row
     .each(function(colNum) {
@@ -283,22 +278,19 @@ Facet.prototype.makeClip = function(selection, x, y) {
     .attr('clip-path', "url(#" + id + ")");
 };
 
-function rep(s) {
-  return s.replace(' ', '-');
-}
-
 Facet.prototype.id = function(x, y) {
-
+  var n;
   if(this.x() && this.y()) {
-    return rep(this.y() + "-" + this.yFacets[y]  + '_' + 
-    this.x() + "-" + this.xFacets[x]);
+    n = this.y() + "-" + this.yFacets[y]  + '_' + 
+    this.x() + "-" + this.xFacets[x];
   } else if(this.x()){
-    return rep(this.x() + "-" + this.xFacets[this.nSVGs]);
+    n = this.x() + "-" + this.xFacets[this.nSVGs];
   } else if(this.y()){
-    return rep(this.y() + "-" + this.yFacets[this.nSVGs]);
+    n = this.y() + "-" + this.yFacets[this.nSVGs];
   } else {
-    return 'single';
+    n = 'single';
   }
+  return cleanName(n);
 };
 
 Facet.prototype.makeCell = function(selection, colNum, rowNum, 
@@ -384,7 +376,7 @@ Facet.prototype.makeTitle = function(sel, colNum, rowNum) {
           x: (dim.x - dim.ftx)/2,
           y: ts[0] * 0.8,
           "text-anchor": that.textAnchorX()})
-        .text(_.identity);
+        .text(identity);
   }
   if(that.type() === "grid" && colNum === (this._ncols - 1) && this.y()){
     ylab.enter().append('svg')
@@ -409,7 +401,7 @@ Facet.prototype.makeTitle = function(sel, colNum, rowNum) {
             y: -ts[1]*0.25,
             "text-anchor": that.textAnchorY(),
             transform: "rotate(90)"})
-        .text(_.identity);
+        .text(identity);
   }
   // add labels to wrap-style faceting.
   if(this.type() === "wrap"){

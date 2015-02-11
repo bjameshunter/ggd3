@@ -69,10 +69,11 @@ function Plot() {
     colorRange: ["white", "black"],
     shapeRange: d3.superformulaTypes,
     opts: {},
+    axisLabels: false,
     theme: "ggd3",
     // currently just used to ensure clip-paths are unique
     // on pages with more than one single faceted plot.
-    id: parseInt(_.random(0, 1, true)*10000)
+    id: parseInt(Math.random(0, 1, true)*10000)
   };
 
   this.attributes = attributes;
@@ -103,11 +104,12 @@ function Plot() {
     'subRangeBand', 'subRangePadding', 'subDomain',
     "alphaRange", "lineWidth",
     "xGrid", "yGrid", "gridLineType",
-    "highlightXZero", "highlightYZero"];
+    "highlightXZero", "highlightYZero",
+    "axisLabels"];
 
   for(var attr in attributes){
     if((!this[attr] && 
-       _.contains(getSet, attr))){
+       contains(getSet, attr))){
       this[attr] = createAccessor(attr);
     }
   }
@@ -118,7 +120,7 @@ function setGlobalScale(scale) {
     if(!arguments.length) { return this.attributes[scale]; }
     // if function, string, or number is passed,
     // set it as new scale function.
-    if(_.isPlainObject(obj)){
+    if(typeof obj === "object"){
       return this.attributes[scale](obj);
     }
     this.attributes[scale] = d3.functor(obj);
@@ -140,19 +142,18 @@ function scaleConfig(type) {
       return this;
     }
     // pass null to reset scales entirely;
-    if(_.isNull(obj)){
-      this.attributes[scale] = {single: new ggd3.scale() };
+    if(obj === null){
+      this.attributes[scale] = {single: ggd3.scale() };
       return this;
     }
-    // 
-    if(!_.isUndefined(obj)) {
+    if(obj !== undefined) {
       // merge additional options with old options
       if(this.attributes[scale].single instanceof ggd3.scale){
         // scale must have type to be initiated.
-        obj = _.merge(this.attributes[scale].single._userOpts,
+        obj = merge(this.attributes[scale].single._userOpts,
                            obj);
       }
-      this.attributes[scale].single = new ggd3.scale(obj).plot(this);
+      this.attributes[scale].single = ggd3.scale(obj).plot(this);
       return this;
     }
   }
@@ -188,31 +189,31 @@ Plot.prototype.alphaScale = scaleConfig('alpha');
 
 Plot.prototype.margins = function(margins) {
   if(!arguments.length) { return this.attributes.margins; }
-  this.attributes.margins = _.merge(this.attributes.margins, margins);
+  this.attributes.margins = merge(this.attributes.margins, margins);
   return this;
 };
 
 Plot.prototype.layers = function(layers) {
   if(!arguments.length) { return this.attributes.layers; }
   var aes,
-      origAes = _.clone(this.aes());
-  if(_.isArray(layers)) {
+      origAes = clone(this.aes());
+  if(Array.isArray(layers)) {
     // allow reseting of layers by passing empty array
     if(layers.length === 0){
       this.attributes.layers = layers;
       return this;
     }
     var layer;
-    _.each(layers, function(l) {
-      if(_.isString(l)){
+    layers.forEach(function(l) {
+      if(typeof l === 'string'){
         // passed string to get geom with default settings
         l = ggd3.layer()
-              .aes(_.clone(origAes))
+              .aes(clone(origAes))
               .data(this.data(), true)
               .geom(l);
       } else if ( l instanceof ggd3.layer ){
         // user specified layer
-        aes = _.clone(l.aes());
+        aes = clone(l.aes());
         if(!l.data()) { 
           l.data(this.data(), true); 
         } else {
@@ -220,18 +221,18 @@ Plot.prototype.layers = function(layers) {
         }
         // inherit plot level aesthetics and override 
         // w/ explicitly declared aesthetics.
-        l.aes(_.merge(_.clone(origAes), _.clone(aes)));
+        l.aes(merge(clone(origAes), clone(aes)));
       } else if (l instanceof ggd3.geom){
 
         var g = l;
         l = ggd3.layer()
-                .aes(_.clone(origAes))
+                .aes(clone(origAes))
                 .data(this.data(), true)
                 .geom(g);
       }
       l.plot(this).dtypes(this.dtypes());
       this.attributes.layers.push(l);
-      // this.aes(_.merge(_.clone(l.aes()), _.clone(origAes)));
+      // this.aes(merge(clone(l.aes()), clone(origAes)));
     }, this);
   } else if (layers instanceof ggd3.layer) {
     if(!layers.data()) { 
@@ -239,26 +240,26 @@ Plot.prototype.layers = function(layers) {
     } else {
       layers.ownData(true);
     }
-    aes = _.clone(layers.aes());
-    layers.aes(_.merge(_.clone(origAes), _.clone(aes)))
+    aes = clone(layers.aes());
+    layers.aes(merge(clone(origAes), clone(aes)))
       .dtypes(this.dtypes())
       .plot(this);
     this.attributes.layers.push(layers);
-    // this.aes(_.merge(_.clone(aes), _.clone(origAes)));
+    // this.aes(merge(clone(aes), clone(origAes)));
   } 
   return this;
 };
 
 Plot.prototype.dtypes = function(dtypes) {
   if(!arguments.length) { return this.attributes.dtypes; }
-  this.attributes.dtypes = _.merge(this.attributes.dtypes, dtypes);
+  this.attributes.dtypes = merge(this.attributes.dtypes, dtypes);
   this.data(this.data());
   this.updateLayers();
   return this;
 };
 
 Plot.prototype.data = function(data) {
-  if(!arguments.length || _.isNull(data)) { return this.attributes.data; }
+  if(!arguments.length || data === null) { return this.attributes.data; }
   // if passing 'dtypes', must be done before
   // let's just always nest and unNest
   this.hasJitter = false;
@@ -267,7 +268,7 @@ Plot.prototype.data = function(data) {
   this.timesCleaned += 1;
   // after data is declared, nest it according to facets.
   this.attributes.data = this.nest(data.data);
-  this.attributes.dtypes = _.merge(this.attributes.dtypes, data.dtypes);
+  this.attributes.dtypes = merge(this.attributes.dtypes, data.dtypes);
   this.updateLayers();
   this.nested = data.data ? true:false;
   this.newData = data.data ? false:true;
@@ -276,12 +277,12 @@ Plot.prototype.data = function(data) {
 
 Plot.prototype.updateLayers = function() {
 
-  _.each(this.layers(), function(l) {
+  this.layers().forEach(function(l) {
     l.dtypes(this.dtypes());
     if(!l.ownData()) { 
       l.data(this.data(), true); }
     // plot level aes never override layer level.
-    l.aes(_.merge(_.clone(this.aes()), l.aes()));
+    l.aes(merge(clone(this.aes()), l.aes()));
   }, this);
 };
 
@@ -302,8 +303,8 @@ Plot.prototype.facet = function(spec) {
 Plot.prototype.aes = function(aes) {
   if(!arguments.length) { return this.attributes.aes; }
   // all layers need aesthetics
-  aes = _.merge(this.attributes.aes, _.clone(aes));
-  this.attributes.aes = _.clone(aes);
+  aes = merge(this.attributes.aes, clone(aes));
+  this.attributes.aes = clone(aes);
   this.updateLayers();
   return this;
 };
@@ -312,34 +313,44 @@ Plot.prototype.setFixedScale = function(a) {
   var scale = this[a + "Scale"]().single;
   var domain = [];
   // don't bother if no facets.
-  if(_.keys(this[a + "Scale"]()).length === 1) { return scale; }
-  if(_.contains(linearScales, scale.type())){
-    domain[0] = _.min(this[a + "Scale"](), function(v, k) {
-                  if(k === "single") { return undefined; }
-                  return v.domain()[0];
-                }).domain()[0];
-    domain[1] = _.max(this[a + "Scale"](), function(v, k) {
-                  if(k === "single") { return undefined; }
-                  return v.domain()[1];
-                }).domain()[1];
+  if(Object.keys(this[a + "Scale"]()).length === 1) { return scale; }
+  var min, max, lower, upper;
+  if(contains(linearScales, scale.type())){
+    for(var k in this[a + "Scale"]()){
+      if(k === "single") { continue; }
+      if(this[a + "Scale"]().hasOwnProperty(k)){
+        lower = this[a + "Scale"]()[k].domain()[0];
+        upper = this[a + "Scale"]()[k].domain()[1];
+        min = (min === undefined || min > lower) ? lower: min;
+        max = (max === undefined || max < upper) ? upper: max;
+      }
+    }
+    domain[0] = min;
+    domain[1] = max;
   } else {
-    if(!_.isUndefined(scale._userOpts.scale) &&
-       !_.isUndefined(scale._userOpts.scale.domain)){
+    if((scale._userOpts.scale !== undefined) &&
+       (scale._userOpts.scale.domain !== undefined)){
       domain = scale._userOpts.scale.domain;
       return scale.domain(domain);
     }
-    domain = _.sortBy(_.unique(
-                  _.flatten(
-                    _.map(this[a + "Scale"](), function(v, k){
-                  if(k === "single") { return undefined; }
-                      return v.domain();
-                    }, this) )));
-    domain = _.filter(domain, function(d) {
-      return !_.isUndefined(d) && !_.isNull(d);
+    for(var k2 in this[a + "Scale"]()){
+      if(k2 === "single") { continue; }
+      if(this[a + "Scale"]().hasOwnProperty(k2)){
+        var nd = this[a + "Scale"]()[k2].domain();
+        for(var i = 0; i < nd.length; i++){
+          if(!contains(domain, nd[i])){
+            domain.push(nd[i]);
+          }
+        }
+        domain.sort();
+      }
+    }
+    domain = domain.filter(function(d) {
+      return d !== undefined && d !== null && d !== "";
     });
   }
-  // scale.scale().domain(domain);
-  return scale.domain(domain);
+  scale.scale().domain(domain);
+  scale.domain(domain);
 };
 
 Plot.prototype.plotDim = function() {
@@ -396,14 +407,13 @@ Plot.prototype.draw = function(sel) {
   // get the layer classes that should
   // be present in the plot to remove 
   // layers that no longer exist.
-  var classes = _.map(_.range(this.layers().length),
-                  function(n) {
-                    return "g" + (n);
+  var classes = d3.range(this.layers().length).map(function(n) {
+                    return "g" + n;
                   }, this);
 
   this.setScale('single', this.aes());
 
-  _.each(this.layers(), function(l) {
+  this.layers().forEach(function(l) {
     l.compute(sel);
   });
   // make global scales
@@ -418,22 +428,22 @@ Plot.prototype.draw = function(sel) {
   // at this point, all layers are computed
   // and all groups should be known.
   this.setSubScale();
-  _.each(this.layers(), function(l, layerNum) {
+  this.layers().forEach(function(l, layerNum) {
     l.draw(sel, layerNum);
   });
   sel.selectAll('g.geom')
     .filter(function() {
       var cl = d3.select(this).attr('class').split(' ');
-      return !_.contains(classes, cl[1]);
+      return contains(classes, cl[1]) === false;
     })
     .transition() // add custom remove function here.
     .style('opacity', 0)
     .remove();
   // if any of the layers had a jitter, it has
   // been added to each facet's dataset
-  if(_.any(this.layers(), function(l) {
+  if(any(this.layers(), function(l) {
     return l.position() === "jitter";
-  }) ) { 
+  })) { 
     this.hasJitter = true; 
   }
 

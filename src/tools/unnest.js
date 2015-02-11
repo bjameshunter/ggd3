@@ -1,17 +1,17 @@
 // generic nesting function
 Nest = function(data) {
-  if(_.isNull(data)) { return data; }
+  if(data === null) { return data; }
   var isLayer = (this instanceof ggd3.layer),
       nest = d3.nest(),
       that = this,
       facet = isLayer ? this.plot().facet(): this.facet();
-  if(facet && !_.isNull(facet.x())){
+  if(facet && (facet.x() !== null)){
     nest.key(function(d) { return d[facet.x()]; });
   }
-  if(facet && !_.isNull(facet.y())){
+  if(facet && (facet.y() !== null)){
     nest.key(function(d) { return d[facet.y()]; });
   }
-  if(facet && !_.isNull(facet.by())){
+  if(facet && (facet.by() !== null)){
     nest.key(function(d) { return d[facet.by()]; });
   }
   data = nest.entries(data);
@@ -21,10 +21,10 @@ Nest = function(data) {
 function unNest(data, nestedArray) {
   // recurse and flatten nested dataset
   // this means no dataset can have a 'values' column
-  if(!data || _.isEmpty(data)){ 
+  if(!data || data.length === 0){ 
     return data;
   }
-  var branch = _.all(_.map(data, function(d){
+  var branch = all(data.map(function(d){
     return d.hasOwnProperty('values');
   }));
   if(!branch) {
@@ -33,8 +33,8 @@ function unNest(data, nestedArray) {
     }
     return data; 
   }
-  var vals = _.flatten(
-              _.map(data, function(d) { return d.values; }), true
+  var vals = flatten(
+              data.map(function(d) { return d.values; }), false
              );
   return this.unNest(vals);
 }
@@ -43,8 +43,7 @@ function unNest(data, nestedArray) {
 // accepts single nested object
 function recurseNest(data) {
   if(!data.values) { return data; }
-  return _.map(data.values, 
-                 function(d) {
+  return data.values.map(function(d) {
                   return recurseNest(d);
                 });
 }

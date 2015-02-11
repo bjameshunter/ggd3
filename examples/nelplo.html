@@ -30,7 +30,7 @@ var div = d3.select('#chart01'),
 $("#facet-scales").on('change', function() {
   redraw();
 });
-var facet = {x: 'group', nrows: 3, scales: 'free'};
+var facet = {x: 'variable', nrows: 1, scales: 'free_y'};
 var p75 = function(d) { return d3.quantile(d, 0.75); }
 var p25 = function(d) { return d3.quantile(d, 0.25); }
 var l1 = ggd3.geoms.hline()

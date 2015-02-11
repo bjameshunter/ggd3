@@ -22,7 +22,7 @@ function Layer(aes) {
   this.attributes = attributes;
   var getSet = ["plot", "ownData", 'dtypes', "aggFunctions"];
   for(var attr in this.attributes){
-    if(!this[attr] && _.contains(getSet, attr) ){
+    if(!this[attr] && contains(getSet, attr) ){
       this[attr] = createAccessor(attr);
     }
   }
@@ -52,19 +52,19 @@ Layer.prototype.updateGeom = function() {
 
 Layer.prototype.aes = function(aes) {
   if(!arguments.length) { return this.attributes.aes; }
-  this.attributes.aes = _.merge(this.attributes.aes, aes);
+  this.attributes.aes = merge(this.attributes.aes, aes);
   this.updateGeom();
   return this;
 };
 
 Layer.prototype.geom = function(geom) {
   if(!arguments.length) { return this.attributes.geom; }
-  if(_.isString(geom)){
+  if(typeof geom === 'string'){
     geom = ggd3.geoms[geom]();
   }
   geom.layer(this);
   this.attributes.geom = geom;
-  if(_.isNull(this.stat())){
+  if(this.stat() === null){
     this.stat(geom.stat());
   }
   if(!this.position()){
@@ -93,14 +93,17 @@ Layer.prototype.setStat = function() {
       dtypes = this.dtypes(),
       stat = this.stat(),
       plot = this.plot(),
-      scaleType, dtype;
+      scaleType, dtype, diff;
 
-  _.each(_.difference(_.keys(aes), stat.exclude), function(a) {
+  diff = Object.keys(aes).filter(function(d) {
+    return !contains(stat.exclude, d);
+  });
+  diff.forEach(function(a) {
     dtype = dtypes[aes[a]];
-    if(!stat[a]() && _.contains(measureScales, a)){
+    if(!stat[a]() && contains(measureScales, a)){
     scaleType = plot[a + "Scale"]().single.type();
-      if(_.contains(linearScales, scaleType) && 
-         _.contains(['x', 'y'], a)){
+      if(contains(linearScales, scaleType) && 
+         contains(['x', 'y'], a)){
         if(this.geom() instanceof ggd3.geoms.hline){
           stat[a]('range');
         } else {
@@ -121,7 +124,7 @@ Layer.prototype.setStat = function() {
   }, this);
   // if a stat has not been set, it is x or y
   // and should be set
-  _.each(['x', 'y'], function(a) {
+  ['x', 'y'].forEach(function(a) {
     if(!stat[a]() ){
       stat[a](stat.linearAgg());
       if(stat.linearAgg() === "bin"){
@@ -144,7 +147,7 @@ Layer.prototype.data = function(data, fromPlot) {
   } else {
     data = this.unNest(data);
     data = ggd3.tools.clean(data, this);
-    this.attributes.dtypes = _.merge(this.attributes.dtypes, data.dtypes);
+    this.attributes.dtypes = merge(this.attributes.dtypes, data.dtypes);
     this.attributes.data = data.data;
   }
   return this;
@@ -161,12 +164,14 @@ Layer.prototype.compute = function(sel) {
   } 
   var divs = [];
   // reset geom's data array;
-  this.geom().data([]);
+  if(!this.geom().ownData()){
+    this.geom().data([]);
+  }
   sel.selectAll('.plot-div')
     .each(function(d) {
       divs.push(d3.select(this).attr('id'));
     });
-  _.each(divs, function(id, i){
+  divs.forEach(function(id, i){
     // cycle through all divs, drawing data if it exists.
     var s = sel.select("#" + id),
         d = dlist.filter(function(d) {
@@ -178,12 +183,17 @@ Layer.prototype.compute = function(sel) {
       // add a jitter if not present
       if(this.position() === "jitter" && 
          !plot.hasJitter) {
-        _.each(d.data, function(r) { r._jitter = _.random(-1,1,1); });        
+        d.data.forEach(function(r) 
+                       { r._jitter = Math.random() * (Math.random()<0.5 ? -1:1); });
       }
       d = plot.setDomain(d, this);
     }
-    if(_.isEmpty(d)) { d = {selector: id, data: []}; }
-    this.geom().data().push(d);
+    if(d === undefined || Object.keys(d).length === 0) { 
+      d = {selector: id, data: []}; 
+    }
+    if(!this.geom().ownData()){
+      this.geom().data().push(d);
+    }
   }, this);
 };
 // the only thing update doesn't do is removeElements.
@@ -194,15 +204,19 @@ Layer.prototype.draw = function(sel, layerNum) {
     .each(function(d) {
       divs.push(d3.select(this).attr('id'));
     });
-  _.each(divs, function(id, i){
+  divs.forEach(function(id, i){
     // cycle through all divs, drawing data if it exists.
     var selection = sel.select("#" + id),
+        data;
+    if(!this.geom().ownData()){
         data = this.geom().data().filter(function(d) {
           return d.selector === id;
         })[0];
-    if(!_.isUndefined(layerNum)){
+    } else {
+      data = this.geom().data();
+    }
+    if(layerNum !== undefined){
       if(selection.select('.plot g.g' + layerNum).empty()) {
-
         g = selection.select('.plot')[this.geom().gPlacement()]('g', 'g')
               .attr('class', 'g g' + layerNum);
       } else {

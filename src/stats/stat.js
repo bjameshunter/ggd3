@@ -26,15 +26,15 @@ function Stat(setting) {
     label: null,
   };
 
-  if(_.isPlainObject(setting)) {
+  if(setting.constructor === Object) {
     for(var a in setting){
-      if(_.isFunction(setting[a])){
+      if(typeof setting[a] === 'function'){
         attributes[a] = setting[a];
       } else {
         attributes[a] = this[setting[a]];
       }
     }
-  } else if(_.isString(setting)) {
+  } else if(typeof setting === 'string') {
     attributes.linearAgg = setting;
   }
   this.exclude = ["xintercept", "yintercept", "slope",
@@ -47,11 +47,12 @@ function Stat(setting) {
   this.attributes = attributes;
   var getSet = ["layer", "linearAgg"];
   for(var attr in attributes){
-    if(_.contains(getSet, attr)){
+    if(contains(getSet, attr)){
       this[attr] = createAccessor(attr);
     }
   }
 }
+
 var specialStats = [
   "density",
   "bin",
@@ -60,18 +61,18 @@ var specialStats = [
 
 Stat.prototype.agg = function(data, aes) {
   var out = [{}];
-  _.each(_.keys(aes), function (a) {
-    if(!_.contains(this.exclude, a)) {
-      if(_.contains(["range", "unique"], this[a]()._name) ){
-        var r = this[a]()(_.pluck(_.flatten([data]), aes[a]));
-        out = _.map(r, function(d) {
-            var o = _.clone(out[0]);
+  Object.keys(aes).forEach(function (a) {
+    if(!contains(this.exclude, a)) {
+      if(contains(["range", "unique"], this[a]()._name) ){
+        var r = this[a]()(pluck(flatten([data]), aes[a]));
+        out = r.map(function(d) {
+            var o = clone(out[0]);
             o[aes[a]] = d;
             return o;
           });
       } else {
-        out = _.map(out, function(o) {
-          o[aes[a]] = this[a]()(_.pluck(_.flatten([data]), aes[a]));
+        out = out.map(function(o) {
+          o[aes[a]] = this[a]()(pluck(flatten([data]), aes[a]));
           return o;
         }, this);
       }
@@ -82,30 +83,30 @@ Stat.prototype.agg = function(data, aes) {
 
 Stat.prototype.compute = function(data) {
   var aes = this.layer().aes(),
-      id = _.any(_.map(_.difference(_.keys(aes), this.exclude), 
+      id = any(difference(Object.keys(aes), this.exclude).map( 
             function(k){
               if(!this[k]()){ return null; }
               return this[k]()([]) === "identity";
             }, this));
-  if(_.contains(specialStats, this.linearAgg()) ){
+  if(contains(specialStats, this.linearAgg()) ){
     return this["compute_" + this.linearAgg()](data);
   }
   // most situations will need these two
   if(id){
     return data;
   }
-  out = _.flatten(this.agg(data, aes));
+  out = flatten(this.agg(data, aes));
   return out;
 };
 
 function aggSetter(a) {
   return function(f) {
     if(!arguments.length) { return this.attributes[a]; }
-    if(_.isString(f)){
+    if(typeof f === 'string'){
       this.attributes[a] = this[f];
-    } else if(_.isFunction(f)){
+    } else if(typeof f === 'function'){
       this.attributes[a] = f;
-    } else if(_.isArray(f)){
+    } else if(Array.isArray(f)){
       // f is dtype
       if(f[0] === "string" || f[1] === "few"){
         // likely just need first
@@ -137,7 +138,7 @@ Stat.prototype.label = function() {
 Stat.prototype.label._name = "label";
 
 Stat.prototype.unique = function(arr) {
-  return _.unique(arr);
+  return unique(arr);
 };  
 Stat.prototype.unique._name = "unique";
 
@@ -184,7 +185,7 @@ Stat.prototype.mean._name = "mean";
 
 // iqr
 Stat.prototype.iqr = function(arr) {
-  // arr = _.sortBy(arr);
+
   return {"75th percentile": d3.quantile(arr, 0.75),
           "50th percentile": d3.quantile(arr, 0.5),
           "25th percentile": d3.quantile(arr, 0.25),
@@ -233,11 +234,11 @@ Stat.prototype.compute_boxplot = function(data) {
       // special marker on dtypes
       factor = this.layer().dtypes()[aes.x][1] === "few" ? 'x': 'y',
       number = factor === 'x' ? 'y': 'x',
-      arr = _.sortBy(_.pluck(data, aes[number])),
+      arr = pluck(data, aes[number]).sort(d3.ascending),
       iqr = this.iqr(arr),
       upper = d3.quantile(arr, g.tail() ? (1 - g.tail()): g.upper()),
       lower = d3.quantile(arr, g.tail() || g.lower()),
-      out = _.merge({
+      out = merge({
         "quantiles": iqr,
         "upper": upper,
         "lower": lower,
@@ -273,14 +274,14 @@ Stat.prototype.compute_bin = function(data) {
                 });
   data = hist(data);
   data.map(function(d) {
-    if(_.isEmpty(d)) { return d; }
+    if(d.length === 0) { return d; }
     d[aes[n]] = d.x;
     d.binHeight = d.y;
     // all other aesthetics in histograms will only map to
     // categories, so we don't need to know all about other 
     // variables in the bin.
     for(var a in aes) {
-      if(_.contains(['x', 'y'], a)) { continue; }
+      if(contains(['x', 'y'], a)) { continue; }
       d[aes[a]] = d[0][aes[a]];
     }
     return d;
@@ -302,22 +303,22 @@ Stat.prototype.compute_density = function(data) {
     aes[d] = "density";
   }
   n = d === "y" ? "x": "y";
-  _.map(['color', 'group', "fill"], function(a) {
+  ['color', 'group', "fill"].forEach(function(a) {
     if(aes[a]){
       out[aes[a]] = data[0][aes[a]];
       start[aes[a]] = data[0][aes[a]];
       end[aes[a]] = data[0][aes[a]];
     }
   });
-  data = _.pluck(data, aes[n]);
+  data = pluck(data, aes[n]);
   g = this.layer().geom();
   k = g[g.kernel()](g.smooth());
   r = d3.extent(data);
-  p = _.range(r[0], r[1], (r[1] - r[0])/g.nPoints());
+  p = d3.range(r[0], r[1], (r[1] - r[0])/g.nPoints());
   kde = g.kde(k, p);
   data = kde(data);
-  out = _.map(data, function(d) {
-    var o = _.clone(out);
+  out = data.map(function(d) {
+    var o = clone(out);
     o[aes[n]] = d[0];
     o.density = d[1];
     return o;

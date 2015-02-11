@@ -21,7 +21,7 @@ function Smooth(spec) {
     ribbonAlpha: 0.2,
   };
 
-  this.attributes = _.merge(this.attributes, attributes);
+  this.attributes = merge(this.attributes, attributes);
 
   for(var attr in this.attributes){
     if((!this[attr] && this.attributes.hasOwnProperty(attr))){
@@ -35,9 +35,10 @@ Smooth.prototype = new Line();
 Smooth.prototype.constructor = Smooth;
 
 Smooth.prototype.validate = function(data, s){
-  data = _.filter(data, function(d) {
-    var xvalid = _.isNumber(d[s.aes.x]) || _.isDate(d[s.aes.x]);
-    var yvalid = _.isNumber(d[s.aes.y]);
+  data = data.filter(function(d) {
+    var xvalid = ((typeof d[s.aes.x] === 'number') || 
+                  (d[s.aes.x].constructor === Date));
+    var yvalid = typeof d[s.aes.y] === 'number';
     return xvalid && yvalid;
   });
   return data;
@@ -45,25 +46,26 @@ Smooth.prototype.validate = function(data, s){
 
 Smooth.prototype.loess = function(data, s) {
 
-  var params = _.clone(this.loessParams()),
+  var params = clone(this.loessParams()),
       aes = s.aes,
       vs = [],
       size = Math.floor(params.alpha * data.length),
       bandWidth = Math.floor(data.length/params.m),
       points = [];
-  data = _.sortBy(this.validate(data, s), function(d) {
-            return d[aes.x];
+  data = this.validate(data, s);
+  data.sort(function(a, b) {
+            return a[aes.x] - b[aes.x];
           });
-  if(_.isNull(params.m)){ 
+  if(params.m === null){ 
     vs = data; 
   } else {
     // get equally spaced points
-    vs = _.map(_.range(params.m), function(d) {
+    vs = d3.range(params.m).map(function(d) {
           return data[bandWidth*d];
         });
     vs.push(data[data.length-1]);
   }
-  _.each(vs, function(d, i) {
+  vs.forEach(function(d, i) {
     var vindow,
         pos = bandWidth * i,
         mid = Math.floor(size / 2),
@@ -74,12 +76,12 @@ Smooth.prototype.loess = function(data, s) {
       vindow = data.slice(data.length - size, data.length);
     } else if(pos > mid){
       vindow = data.slice(pos - mid, pos);
-      vindow = _.flatten([vindow, data.slice(pos, pos + mid)]);
+      vindow = flatten([vindow, data.slice(pos, pos + mid)]);
     } else {
       vindow = data.slice(0, size);
     }
-    max = d3.max(_.pluck(vindow, aes.x));
-    min = d3.min(_.pluck(vindow, aes.x));
+    max = d3.max(pluck(vindow, aes.x));
+    min = d3.min(pluck(vindow, aes.x));
     // Thanks Jason Davies. I'll have to learn better how this actually works.
     // https://github.com/jasondavies/science.js/blob/master/src/stats/loess.js
     // Also, see:
@@ -90,7 +92,7 @@ Smooth.prototype.loess = function(data, s) {
         sumY = 0,
         sumXY = 0;
 
-    _.each(vindow, function(v) {
+    vindow.forEach(function(v) {
       var xk   = v[aes.x],
           yk   = v[aes.y],
           dist = d3.max([Math.abs(max - d[aes.x]), Math.abs(d[aes.x] - min)]),
@@ -110,7 +112,7 @@ Smooth.prototype.loess = function(data, s) {
     var beta = (Math.sqrt(Math.abs(meanXSquared - meanX * meanX)) < 1e-12)        ? 0 : ((meanXY - meanX * meanY) / (meanXSquared - meanX * meanX));
 
     var alpha = meanY - beta * meanX,
-        out = _.clone(d);
+        out = clone(d);
 
     out[aes.y] = alpha + beta*out[aes.x];
     points.push(out);
@@ -127,21 +129,26 @@ Smooth.prototype.lm = function(data, s, coef, weights) {
   var aes = s.aes,
       o1, o2, sigma,
       ts = false,
-      prod = d3.mean(_.map(data, function(d) {
+      prod = d3.mean(pluck(data, function(d) {
         return d[aes.x] * d[aes.y];
       })),
-      x2 = d3.mean(_.map(data, function(d) {
+      x2 = d3.mean(pluck(data, function(d) {
         return Math.pow(d[aes.x], 2);
       })),
-      xbar = d3.mean(_.pluck(data, aes.x)), 
-      ybar = d3.mean(_.pluck(data, aes.y)),
+      xbar = d3.mean(pluck(data, aes.x)), 
+      ybar = d3.mean(pluck(data, aes.y)),
       m = (prod - xbar*ybar) / (x2 - Math.pow(xbar, 2)),
       b = ybar - m*xbar;
   if(coef) { return {m: m, b: b}; }
-  o1 = _.clone(_.min(data, aes.x));
-  o2 = _.clone(_.max(data, aes.x));
-  if(_.any([o1, o2], function(d) {
-    return !_.isPlainObject(d);}) ){ return [];}
+  var extent = d3.extent(pluck(data, aes.x));
+  o1 = clone(data.filter(function(d) {
+          return d[aes.x] === extent[0];
+        })[0]);
+  o2 = clone(data.filter(function(d) {
+          return d[aes.x] === extent[1];
+        })[0]);
+  if(any([o1, o2], function(d) {
+    return d.constructor !== Object;}) ){ return [];}
   o1[aes.y] = b + m * o1[aes.x];
   o2[aes.y] = b + m * o2[aes.x];
   sigma = Math.sqrt(d3.sum(data.map(function(d, i) {
@@ -159,14 +166,13 @@ Smooth.prototype.lm = function(data, s, coef, weights) {
 Smooth.prototype.prepareData = function(data, s) {
   data = s.nest.entries(data.data);
   data = ggd3.tools.arrayOfArrays(
-          _.map(data, function(d) { 
+          data.map(function(d) { 
             return this.recurseNest(d);}, this));
-  data = _.filter(data, function(d) {
-    return _.isPlainObject(d) || d.length >=2;
+  data = data.filter(function(d) {
+    return (d.constructor === Object) || d.length >=2;
   });
-  data = _.isArray(data[0]) ? data: [data];
-
-  data = _.map(data, function(d) {
+  data = Array.isArray(data[0]) ? data: [data];
+  data = data.map(function(d) {
     return this[this.method()](d, s);
   }, this);
   return data;  
@@ -175,7 +181,7 @@ Smooth.prototype.prepareData = function(data, s) {
 Smooth.prototype.draw = function(sel, data, i, layerNum) {
   var selector = data.selector;
   data = Line.prototype.draw.call(this, sel, data, i, layerNum);
-  if(_.isEmpty(_.flatten(data))) { return data; }
+  if(flatten(data).length === 0) { return data; }
 
   if(!this.errorBand()){
     return null;

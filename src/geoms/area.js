@@ -14,7 +14,7 @@ function Area(spec) {
     strokeOpacity: 0.1
   };
 
-  this.attributes = _.merge(this.attributes, attributes);
+  this.attributes = merge(this.attributes, attributes);
 
   for(var attr in this.attributes){
     if((!this[attr] && this.attributes.hasOwnProperty(attr))){
@@ -29,13 +29,13 @@ Area.prototype.constructor = Area;
 
 Area.prototype.prepareData = function(data, s) {
   data = s.nest
-          .entries(data.data) ;
-  data = _.map(data, function(d) { return this.recurseNest(d);}, this);
-  return _.isArray(data[0]) ? data: [data];
+          .entries(data.data || data) ;
+  data = data.map(function(d) { return this.recurseNest(d);}, this);
+  return Array.isArray(data[0]) ? data: [data];
 };
 
 Area.prototype.generator = function(aes, x, y, o2, group, n) {
-  var dir = !_.isUndefined(aes.ymin) ? 'x': 'y',
+  var dir = aes.ymin !== undefined ? 'x': 'y',
       other = dir === "x" ? "y": 'x',
       dirScale = dir === "x" ? x: y,
       otherScale = dir === "x" ? y: x;
@@ -78,7 +78,7 @@ Area.prototype.generator = function(aes, x, y, o2, group, n) {
 Area.prototype.decorateScale = function(dir, s, sc, data) {
   // if it's area, don't use data and just use values
   var a = this.name() === 'area';
-  if(_.isNumber(s.aes[dir + 'min'])){
+  if(typeof s.aes[dir + 'min'] === 'number'){
     // both ymin and ymax should be set to be a number above
     // and below the given y variable
     this.check(s.aes, dir);
@@ -91,21 +91,21 @@ Area.prototype.decorateScale = function(dir, s, sc, data) {
         return function(d) { return sc(d[s.aes[dir]] + s.aes[m]);};
       };
     }
-  } else if(_.isFunction(s.aes[dir + "min"])) {
+  } else if(typeof s.aes[dir + "min"] === 'function') {
     this.check(s.aes, dir);
     // is trusting the order a reliable thing to do?
-    var minAgg = _.map(data, function(d) { 
-      return -s.aes[dir + 'min'](_.pluck(d, s.aes[dir]));
+    var minAgg = data.map(function(d) { 
+      return -s.aes[dir + 'min'](pluck(d, s.aes[dir]));
     });
-    var maxAgg = _.map(data, function(d) { 
-      return s.aes[dir + 'max'](_.pluck(d, s.aes[dir]));
+    var maxAgg = data.map(function(d) { 
+      return s.aes[dir + 'max'](pluck(d, s.aes[dir]));
     });
     return function(m, i) {
       return function(d) {
         var v = m === (dir + 'max') ? maxAgg[i]:minAgg[i];
         return sc(d[s.aes[dir]] + v) ;};
     };
-  } else if (_.isString(s.aes[dir + "min"])){
+  } else if (typeof s.aes[dir + "min"] === 'string'){
     this.check(s.aes, dir);
     // not tested, should work fine;
     return function(m) {
@@ -141,6 +141,19 @@ Area.prototype.drawArea = function(area, gen, s, layerNum) {
     .attr('stroke-opacity', function(d) { return that.strokeOpacity(); })
     .attr('fill', function(d) { return s.fill(d[0]); });
 };
+
+Area.prototype.data_matcher = function(matches, layerNum){
+  return function(d, i) {
+    if(matches.length){
+      return matches.map(function(m) {
+        return d[m];
+      }).join(' ') + " " + i + " " + layerNum;
+    } else {
+      return i;
+    }
+  };
+};
+
 
 // area recieves an array of objects, each of which
 // have variables corresponding to ymin, ymax, xmin, xmax
@@ -190,14 +203,15 @@ Area.prototype.draw = function(sel, data, i, layerNum){
     }
   }
   var areaGen = that.generator(s.aes, x2, y2, o2, s.group);
-
-  var area = sel.selectAll(".g" + layerNum + ".geom-" + this.name())
-              .data(data); // one area per geom
+  var matched = this.merge_variables(Object.keys(data[0][0]));
+  var data_matcher = this.data_matcher(matched, layerNum).bind(this);
+  var area = sel.selectAll("path.geom.g" + layerNum + ".geom-" + this.name())
+              .data(data, data_matcher); // one area per geom
   area.transition()
     .each(function(d, i) {
       that.drawArea(d3.select(this), areaGen, s, layerNum);
     });
-  area.enter().append(this.geom(), "*")
+  area.enter().append(this.geom())
     .each(function(d, i) {
       that.drawArea(d3.select(this), areaGen, s, layerNum);
     });

@@ -21,15 +21,15 @@ function Boxplot(spec) {
     var that = this;
     sel.each(function(d) {
         var el = d3.select(this);
-        _.mapValues(d.quantiles, function(v, k) {
+        Object.keys(d.quantiles).forEach(function(k) {
           el.append('h5')
-            .text(k + ": " + d3.format(',.2')(r(v)));
+            .text(k + ": " + d3.format(',.2')(r(d.quantiles[k])));
         });
     });
   }
-  attributes.tooltip = _.bind(tooltip, this);
+  attributes.tooltip = tooltip.bind(this);
 
-  this.attributes = _.merge(this.attributes, attributes);
+  this.attributes = merge(this.attributes, attributes);
 
   for(var attr in this.attributes){
     if((!this[attr] && this.attributes.hasOwnProperty(attr))){
@@ -56,15 +56,23 @@ Boxplot.prototype.domain = function(data, a) {
   var s = this.setup(),
       factor = this.determineOrdinal(s),
       number = factor === 'x' ? 'y': 'x',
-      domain,
-      extent;
+      domain = [],
+      extent,
+      factors;
   if(a === factor) {
-    domain = _.sortBy(_.map(data, function(d) {
-      return _.unique(_.pluck(d.data, s.aes[a]));
-    }));
+     factors = data.map(function(d) {
+      return pluck(d.data, getItem(s.aes[a]));
+    });
+    factors = flatten(factors);
+    for(var i = 0; i < factors.length; i++){
+      if(!contains(domain, factors[i])){
+        domain.push(factors[i]);
+      }
+    }
+    domain.sort();
   } else {
-    domain = d3.extent(_.flatten(_.map(data, function(d) {
-      return _.pluck(d.data, s.aes[a]);
+    domain = d3.extent(flatten(data.map(function(d) {
+      return pluck(d.data, getItem(s.aes[a]));
     })));
     extent = domain[1] - domain[0];
     domain[0] -= extent*0.1;
@@ -121,10 +129,11 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
       return (n(d.quantiles["75th percentile"]) - 
               n(d.quantiles["25th percentile"])); };
   }
-  if(s.grouped && !_.contains([s.aes.x, s.aes.y], s.group)) {
-    s.groups = _.sortBy(_.unique(_.flatten(_.map(data, function(d) {
-      return _.compact(_.pluck(d.data, s.group));
-    }))));
+  if(s.grouped && !contains([s.aes.x, s.aes.y], s.group)) {
+    s.groups = unique(flatten(data.map(function(d) {
+      return pluck(d.data, s.group);
+    })));
+    s.groups.sort();
     o2 = s.plot.subScale().single.scale();
     rb = o2.rangeBand();
   } else {
@@ -151,7 +160,7 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
         break;
     }
     if(!vertical) { 
-      out = _.map(out, function(d){
+      out = out.map(function(d){
                   return d.reverse();
               }); 
     }
@@ -200,16 +209,16 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
       p.draw(box, d.data, i, layerNum, s);
     }
   }
-  var matched = _.intersection(_.keys(data[0]), 
-                               _.filter(_.keys(s.dtypes), function(d) {
+  var matched = intersection(Object.keys(data[0]), 
+                               Object.keys(s.dtypes).filter(function(d) {
                                  return s.dtypes[d][1] === 'few';
                                }));
-  var data_matcher = _.bind(this.data_matcher(matched), this);
+  var data_matcher = this.data_matcher(matched).bind(this);
   var boxes = sel.selectAll('.geom g' + layerNum)
                 .data(data, data_matcher);
 
   boxes.each(function(d) {
-    d3.select(this).call(_.bind(draw, this));
+    d3.select(this).call(draw.bind(this));
   });
 
   boxes.enter().append('g').each(function(d) {

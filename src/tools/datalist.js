@@ -11,18 +11,18 @@ function DataList(data) {
       selector;
   if((x && !y) || (y && !x)){
     selector = x ? x + "-": y + "-";
-    return _.map(data, function(d) {
-      return {selector: rep(selector + d.key),
+    return data.map(function(d) {
+      return {selector: cleanName(selector + d.key),
         data: d.values};
     });
 
   } else if(x && y) {
     // loop through both levels
     out = [];
-    _.each(data, function(l1) {
+    data.forEach(function(l1) {
       var selectX = x + "-" + l1.key;
-      _.each(l1.values, function(l2) {
-        var s = rep(y + "-" + l2.key + "_" + selectX);
+      l1.values.forEach(function(l2) {
+        var s = cleanName(y + "-" + l2.key + "_" + selectX);
         out.push({selector:s, data: l2.values});
       });
     });

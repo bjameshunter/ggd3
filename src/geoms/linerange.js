@@ -8,7 +8,7 @@ function Linerange(spec){
     gPlacement: 'insert',
     name: 'linerange',
   };
-  this.attributes = _.merge(this.attributes, attributes);
+  this.attributes = merge(this.attributes, attributes);
 
   for(var attr in this.attributes){
     if((!this[attr] && this.attributes.hasOwnProperty(attr))){
@@ -31,29 +31,29 @@ Linerange.prototype.domain = function(data, a) {
       minmax  = a === "x" ? ['xmin', 'xmax']:['ymin', 'ymax'],
       range;
 
-  _.each(minmax, function(d) {
-    if(_.isFunction(aes[d])){
-      extent.push(d3.extent(_.map(data, function(r) {
+  minmax.forEach(function(d) {
+    if(typeof aes[d] === 'function'){
+      extent.push(d3.extent(pluck(data, function(r) {
         return aes[d](r);
       })));
-    } else if(_.isString(aes[d])){
-      extent.push(d3.extent(_.map(data, aes[d])));
+    } else if(typeof aes[d] === 'string'){
+      extent.push(d3.extent(pluck(data, aes[d])));
     }
   });
-  extent = d3.extent(_.flatten(extent));
+  extent = d3.extent(flatten(extent));
   return extent;
 };
 
 Linerange.prototype.prepareData = function(data, s){
-  var aes = _.clone(s.aes),
-      dir = !_.isUndefined(aes.ymin) ? "y": "x",
+  var aes = clone(s.aes),
+      dir = aes.ymin !== undefined ? "y": "x",
       min = aes[dir + 'min'],
       max = aes[dir + 'max'];
   data = Line.prototype.prepareData.call(this, data, s);
 
-  data = _.map(_.flatten(data), function(d) {
-    var o1 = _.clone(d),
-        o2 = _.clone(d);
+  data = pluck(flatten(data), function(d) {
+    var o1 = clone(d),
+        o2 = clone(d);
     o1[aes[dir]] = min(d);
     o2[aes[dir]] = max(d);
     return [o1, o2];
