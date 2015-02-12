@@ -183,8 +183,9 @@ Layer.prototype.compute = function(sel) {
       // add a jitter if not present
       if(this.position() === "jitter" && 
          !plot.hasJitter) {
-        d.data.forEach(function(r) 
-                       { r._jitter = Math.random() * (Math.random()<0.5 ? -1:1); });
+        for(var j = 0; j < d.data.length; j++){
+          d.data[j]._jitter = Math.random() * (Math.random()<0.5 ? -1:1);
+        }
       }
       d = plot.setDomain(d, this);
     }

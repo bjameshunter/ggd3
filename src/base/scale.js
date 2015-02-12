@@ -95,11 +95,12 @@ Scale.prototype.type = function(type) {
 Scale.prototype.style = function(sel) {
   var styles = ['text', 'style'],
       axis = this.opts().axis;
-  styles.forEach(function(s) {
-    if(axis.hasOwnProperty(s)){
-      sel.call(axis[s]);
+
+  for(var i = 0; i < styles.length; i++){
+    if(axis.hasOwnProperty(styles[i]) ){
+      sel.call(axis[styles[i]]);
     }
-  }, this);
+  }
 };
 
 Scale.prototype.scale = function(settings){

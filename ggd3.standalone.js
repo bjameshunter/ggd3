@@ -111,13 +111,19 @@ var ggd3 = require('./dist/ggd3.v.0.1.0.js');
   }
 
   function pluck(arr, f){
+    var o = [];
     if(typeof f === "string"){
-      return arr.map(function(d) {
-        return d[f];
-      })
+      for(i = 0; i<arr.length; i++){
+        o.push(arr[i][f]);
+      }
+    } else if(f === undefined){
+      o = arr;
+    } else if(typeof f === 'function'){
+      for(i = 0; i<arr.length;i++){
+        o.push(f(arr[i]));
+      }
     }
-    if(f === undefined) { return arr; }
-    return arr.map(f)
+    return o;
   }
 
   function unique(arr, v) {
@@ -228,14 +234,13 @@ ggd3.tools.arrayOfArrays = function(data) {
 
   function dtype(arr) {
     var numProp = [],
-        dateProp = [],
-        n = (arr.length > 1000 ? 1000: arr.length);
+        dateProp = [];
     // for now, looking at random 1000 obs.
-    getRandomSubarray(arr, n).map(function(d) {
+    arr.map(function(d) {
             numProp.push(!isNaN(parseFloat(d)));
           });
     numProp = numProp.reduce(function(p,v) { 
-      return p + v; }) / n;
+      return p + v; }) / arr.length;
     var lenUnique = unique(arr).length;
     // handle floats v. ints and Dates.
     // if a number variable has fewer than 20 unique values
@@ -256,6 +261,7 @@ function Clean(data, obj) {
   // type and get domains for all scales in aes.
   if(!data) { return {data: null, dtypes:null}; }
   var vars = {},
+      n = (data.length > 1000 ? 1000: data.length),
       dtypeDict = {"number": parseFloat, 
                   "integer": parseInt,
                   "string": String},
@@ -277,17 +283,22 @@ function Clean(data, obj) {
   dkeys.forEach(function(v){
     // if a data type has been declared, don't 
     // bother testing what it is.
-    // this is necessary for dates and such.
-    if(!contains(keys, v)) { vars[v] = []; }
-  });
-  data.forEach(function(d) {
-    for(var v in vars){
-      vars[v].push(d[v]);
+    // this is necessary for dates.
+    if(!contains(keys, v)) { 
+      console.log('determining data type');
+      vars[v] = dtype(pluck(getRandomSubarray(data , n), v)); //[]; 
     }
   });
-  for(v in vars){
-    vars[v] = dtype(vars[v]);
-  }
+  // for(var i=0;i<data.length;i++){
+  //   for(var v in vars){
+  //     vars[v].push(data[i][v]);
+  //   }
+  // }
+  // data.forEach(function(d) {
+  // });
+  // for(v in vars){
+  //   vars[v] = dtype(vars[v]);
+  // }
 
   dtypes = merge(vars, dtypes);
 
@@ -1150,8 +1161,9 @@ Layer.prototype.compute = function(sel) {
       // add a jitter if not present
       if(this.position() === "jitter" && 
          !plot.hasJitter) {
-        d.data.forEach(function(r) 
-                       { r._jitter = Math.random() * (Math.random()<0.5 ? -1:1); });
+        for(var j = 0; j < d.data.length; j++){
+          d.data[j]._jitter = Math.random() * (Math.random()<0.5 ? -1:1);
+        }
       }
       d = plot.setDomain(d, this);
     }
@@ -1794,11 +1806,12 @@ Scale.prototype.type = function(type) {
 Scale.prototype.style = function(sel) {
   var styles = ['text', 'style'],
       axis = this.opts().axis;
-  styles.forEach(function(s) {
-    if(axis.hasOwnProperty(s)){
-      sel.call(axis[s]);
+
+  for(var i = 0; i < styles.length; i++){
+    if(axis.hasOwnProperty(styles[i]) ){
+      sel.call(axis[styles[i]]);
     }
-  }, this);
+  }
 };
 
 Scale.prototype.scale = function(settings){
@@ -2125,14 +2138,14 @@ function setDomain(data, layer) {
       }
       // weird wrapper for legend aesthetic functions
       if(contains(globalScales, g)) {
-        var aesScale = function(d) {
+        var aesScale = _.bind(function(d) {
           // if a plot doesn't use a particular
           // aesthetic, it will trip up here, 
           // test if it exists.
-          if(d[s.aes[g]]){
+          if(d[s.aes[g]] !== undefined){
             return this.scale()(d[s.aes[g]]);
           }
-        }.bind(scale);
+        }, scale);
         this[g](aesScale);
       }
     }
@@ -3757,7 +3770,6 @@ Box.prototype.domain = function(data, a) {
 // box takes an array of numbers and draws a box around the 
 // two extremes and lines at the inner points.
 Box.prototype.drawGeom = function(box, x, y, w, h, s, layerNum) {
-  console.log(s);
   box.attr({
     x: x,
     y: y,

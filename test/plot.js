@@ -5,7 +5,7 @@ var vows = require('vows'),
     _ = require('lodash'),
     ggd3 = require('../dist/ggd3.v.0.1.0.js'),
     data = require('../data/data.js'),
-    // plots = require('../plot_examples.js'),
+    plots = require('../plot_examples.js'),
     suite = vows.describe('ggd3.plot');
 
 suite.addBatch({
@@ -49,27 +49,7 @@ suite.addBatch({
         aes = {y: "team", x:'batting',
                     fill: "decade",
                     alpha: "hr"},
-        chart = ggd3.plot()
-                  .facet(facet)
-                  .width(300)
-                  .height(800)
-                  .color('white')
-                  .rangeBand(0)
-                  .rangePadding(0)
-                  .subRangePadding(0.2)
-                  .layers(layers)
-                  .yGrid(false)
-                  .xGrid(false)
-                  .margins({right: 50, top:0})
-                  .xScale({axis: {ticks:4, position: 'top',
-                                  orient:'top'},
-                                  offset:45})
-                  .yScale({axis:{position:"right",
-                                orient: "right"},
-                                offset:45})
-                  .aes({y: "team", x:"batting",
-                        fill: "decade",
-                        alpha: "hr"})
+        chart = plots.verticalExpandedBar(layers, facet, aes)
                   .dtypes({"year": ['date', 'many', "%Y"],
                       "decade": ['string'],
                       "stint": ['string'],

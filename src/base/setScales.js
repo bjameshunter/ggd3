@@ -189,14 +189,14 @@ function setDomain(data, layer) {
       }
       // weird wrapper for legend aesthetic functions
       if(contains(globalScales, g)) {
-        var aesScale = function(d) {
+        var aesScale = _.bind(function(d) {
           // if a plot doesn't use a particular
           // aesthetic, it will trip up here, 
           // test if it exists.
-          if(d[s.aes[g]]){
-            return this.scale(d[s.aes[g]]);
+          if(d[s.aes[g]] !== undefined){
+            return this.scale()(d[s.aes[g]]);
           }
-        }.bind(scale);
+        }, scale);
         this[g](aesScale);
       }
     }

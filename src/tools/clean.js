@@ -11,14 +11,13 @@
 
   function dtype(arr) {
     var numProp = [],
-        dateProp = [],
-        n = (arr.length > 1000 ? 1000: arr.length);
+        dateProp = [];
     // for now, looking at random 1000 obs.
-    getRandomSubarray(arr, n).map(function(d) {
+    arr.map(function(d) {
             numProp.push(!isNaN(parseFloat(d)));
           });
     numProp = numProp.reduce(function(p,v) { 
-      return p + v; }) / n;
+      return p + v; }) / arr.length;
     var lenUnique = unique(arr).length;
     // handle floats v. ints and Dates.
     // if a number variable has fewer than 20 unique values
@@ -39,6 +38,7 @@ function Clean(data, obj) {
   // type and get domains for all scales in aes.
   if(!data) { return {data: null, dtypes:null}; }
   var vars = {},
+      n = (data.length > 1000 ? 1000: data.length),
       dtypeDict = {"number": parseFloat, 
                   "integer": parseInt,
                   "string": String},
@@ -60,17 +60,22 @@ function Clean(data, obj) {
   dkeys.forEach(function(v){
     // if a data type has been declared, don't 
     // bother testing what it is.
-    // this is necessary for dates and such.
-    if(!contains(keys, v)) { vars[v] = []; }
-  });
-  data.forEach(function(d) {
-    for(var v in vars){
-      vars[v].push(d[v]);
+    // this is necessary for dates.
+    if(!contains(keys, v)) { 
+      console.log('determining data type');
+      vars[v] = dtype(pluck(getRandomSubarray(data , n), v)); //[]; 
     }
   });
-  for(v in vars){
-    vars[v] = dtype(vars[v]);
-  }
+  // for(var i=0;i<data.length;i++){
+  //   for(var v in vars){
+  //     vars[v].push(data[i][v]);
+  //   }
+  // }
+  // data.forEach(function(d) {
+  // });
+  // for(v in vars){
+  //   vars[v] = dtype(vars[v]);
+  // }
 
   dtypes = merge(vars, dtypes);
 

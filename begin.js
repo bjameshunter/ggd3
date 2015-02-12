@@ -100,13 +100,19 @@
   }
 
   function pluck(arr, f){
+    var o = [];
     if(typeof f === "string"){
-      return arr.map(function(d) {
-        return d[f];
-      })
+      for(i = 0; i<arr.length; i++){
+        o.push(arr[i][f]);
+      }
+    } else if(f === undefined){
+      o = arr;
+    } else if(typeof f === 'function'){
+      for(i = 0; i<arr.length;i++){
+        o.push(f(arr[i]));
+      }
     }
-    if(f === undefined) { return arr; }
-    return arr.map(f)
+    return o;
   }
 
   function unique(arr, v) {

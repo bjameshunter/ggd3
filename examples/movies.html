@@ -43,13 +43,15 @@ var chart = ggd3.plot()
               .facet(facet)
               .layers(layers)
               .dtypes({
-                Comedy: ['number', 'few'],
+                Comedy: ['string', 'few'],
                 Action: ['number', 'few'],
-                Documentary: ['number', 'few'],
-                Romance: ['number','few'],
+                Documentary: ['string', 'few'],
+                Romance: ['string','few'],
+                year: ['string','many'],
                 rating: ['number', 'many', '0,.1d']
               })
-              .aes({x:'rating', y: 'Comedy', group: "Action"})
+              .aes({x:'rating', y: 'Comedy', fill: "Action",
+                   additional: ['title', 'year', 'mpaa']})
 
 d3.csv("../data/movies.csv", function(error, d) {
   data = d;
