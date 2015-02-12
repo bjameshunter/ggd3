@@ -100,13 +100,19 @@
   }
 
   function pluck(arr, f){
+    var o = [];
     if(typeof f === "string"){
-      return arr.map(function(d) {
-        return d[f];
-      })
+      for(i = 0; i<arr.length; i++){
+        o.push(arr[i][f]);
+      }
+    } else if(f === undefined){
+      o = arr;
+    } else if(typeof f === 'function'){
+      for(i = 0; i<arr.length;i++){
+        o.push(f(arr[i]));
+      }
     }
-    if(f === undefined) { return arr; }
-    return arr.map(f)
+    return o;
   }
 
   function unique(arr, v) {
@@ -217,14 +223,13 @@ ggd3.tools.arrayOfArrays = function(data) {
 
   function dtype(arr) {
     var numProp = [],
-        dateProp = [],
-        n = (arr.length > 1000 ? 1000: arr.length);
+        dateProp = [];
     // for now, looking at random 1000 obs.
-    getRandomSubarray(arr, n).map(function(d) {
+    arr.map(function(d) {
             numProp.push(!isNaN(parseFloat(d)));
           });
     numProp = numProp.reduce(function(p,v) { 
-      return p + v; }) / n;
+      return p + v; }) / arr.length;
     var lenUnique = unique(arr).length;
     // handle floats v. ints and Dates.
     // if a number variable has fewer than 20 unique values
@@ -245,6 +250,7 @@ function Clean(data, obj) {
   // type and get domains for all scales in aes.
   if(!data) { return {data: null, dtypes:null}; }
   var vars = {},
+      n = (data.length > 1000 ? 1000: data.length),
       dtypeDict = {"number": parseFloat, 
                   "integer": parseInt,
                   "string": String},
@@ -266,17 +272,11 @@ function Clean(data, obj) {
   dkeys.forEach(function(v){
     // if a data type has been declared, don't 
     // bother testing what it is.
-    // this is necessary for dates and such.
-    if(!contains(keys, v)) { vars[v] = []; }
-  });
-  data.forEach(function(d) {
-    for(var v in vars){
-      vars[v].push(d[v]);
+    // this is necessary for dates.
+    if(!contains(keys, v)) { 
+      vars[v] = dtype(pluck(getRandomSubarray(data , n), v)); //[]; 
     }
   });
-  for(v in vars){
-    vars[v] = dtype(vars[v]);
-  }
 
   dtypes = merge(vars, dtypes);
 
@@ -1139,8 +1139,9 @@ Layer.prototype.compute = function(sel) {
       // add a jitter if not present
       if(this.position() === "jitter" && 
          !plot.hasJitter) {
-        d.data.forEach(function(r) 
-                       { r._jitter = Math.random() * (Math.random()<0.5 ? -1:1); });
+        for(var j = 0; j < d.data.length; j++){
+          d.data[j]._jitter = Math.random() * (Math.random()<0.5 ? -1:1);
+        }
       }
       d = plot.setDomain(d, this);
     }
@@ -1783,11 +1784,12 @@ Scale.prototype.type = function(type) {
 Scale.prototype.style = function(sel) {
   var styles = ['text', 'style'],
       axis = this.opts().axis;
-  styles.forEach(function(s) {
-    if(axis.hasOwnProperty(s)){
-      sel.call(axis[s]);
+
+  for(var i = 0; i < styles.length; i++){
+    if(axis.hasOwnProperty(styles[i]) ){
+      sel.call(axis[styles[i]]);
     }
-  }, this);
+  }
 };
 
 Scale.prototype.scale = function(settings){
@@ -2114,14 +2116,14 @@ function setDomain(data, layer) {
       }
       // weird wrapper for legend aesthetic functions
       if(contains(globalScales, g)) {
-        var aesScale = function(d) {
+        var aesScale = _.bind(function(d) {
           // if a plot doesn't use a particular
           // aesthetic, it will trip up here, 
           // test if it exists.
-          if(d[s.aes[g]]){
+          if(d[s.aes[g]] !== undefined){
             return this.scale()(d[s.aes[g]]);
           }
-        }.bind(scale);
+        }, scale);
         this[g](aesScale);
       }
     }
@@ -2610,7 +2612,7 @@ Bar.prototype.fillEmptyStackGroups = function(data, v) {
     filler[k] = null;
   }
   data.forEach(function(d) {
-    var dkey, missing;
+    var dkeys, missing;
     dkeys = pluck(d.values, v);
     missing = compact(keys.filter(function(k) {
       return !contains(dkeys, k);
@@ -3234,6 +3236,12 @@ function Histogram(spec) {
         c = s.aes.fill || s.aes.color;
     sel.each(function(d) {
         var el = d3.select(this);
+        if(c) {
+          el.append('h4')
+            .text(c + ": ")
+            .append('span')
+            .text(d[c]);
+        }
         el.append('h4')
           .text(v + ": " )
           .append("span").text(r(d[v]) + " - " + r(d[v]+d.dx));
@@ -3331,19 +3339,19 @@ Histogram.prototype.compute = function(data, s) {
 };
 
 Histogram.prototype.fillEmptyStackGroups = function(data, v) {
+  console.log(data);
 
   var keys = unique(pluck(data, function(d) { return d.key; })),
       vals = unique(flatten(pluck(data, function(d) {
         return pluck(d.values, 'x');
       }))),
-      empty = {},
-      n = d3.nest()
-            .key(function(d) { return d[v]; });
+      empty = {};
   empty.y = 0;
   empty.binHeight = 0;
   empty.dx = data[0].dx;
+  console.log(vals);
   data.forEach(function(d) {
-    var dkey, missing;
+    var dkeys, missing;
     dkeys = pluck(d.values, 'x');
     missing = compact(vals.filter(function(k) {
       return !contains(dkeys, k);
@@ -3746,7 +3754,6 @@ Box.prototype.domain = function(data, a) {
 // box takes an array of numbers and draws a box around the 
 // two extremes and lines at the inner points.
 Box.prototype.drawGeom = function(box, x, y, w, h, s, layerNum) {
-  console.log(s);
   box.attr({
     x: x,
     y: y,
@@ -4919,7 +4926,8 @@ Stat.prototype.agg = function(data, aes) {
   var out = [{}];
   Object.keys(aes).forEach(function (a) {
     if(!contains(this.exclude, a)) {
-      if(contains(["range", "unique"], this[a]()._name) ){
+      if(contains(["range", "unique", 'first'], 
+         this[a]()._name) ){
         var r = this[a]()(pluck(flatten([data]), aes[a]));
         out = r.map(function(d) {
             var o = clone(out[0]);
@@ -4928,7 +4936,7 @@ Stat.prototype.agg = function(data, aes) {
           });
       } else {
         out = out.map(function(o) {
-          o[aes[a]] = this[a]()(pluck(flatten([data]), aes[a]));
+          o[aes[a]] = this[a]()(pluck(flatten([data], false), aes[a]));
           return o;
         }, this);
       }
@@ -4939,11 +4947,12 @@ Stat.prototype.agg = function(data, aes) {
 
 Stat.prototype.compute = function(data) {
   var aes = this.layer().aes(),
+      that = this,
       id = any(difference(Object.keys(aes), this.exclude).map( 
             function(k){
               if(!this[k]()){ return null; }
               return this[k]()([]) === "identity";
-            }, this));
+            }, that));
   if(contains(specialStats, this.linearAgg()) ){
     return this["compute_" + this.linearAgg()](data);
   }
@@ -5005,6 +5014,7 @@ Stat.prototype.range._name = "range";
 
 // median
 Stat.prototype.median = function(arr) {
+  arr.sort(d3.ascending);
   if(arr.length > 100000) { 
     console.warn("Default behavior of returning median overridden " + 
            "because array length > 1,000,000." + 
@@ -5083,6 +5093,7 @@ Stat.prototype.bin = function() {
 Stat.prototype.bin._name = "bin";
 
 Stat.prototype.compute_boxplot = function(data) {
+  var start = new Date().getTime();
   var aes = this.layer().aes(),
       g = this.layer().geom(),
       // come up with better test to 
@@ -5120,6 +5131,7 @@ Stat.prototype.compute_bin = function(data) {
     h = aes.y ? 'x': 'y';
     aes[h] = "binHeight";
   }
+  this.layer().plot().dtypes({binHeight:['number', 'many']});
   n = h === "y" ? "x": "y";
 
   var hist = d3.layout.histogram()
