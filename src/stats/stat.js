@@ -63,7 +63,8 @@ Stat.prototype.agg = function(data, aes) {
   var out = [{}];
   Object.keys(aes).forEach(function (a) {
     if(!contains(this.exclude, a)) {
-      if(contains(["range", "unique"], this[a]()._name) ){
+      if(contains(["range", "unique"], 
+         this[a]()._name) ){
         var r = this[a]()(pluck(flatten([data]), aes[a]));
         out = r.map(function(d) {
             var o = clone(out[0]);
@@ -83,11 +84,12 @@ Stat.prototype.agg = function(data, aes) {
 
 Stat.prototype.compute = function(data) {
   var aes = this.layer().aes(),
-      id = any(difference(Object.keys(aes), this.exclude).map( 
+      that = this,
+      id = any(difference(Object.keys(aes), that.exclude).map( 
             function(k){
               if(!this[k]()){ return null; }
               return this[k]()([]) === "identity";
-            }, this));
+            }, that));
   if(contains(specialStats, this.linearAgg()) ){
     return this["compute_" + this.linearAgg()](data);
   }
@@ -149,6 +151,7 @@ Stat.prototype.range._name = "range";
 
 // median
 Stat.prototype.median = function(arr) {
+  arr.sort(d3.ascending);
   if(arr.length > 100000) { 
     console.warn("Default behavior of returning median overridden " + 
            "because array length > 1,000,000." + 
@@ -235,15 +238,9 @@ Stat.prototype.compute_boxplot = function(data) {
       // special marker on dtypes
       factor = this.layer().dtypes()[aes.x][1] === "few" ? 'x': 'y',
       number = factor === 'x' ? 'y': 'x',
-      arr = pluck(data, aes[number]).sort(d3.ascending);
-      var end = new Date().getTime();
-      console.log("after sort");
-      console.log(end - start);
-      var iqr = this.iqr(arr);
-      end = new Date().getTime();
-      console.log("after iqr");
-      console.log(end - start);
-      var upper = d3.quantile(arr, g.tail() ? (1 - g.tail()): g.upper()),
+      arr = pluck(data, aes[number]).sort(d3.ascending),
+      iqr = this.iqr(arr),
+      upper = d3.quantile(arr, g.tail() ? (1 - g.tail()): g.upper()),
       lower = d3.quantile(arr, g.tail() || g.lower()),
       out = merge({
         "quantiles": iqr,
@@ -251,9 +248,6 @@ Stat.prototype.compute_boxplot = function(data) {
         "lower": lower,
       }, this.agg(data, aes)[0]);
       out["n. observations"] = data.length;
-      end = new Date().getTime();
-      console.log("after outliers");
-      console.log(end - start);
       out.data = data.filter(function(d) {
         return ((d[aes[number]] < lower) || 
                 (d[aes[number]] > upper));
@@ -275,6 +269,7 @@ Stat.prototype.compute_bin = function(data) {
     aes[h] = "binHeight";
   }
   n = h === "y" ? "x": "y";
+  console.log(data);
 
   var hist = d3.layout.histogram()
                 .bins(g.breaks() || g.bins())
@@ -283,6 +278,7 @@ Stat.prototype.compute_bin = function(data) {
                   return d[aes[n]];
                 });
   data = hist(data);
+  console.log(data);
   data.map(function(d) {
     if(d.length === 0) { return d; }
     d[aes[n]] = d.x;

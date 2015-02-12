@@ -208,12 +208,12 @@ Plot.prototype.layers = function(layers) {
       if(typeof l === 'string'){
         // passed string to get geom with default settings
         l = ggd3.layer()
-              .aes(clone(origAes))
+              .aes(origAes)
               .data(this.data(), true)
               .geom(l);
       } else if ( l instanceof ggd3.layer ){
         // user specified layer
-        aes = clone(l.aes());
+        aes = l.aes();
         if(!l.data()) { 
           l.data(this.data(), true); 
         } else {
@@ -221,9 +221,8 @@ Plot.prototype.layers = function(layers) {
         }
         // inherit plot level aesthetics and override 
         // w/ explicitly declared aesthetics.
-        l.aes(merge(clone(origAes), clone(aes)));
+        l.aes(merge(origAes, clone(aes)));
       } else if (l instanceof ggd3.geom){
-
         var g = l;
         l = ggd3.layer()
                 .aes(clone(origAes))
@@ -232,7 +231,6 @@ Plot.prototype.layers = function(layers) {
       }
       l.plot(this).dtypes(this.dtypes());
       this.attributes.layers.push(l);
-      // this.aes(merge(clone(l.aes()), clone(origAes)));
     }, this);
   } else if (layers instanceof ggd3.layer) {
     if(!layers.data()) { 
@@ -245,7 +243,6 @@ Plot.prototype.layers = function(layers) {
       .dtypes(this.dtypes())
       .plot(this);
     this.attributes.layers.push(layers);
-    // this.aes(merge(clone(aes), clone(origAes)));
   } 
   return this;
 };
@@ -331,6 +328,7 @@ Plot.prototype.setFixedScale = function(a) {
     if((scale._userOpts.scale !== undefined) &&
        (scale._userOpts.scale.domain !== undefined)){
       domain = scale._userOpts.scale.domain;
+      scale.scale().domain(domain);
       return scale.domain(domain);
     }
     for(var k2 in this[a + "Scale"]()){
@@ -354,7 +352,6 @@ Plot.prototype.setFixedScale = function(a) {
 };
 
 Plot.prototype.plotDim = function() {
-  var margins = this.margins();
   return {x: this.width(),
    y: this.height()};
 };
@@ -412,10 +409,10 @@ Plot.prototype.draw = function(sel) {
                   }, this);
 
   this.setScale('single', this.aes());
-
   this.layers().forEach(function(l) {
     l.compute(sel);
   });
+
   // make global scales
   this.setFixedScale('x'); 
   this.setFixedScale('y'); 

@@ -22,6 +22,12 @@ function Histogram(spec) {
         c = s.aes.fill || s.aes.color;
     sel.each(function(d) {
         var el = d3.select(this);
+        if(c) {
+          el.append('h4')
+            .text(c + ": ")
+            .append('span')
+            .text(d[c]);
+        }
         el.append('h4')
           .text(v + ": " )
           .append("span").text(r(d[v]) + " - " + r(d[v]+d.dx));
@@ -124,14 +130,13 @@ Histogram.prototype.fillEmptyStackGroups = function(data, v) {
       vals = unique(flatten(pluck(data, function(d) {
         return pluck(d.values, 'x');
       }))),
-      empty = {},
-      n = d3.nest()
-            .key(function(d) { return d[v]; });
+      empty = {};
   empty.y = 0;
   empty.binHeight = 0;
   empty.dx = data[0].dx;
+  console.log(vals);
   data.forEach(function(d) {
-    var dkey, missing;
+    var dkeys, missing;
     dkeys = pluck(d.values, 'x');
     missing = compact(vals.filter(function(k) {
       return !contains(dkeys, k);
@@ -154,10 +159,11 @@ Histogram.prototype.fillEmptyStackGroups = function(data, v) {
 Histogram.prototype.nest = function() {
   // if stacking histograms, bins must be calculated
   // first on entire facet, then individually on
-  // each layer. If facet.scales() === "fixed"
+  // each stack layer. If facet.scales() === "fixed"
   // bins should be the same across facets. If not
   // the pre calculated bins need to be stored and 
   // referenced when calculating layers.
+  // one call to goem histogram is going through 47 times.
   var aes = this.layer().aes(),
       plot = this.layer().plot(),
       nest = d3.nest(),

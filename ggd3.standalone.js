@@ -285,23 +285,9 @@ function Clean(data, obj) {
     // bother testing what it is.
     // this is necessary for dates.
     if(!contains(keys, v)) { 
-      console.log('determining data type');
-      var start = new Date().getTime();
       vars[v] = dtype(pluck(getRandomSubarray(data , n), v)); //[]; 
-      var end = new Date().getTime(); 
-      console.log(end - start);
     }
   });
-  // for(var i=0;i<data.length;i++){
-  //   for(var v in vars){
-  //     vars[v].push(data[i][v]);
-  //   }
-  // }
-  // data.forEach(function(d) {
-  // });
-  // for(v in vars){
-  //   vars[v] = dtype(vars[v]);
-  // }
 
   dtypes = merge(vars, dtypes);
 
@@ -1001,7 +987,7 @@ function Layer(aes) {
   // unique character element, or it's unique character element
   // will have the scale applied to it.
   this.attributes = attributes;
-  var getSet = ["plot", "ownData", 'dtypes', "aggFunctions"];
+  var getSet = ["plot", "ownData", "aggFunctions"];
   for(var attr in this.attributes){
     if(!this[attr] && contains(getSet, attr) ){
       this[attr] = createAccessor(attr);
@@ -1009,6 +995,11 @@ function Layer(aes) {
   }
   return this;
 }
+Layer.prototype.dtypes = function(dtypes) {
+  if(!arguments.length) { return this.attributes.dtypes;}
+  this.attributes.dtypes = merge(this.attributes.dtypes, dtypes);
+  return this;
+};
 
 Layer.prototype.plot = function(plot) {
   if(!arguments.length) { return this.attributes.plot; }
@@ -1088,7 +1079,7 @@ Layer.prototype.setStat = function() {
         if(this.geom() instanceof ggd3.geoms.hline){
           stat[a]('range');
         } else {
-          stat[a](stat.linearAgg());
+          stat[a](stat.linearAgg()); //
         }
       } else {
         if(this.geom() instanceof ggd3.geoms.hline){
@@ -1103,19 +1094,27 @@ Layer.prototype.setStat = function() {
       stat[a]('first');
     }
   }, this);
-  // if a stat has not been set, it is x or y
+  // if a stat has not been set, 
+  // ie. not passed in aes, it is x or y
   // and should be set
   ['x', 'y'].forEach(function(a) {
     if(!stat[a]() ){
       stat[a](stat.linearAgg());
       if(stat.linearAgg() === "bin"){
         aes[a] = "binHeight";
+        this.dtypes({'binHeight': ['number', 'many']});
+        plot.dtypes({'binHeight': ['number', 'many']});
       } else if(stat.linearAgg() === "count") {
         aes[a] = "n. observations";
+        this.dtypes({'n. observations': ['number', 'many']});
+        plot.dtypes({'n. observations': ['number', 'many']});
       } else if(stat.linearAgg() === "density"){
         aes[a] = "density";
+        this.dtypes({'density': ['number', 'many']});
+        plot.dtypes({'density': ['number', 'many']});
       }
       this.aes(aes);
+      plot.aes(aes);
     }
   }, this);
 };
@@ -1438,12 +1437,12 @@ Plot.prototype.layers = function(layers) {
       if(typeof l === 'string'){
         // passed string to get geom with default settings
         l = ggd3.layer()
-              .aes(clone(origAes))
+              .aes(origAes)
               .data(this.data(), true)
               .geom(l);
       } else if ( l instanceof ggd3.layer ){
         // user specified layer
-        aes = clone(l.aes());
+        aes = l.aes();
         if(!l.data()) { 
           l.data(this.data(), true); 
         } else {
@@ -1451,9 +1450,8 @@ Plot.prototype.layers = function(layers) {
         }
         // inherit plot level aesthetics and override 
         // w/ explicitly declared aesthetics.
-        l.aes(merge(clone(origAes), clone(aes)));
+        l.aes(merge(origAes, clone(aes)));
       } else if (l instanceof ggd3.geom){
-
         var g = l;
         l = ggd3.layer()
                 .aes(clone(origAes))
@@ -1462,7 +1460,6 @@ Plot.prototype.layers = function(layers) {
       }
       l.plot(this).dtypes(this.dtypes());
       this.attributes.layers.push(l);
-      // this.aes(merge(clone(l.aes()), clone(origAes)));
     }, this);
   } else if (layers instanceof ggd3.layer) {
     if(!layers.data()) { 
@@ -1475,7 +1472,6 @@ Plot.prototype.layers = function(layers) {
       .dtypes(this.dtypes())
       .plot(this);
     this.attributes.layers.push(layers);
-    // this.aes(merge(clone(aes), clone(origAes)));
   } 
   return this;
 };
@@ -1561,6 +1557,7 @@ Plot.prototype.setFixedScale = function(a) {
     if((scale._userOpts.scale !== undefined) &&
        (scale._userOpts.scale.domain !== undefined)){
       domain = scale._userOpts.scale.domain;
+      scale.scale().domain(domain);
       return scale.domain(domain);
     }
     for(var k2 in this[a + "Scale"]()){
@@ -1584,7 +1581,6 @@ Plot.prototype.setFixedScale = function(a) {
 };
 
 Plot.prototype.plotDim = function() {
-  var margins = this.margins();
   return {x: this.width(),
    y: this.height()};
 };
@@ -1642,10 +1638,10 @@ Plot.prototype.draw = function(sel) {
                   }, this);
 
   this.setScale('single', this.aes());
-
   this.layers().forEach(function(l) {
     l.compute(sel);
   });
+
   // make global scales
   this.setFixedScale('x'); 
   this.setFixedScale('y'); 
@@ -2067,6 +2063,7 @@ function setDomain(data, layer) {
   // each facet's data rolled up according to stat
   // unnested - an array of observations.
   data.data = this.unNest(geom.compute(data.data, s));
+  console.log(data.data);
 
   // free scales
   if(this.freeScales.length > 0){
@@ -2637,7 +2634,7 @@ Bar.prototype.fillEmptyStackGroups = function(data, v) {
     filler[k] = null;
   }
   data.forEach(function(d) {
-    var dkey, missing;
+    var dkeys, missing;
     dkeys = pluck(d.values, v);
     missing = compact(keys.filter(function(k) {
       return !contains(dkeys, k);
@@ -2701,6 +2698,8 @@ Bar.prototype.vertical = function(s){
 
 Bar.prototype.draw = function(sel, data, i, layerNum) {
 
+  console.log('to start');
+  console.log(data);
   var s     = this.setup(),
       that  = this,
       o, // original value or ordinal scale
@@ -2780,22 +2779,29 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
   if(!s.group){
     s.group = s.aes[size.p];
   }
-  s.groups = unique(pluck(data.data, s.group));
+  s.groups = compact(unique(pluck(data.data, s.group)));
+  console.log(s.groups);
 
   data = this.unNest(data.data);
+  console.log('after unnest');
+  console.log(data);
   // data must be nested to go into stack algorithm
-  if(s.group){
+  if(s.grouped){
     data = d3.nest().key(function(d) { return d[s.group];})
               .entries(data);
   } else {
     data = [{key: 'single',values: data}];
   }
+  data = data.filter(function(d) { 
+    return d.key !== "undefined" ;});
+  data = this.fillEmptyStackGroups(data, 
+                          this.name() === "bar" ? s.aes[width.p]: s.group);
+  console.log('after group nest');
+  console.log(data);
 
   // with histograms, if a bin is empty, it's key comes
   // back 'undefined'. This causes bars to be drawn
   // from the top (or right). They should be removed
-  data = data.filter(function(d) { 
-    return d.key !== "undefined" ;});
   if(this.name() === "bar"){
     rb = o.rangeBand();
     valueVar = s.aes[size.p] || "n. observations";
@@ -2814,7 +2820,6 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     console.log('grouping is already shown by facets' +
                 ' unnecessary color scales probably generated');
   }
-  data = that.fillEmptyStackGroups(data, categoryVar);
   var stack = d3.layout.stack()
                 .x(function(d) { return d[categoryVar]; })
                 .y(function(d) {
@@ -2834,6 +2839,8 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     });
     return !isnull;
   });
+  console.log('last manipulation');
+  console.log(data);
 
   if(s.position === 'dodge' && this.name() === 'bar') {
     // make ordinal scale for group
@@ -3261,6 +3268,12 @@ function Histogram(spec) {
         c = s.aes.fill || s.aes.color;
     sel.each(function(d) {
         var el = d3.select(this);
+        if(c) {
+          el.append('h4')
+            .text(c + ": ")
+            .append('span')
+            .text(d[c]);
+        }
         el.append('h4')
           .text(v + ": " )
           .append("span").text(r(d[v]) + " - " + r(d[v]+d.dx));
@@ -3363,14 +3376,13 @@ Histogram.prototype.fillEmptyStackGroups = function(data, v) {
       vals = unique(flatten(pluck(data, function(d) {
         return pluck(d.values, 'x');
       }))),
-      empty = {},
-      n = d3.nest()
-            .key(function(d) { return d[v]; });
+      empty = {};
   empty.y = 0;
   empty.binHeight = 0;
   empty.dx = data[0].dx;
+  console.log(vals);
   data.forEach(function(d) {
-    var dkey, missing;
+    var dkeys, missing;
     dkeys = pluck(d.values, 'x');
     missing = compact(vals.filter(function(k) {
       return !contains(dkeys, k);
@@ -3393,10 +3405,11 @@ Histogram.prototype.fillEmptyStackGroups = function(data, v) {
 Histogram.prototype.nest = function() {
   // if stacking histograms, bins must be calculated
   // first on entire facet, then individually on
-  // each layer. If facet.scales() === "fixed"
+  // each stack layer. If facet.scales() === "fixed"
   // bins should be the same across facets. If not
   // the pre calculated bins need to be stored and 
   // referenced when calculating layers.
+  // one call to goem histogram is going through 47 times.
   var aes = this.layer().aes(),
       plot = this.layer().plot(),
       nest = d3.nest(),
@@ -4945,7 +4958,8 @@ Stat.prototype.agg = function(data, aes) {
   var out = [{}];
   Object.keys(aes).forEach(function (a) {
     if(!contains(this.exclude, a)) {
-      if(contains(["range", "unique"], this[a]()._name) ){
+      if(contains(["range", "unique"], 
+         this[a]()._name) ){
         var r = this[a]()(pluck(flatten([data]), aes[a]));
         out = r.map(function(d) {
             var o = clone(out[0]);
@@ -4965,11 +4979,12 @@ Stat.prototype.agg = function(data, aes) {
 
 Stat.prototype.compute = function(data) {
   var aes = this.layer().aes(),
-      id = any(difference(Object.keys(aes), this.exclude).map( 
+      that = this,
+      id = any(difference(Object.keys(aes), that.exclude).map( 
             function(k){
               if(!this[k]()){ return null; }
               return this[k]()([]) === "identity";
-            }, this));
+            }, that));
   if(contains(specialStats, this.linearAgg()) ){
     return this["compute_" + this.linearAgg()](data);
   }
@@ -5031,6 +5046,7 @@ Stat.prototype.range._name = "range";
 
 // median
 Stat.prototype.median = function(arr) {
+  arr.sort(d3.ascending);
   if(arr.length > 100000) { 
     console.warn("Default behavior of returning median overridden " + 
            "because array length > 1,000,000." + 
@@ -5117,15 +5133,9 @@ Stat.prototype.compute_boxplot = function(data) {
       // special marker on dtypes
       factor = this.layer().dtypes()[aes.x][1] === "few" ? 'x': 'y',
       number = factor === 'x' ? 'y': 'x',
-      arr = pluck(data, aes[number]).sort(d3.ascending);
-      var end = new Date().getTime();
-      console.log("after sort");
-      console.log(end - start);
-      var iqr = this.iqr(arr);
-      end = new Date().getTime();
-      console.log("after iqr");
-      console.log(end - start);
-      var upper = d3.quantile(arr, g.tail() ? (1 - g.tail()): g.upper()),
+      arr = pluck(data, aes[number]).sort(d3.ascending),
+      iqr = this.iqr(arr),
+      upper = d3.quantile(arr, g.tail() ? (1 - g.tail()): g.upper()),
       lower = d3.quantile(arr, g.tail() || g.lower()),
       out = merge({
         "quantiles": iqr,
@@ -5133,9 +5143,6 @@ Stat.prototype.compute_boxplot = function(data) {
         "lower": lower,
       }, this.agg(data, aes)[0]);
       out["n. observations"] = data.length;
-      end = new Date().getTime();
-      console.log("after outliers");
-      console.log(end - start);
       out.data = data.filter(function(d) {
         return ((d[aes[number]] < lower) || 
                 (d[aes[number]] > upper));
@@ -5157,6 +5164,7 @@ Stat.prototype.compute_bin = function(data) {
     aes[h] = "binHeight";
   }
   n = h === "y" ? "x": "y";
+  console.log(data);
 
   var hist = d3.layout.histogram()
                 .bins(g.breaks() || g.bins())
@@ -5165,6 +5173,7 @@ Stat.prototype.compute_bin = function(data) {
                   return d[aes[n]];
                 });
   data = hist(data);
+  console.log(data);
   data.map(function(d) {
     if(d.length === 0) { return d; }
     d[aes[n]] = d.x;

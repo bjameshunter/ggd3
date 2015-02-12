@@ -46,7 +46,7 @@ Bar.prototype.fillEmptyStackGroups = function(data, v) {
     filler[k] = null;
   }
   data.forEach(function(d) {
-    var dkey, missing;
+    var dkeys, missing;
     dkeys = pluck(d.values, v);
     missing = compact(keys.filter(function(k) {
       return !contains(dkeys, k);
@@ -110,6 +110,8 @@ Bar.prototype.vertical = function(s){
 
 Bar.prototype.draw = function(sel, data, i, layerNum) {
 
+  console.log('to start');
+  console.log(data);
   var s     = this.setup(),
       that  = this,
       o, // original value or ordinal scale
@@ -189,22 +191,29 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
   if(!s.group){
     s.group = s.aes[size.p];
   }
-  s.groups = unique(pluck(data.data, s.group));
+  s.groups = compact(unique(pluck(data.data, s.group)));
+  console.log(s.groups);
 
   data = this.unNest(data.data);
+  console.log('after unnest');
+  console.log(data);
   // data must be nested to go into stack algorithm
-  if(s.group){
+  if(s.grouped){
     data = d3.nest().key(function(d) { return d[s.group];})
               .entries(data);
   } else {
     data = [{key: 'single',values: data}];
   }
+  data = data.filter(function(d) { 
+    return d.key !== "undefined" ;});
+  data = this.fillEmptyStackGroups(data, 
+                          this.name() === "bar" ? s.aes[width.p]: s.group);
+  console.log('after group nest');
+  console.log(data);
 
   // with histograms, if a bin is empty, it's key comes
   // back 'undefined'. This causes bars to be drawn
   // from the top (or right). They should be removed
-  data = data.filter(function(d) { 
-    return d.key !== "undefined" ;});
   if(this.name() === "bar"){
     rb = o.rangeBand();
     valueVar = s.aes[size.p] || "n. observations";
@@ -223,7 +232,6 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     console.log('grouping is already shown by facets' +
                 ' unnecessary color scales probably generated');
   }
-  data = that.fillEmptyStackGroups(data, categoryVar);
   var stack = d3.layout.stack()
                 .x(function(d) { return d[categoryVar]; })
                 .y(function(d) {
@@ -243,6 +251,8 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
     });
     return !isnull;
   });
+  console.log('last manipulation');
+  console.log(data);
 
   if(s.position === 'dodge' && this.name() === 'bar') {
     // make ordinal scale for group

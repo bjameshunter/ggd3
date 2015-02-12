@@ -115,6 +115,7 @@ function setDomain(data, layer) {
   // each facet's data rolled up according to stat
   // unnested - an array of observations.
   data.data = this.unNest(geom.compute(data.data, s));
+  console.log(data.data);
 
   // free scales
   if(this.freeScales.length > 0){

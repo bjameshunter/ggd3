@@ -20,7 +20,7 @@ function Layer(aes) {
   // unique character element, or it's unique character element
   // will have the scale applied to it.
   this.attributes = attributes;
-  var getSet = ["plot", "ownData", 'dtypes', "aggFunctions"];
+  var getSet = ["plot", "ownData", "aggFunctions"];
   for(var attr in this.attributes){
     if(!this[attr] && contains(getSet, attr) ){
       this[attr] = createAccessor(attr);
@@ -28,6 +28,11 @@ function Layer(aes) {
   }
   return this;
 }
+Layer.prototype.dtypes = function(dtypes) {
+  if(!arguments.length) { return this.attributes.dtypes;}
+  this.attributes.dtypes = merge(this.attributes.dtypes, dtypes);
+  return this;
+};
 
 Layer.prototype.plot = function(plot) {
   if(!arguments.length) { return this.attributes.plot; }
@@ -107,7 +112,7 @@ Layer.prototype.setStat = function() {
         if(this.geom() instanceof ggd3.geoms.hline){
           stat[a]('range');
         } else {
-          stat[a](stat.linearAgg());
+          stat[a](stat.linearAgg()); //
         }
       } else {
         if(this.geom() instanceof ggd3.geoms.hline){
@@ -122,19 +127,27 @@ Layer.prototype.setStat = function() {
       stat[a]('first');
     }
   }, this);
-  // if a stat has not been set, it is x or y
+  // if a stat has not been set, 
+  // ie. not passed in aes, it is x or y
   // and should be set
   ['x', 'y'].forEach(function(a) {
     if(!stat[a]() ){
       stat[a](stat.linearAgg());
       if(stat.linearAgg() === "bin"){
         aes[a] = "binHeight";
+        this.dtypes({'binHeight': ['number', 'many']});
+        plot.dtypes({'binHeight': ['number', 'many']});
       } else if(stat.linearAgg() === "count") {
         aes[a] = "n. observations";
+        this.dtypes({'n. observations': ['number', 'many']});
+        plot.dtypes({'n. observations': ['number', 'many']});
       } else if(stat.linearAgg() === "density"){
         aes[a] = "density";
+        this.dtypes({'density': ['number', 'many']});
+        plot.dtypes({'density': ['number', 'many']});
       }
       this.aes(aes);
+      plot.aes(aes);
     }
   }, this);
 };
