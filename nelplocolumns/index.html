@@ -50,7 +50,9 @@ var chart = ggd3.plot()
               .margins({left: 55, bottom:60})
               .xScale({axis:{ticks:4}, offset: 25, label: "Real Wages"})
               .yScale({axis:{ticks:4}, offset: 60, label: "Unemployment"})
-              .dtypes({"date": ['date', 'many', "%Y-%m"]})
+              .dtypes({"date": ['date', 'many', "%Y-%m"],
+                      "real.wages": ['number', 'many'],
+                      "unemp": ['number', 'many']})
               .width(300)
               .height(300);
 

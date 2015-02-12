@@ -32,6 +32,7 @@ var facet = ggd3.facet({x:'Romance', y: "Comedy",
 
 var chart = ggd3.plot()
               .facet(facet)
+              .aes({x:"Drama", y:"rating", group: 'Action'})
               .layers(layers)
               .width(300)
               .height(300)
@@ -40,7 +41,14 @@ var chart = ggd3.plot()
                       offset:60})
               .xScale({label: "1 = Drama. Action films are blue",
                       offset: 40})
-              .aes({x:"Drama", y:"rating", fill: 'Action'})
+              // .fillScale({scale:{range:['steelblue', 'orange']}})
+              .dtypes({
+                Romance: ['number', 'few'],
+                Comedy: ['number', 'few'],
+                Drama: ['number', 'few'],
+                Action: ['number', 'few'],
+                rating: ['number', 'many'],
+              })
 
 d3.csv("{{ site.baseurl }}/assets/data/movies.csv", function(error, d) {
   data = d;

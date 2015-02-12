@@ -37,7 +37,9 @@ d3.csv("assets/data/mtcars.csv", function(error, cars) {
                     //     domain:["3", "4", "5"]}})
                     .facet({x:'am', nrows: 1})
                     .dtypes({"gear": ["string", 'few'], 
-                            "cyl": ["string", 'few']
+                            "cyl": ["string", 'few'],
+                            "mpg": ['number', 'many'],
+                            "hp": ['number', 'many'],
                         })
                     .data(cars)
                     .aes({x: "cyl", y: "mpg", fill: "gear", 
