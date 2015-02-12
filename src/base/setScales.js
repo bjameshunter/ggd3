@@ -194,7 +194,7 @@ function setDomain(data, layer) {
           // aesthetic, it will trip up here, 
           // test if it exists.
           if(d[s.aes[g]]){
-            return this.scale()(d[s.aes[g]]);
+            return this.scale(d[s.aes[g]]);
           }
         }.bind(scale);
         this[g](aesScale);

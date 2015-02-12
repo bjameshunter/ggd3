@@ -3757,6 +3757,7 @@ Box.prototype.domain = function(data, a) {
 // box takes an array of numbers and draws a box around the 
 // two extremes and lines at the inner points.
 Box.prototype.drawGeom = function(box, x, y, w, h, s, layerNum) {
+  console.log(s);
   box.attr({
     x: x,
     y: y,
