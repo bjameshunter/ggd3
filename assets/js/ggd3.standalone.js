@@ -3385,10 +3385,11 @@ Histogram.prototype.fillEmptyStackGroups = function(data, v) {
 Histogram.prototype.nest = function() {
   // if stacking histograms, bins must be calculated
   // first on entire facet, then individually on
-  // each layer. If facet.scales() === "fixed"
+  // each stack layer. If facet.scales() === "fixed"
   // bins should be the same across facets. If not
   // the pre calculated bins need to be stored and 
   // referenced when calculating layers.
+  // one call to goem histogram is going through 47 times.
   var aes = this.layer().aes(),
       plot = this.layer().plot(),
       nest = d3.nest(),
@@ -4937,7 +4938,7 @@ Stat.prototype.agg = function(data, aes) {
   var out = [{}];
   Object.keys(aes).forEach(function (a) {
     if(!contains(this.exclude, a)) {
-      if(contains(["range", "unique", 'first'], 
+      if(contains(["range", "unique"], 
          this[a]()._name) ){
         var r = this[a]()(pluck(flatten([data]), aes[a]));
         out = r.map(function(d) {
@@ -4959,7 +4960,7 @@ Stat.prototype.agg = function(data, aes) {
 Stat.prototype.compute = function(data) {
   var aes = this.layer().aes(),
       that = this,
-      id = any(difference(Object.keys(aes), this.exclude).map( 
+      id = any(difference(Object.keys(aes), that.exclude).map( 
             function(k){
               if(!this[k]()){ return null; }
               return this[k]()([]) === "identity";
