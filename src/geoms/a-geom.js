@@ -348,9 +348,8 @@ Geom.prototype.removeElements = function(sel, layerNum, clss) {
   remove.transition()
     .style('opacity', 0)
     .remove();
-  
-};
 
+};
 
 ggd3.geom = Geom;
 

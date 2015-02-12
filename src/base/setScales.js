@@ -15,9 +15,10 @@ var measureScales = ['x', 'y', 'color','size', 'fill' ,'alpha', 'size'],
 function setScale(selector, aes) {
   // gather user defined settings in opts object
   var opts = {},
-  // user defined opts and the fixed scale domain
-  scales = intersection(measureScales, Object.keys(aes));
-  measureScales.map(function(a) {
+      // user defined opts and the fixed scale domain
+      scales = intersection(measureScales, 
+                            ['x', 'y'].concat(Object.keys(aes)));
+  scales.map(function(a) {
     // there is a scale "single" that holds the 
     opts[a] = this[a + "Scale"]().single._userOpts;
   }, this);

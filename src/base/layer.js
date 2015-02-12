@@ -101,7 +101,7 @@ Layer.prototype.setStat = function() {
   diff.forEach(function(a) {
     dtype = dtypes[aes[a]];
     if(!stat[a]() && contains(measureScales, a)){
-    scaleType = plot[a + "Scale"]().single.type();
+      scaleType = plot[a + "Scale"]().single.type();
       if(contains(linearScales, scaleType) && 
          contains(['x', 'y'], a)){
         if(this.geom() instanceof ggd3.geoms.hline){
@@ -163,7 +163,7 @@ Layer.prototype.compute = function(sel) {
     dlist = plot.dataList(plot.data());
   } 
   var divs = [];
-  // reset geom's data array;
+  // reset geom's data array if geom wasn't given it's own data;
   if(!this.geom().ownData()){
     this.geom().data([]);
   }

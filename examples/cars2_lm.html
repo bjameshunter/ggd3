@@ -57,7 +57,6 @@ var chart = ggd3.plot()
 
 d3.csv("../data/mtcars.csv", function(error, d) {
   data = d;
-  data = _.sortBy(data, function(d) { return d.am ; })
   chart.data(data)
   .draw(div);
 })

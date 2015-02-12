@@ -1,57 +1,110 @@
 var vows = require('vows'),
-    jQuery = require('../node_modules/jquery/dist/jquery.js'),
+    $ = require('../node_modules/jquery/dist/jquery.js'),
     assert = require('assert'),
     d3 = require('d3'),
     _ = require('lodash'),
     ggd3 = require('../dist/ggd3.v.0.1.0.js'),
-    d = [],
+    data = require('../data/data.js'),
+    // plots = require('../plot_examples.js'),
     suite = vows.describe('ggd3.plot');
-
-for(var i = 0; i < 32; i ++){
-  d.push( {
-    "v1": _.random(20),
-    "v2": Math.random(),
-    "group": _.sample(['group1', 'group2', 'group3']),
-    "facet": _.sample(['facet1', 'facet2', "facet3", 'facet4']),
-  })
-}
 
 suite.addBatch({
   // a context, these are run in parallel/asynch.
   // contexts contain topics, which are run in sequence.
-  'facet single x': {
+  'mtcars': {
     topic: function() {
-      var ch = new ggd3.plot()
-                    .layers(['bar'])
-                    .data(d)
-                    .facet({x: "facet", ncols: 2});
-      d3.select("body").append('div').call(ch.draw());
-      var svgs = d3.selectAll('svg');
-      return {ch:ch, svgs: svgs};
+      var div = d3.select('body').append('div')
+                  .attr('id', 'mtcars');
+      var p = ggd3.plot()
+                .layers(['point'])
+                .aes({x:'wt', y:'mpg', fill:'gear'})
+                .facet({x:'cyl', scales:'free', ncols: 3})
+                .data(data.mtcars_data())
+      p.draw(div);
+      return {div: div, plot:p};
     },
-    "should be 32 long": function(topic){
-      var flat = _.flatten(_.map(topic.ch.data(), 
-                           function(d) { return d.values; }))
-      assert.equal(flat.length, 32);
+    "should have 32 circles": function(topic){
+      assert.equal(topic.div.selectAll('circle.geom')[0].length, 32);
     },
-    "should have 4 facets": function(topic) {
-      assert.equal(topic.svgs[0].length, 4);
+    "should have 3 facets": function(topic) {
+      assert.equal(topic.div.selectAll('.plot-svg')[0].length, 3);
+    },
+    "should properly id dtypes": function(topic) {
+      var dtypes = {
+        wt: ['number', 'many'],
+        mpg: ['number', 'many'],
+        gear: ['number', 'few'], 
+      };
+      assert.deepEqual(topic.plot.dtypes(), dtypes);
     }
   },
-  "facet x and y": {
+  "baseball": {
     topic: function() {
-      d3.selectAll('svg').remove();
-      var ch = new ggd3.plot()
-                      .data(d)
-                      .layers(['bar'])
-                      .facet({x: 'facet', y: 'group'});
-      d3.select('body').append('div').call(ch.draw());
-      var svgs = d3.selectAll('svg');
-      return {ch: ch, svgs: svgs};
+    var layers = ggd3.layer()
+              .geom(ggd3.geoms.bar()
+                      .offset('expand'))
+              .position('stack')
+              .stat({x:'mean', alpha: 'max'}),
+        facet = ggd3.facet({titleSize:[0,0], vShift:40}),
+        aes = {y: "team", x:'batting',
+                    fill: "decade",
+                    alpha: "hr"},
+        chart = ggd3.plot()
+                  .facet(facet)
+                  .width(300)
+                  .height(800)
+                  .color('white')
+                  .rangeBand(0)
+                  .rangePadding(0)
+                  .subRangePadding(0.2)
+                  .layers(layers)
+                  .yGrid(false)
+                  .xGrid(false)
+                  .margins({right: 50, top:0})
+                  .xScale({axis: {ticks:4, position: 'top',
+                                  orient:'top'},
+                                  offset:45})
+                  .yScale({axis:{position:"right",
+                                orient: "right"},
+                                offset:45})
+                  .aes({y: "team", x:"batting",
+                        fill: "decade",
+                        alpha: "hr"})
+                  .dtypes({"year": ['date', 'many', "%Y"],
+                      "decade": ['string'],
+                      "stint": ['string'],
+                      "batting": ["number", "many"]})
+                  .data(data.baseball_data());
+      var div = d3.select('body').append('div')
+                      .attr('id', 'baseball');
+      chart.draw(div);
+      var gs = d3.selectAll('.plot');
+      return {g: gs, chart:chart};
     },
-    "should have 12 facets": function(topic) {
-      assert.equal(topic.svgs[0].length, 12);
+    "should have 34 teams on y axis": function(topic) {
+      var domainLength = topic.chart.yScale().single.domain().length;
+      assert.equal(domainLength, 34);
+    },
+    "should be four plots": function(topic) {
+      assert.equal(topic.g[0].length, 4);
+    },
+    "should have 90 rectangles": function(topic) {
+      setTimeout(function() {
+        var rects = d3.selectAll('rect.geom')[0].length;
+        assert.equal(rects, 90);
+      }, 1000)
     }
   }
+})
+.addBatch({
+  "mtcars still exists": {
+    topic: function() {
+      return {};
+    },
+    "test for plot": function(topic){
+      assert.equal(d3.selectAll('.plot')[0].length, 4);
+    },
+  }
 });
+
 suite.export(module);

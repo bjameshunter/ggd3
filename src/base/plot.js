@@ -464,7 +464,9 @@ Plot.prototype.draw = function(sel) {
         .lineType(this.gridLineType())
         .highlightZero(this.highlightXZero()));
     this.vgrid.compute(sel);
-    this.vgrid.draw(sel);}
+    this.vgrid.draw(sel);
+  }
+  return this;
 };
 
 Plot.prototype.nest = Nest;
