@@ -53,7 +53,10 @@ var chart = ggd3.plot()
               .aes({x:'rating', y: 'Comedy', fill: "Action",
                    additional: ['title', 'year', 'mpaa']})
 
+var start = new Date().getTime();
 d3.csv("../data/movies.csv", function(error, d) {
+  var end = new Date().getTime();  
+  console.log(end - start);
   data = d;
   chart.data(data).draw(div);
 })

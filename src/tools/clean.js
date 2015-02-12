@@ -63,7 +63,10 @@ function Clean(data, obj) {
     // this is necessary for dates.
     if(!contains(keys, v)) { 
       console.log('determining data type');
+      var start = new Date().getTime();
       vars[v] = dtype(pluck(getRandomSubarray(data , n), v)); //[]; 
+      var end = new Date().getTime(); 
+      console.log(end - start);
     }
   });
   // for(var i=0;i<data.length;i++){
