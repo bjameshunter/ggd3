@@ -85,6 +85,11 @@ var chart = ggd3.plot()
                             scale: {domain:[0, 40]}})
                     .xScale({axis: {ticks: 4, position: "top"},
                             offset: 25})
+                    .dtypes({
+                      cyl: ['number', 'few', ',.0d'],
+                      gear:['number', 'few', ',.0d'],
+                      mpg: ['number', 'many', ',.1f']
+                    })
                     .rangePadding(0)
                     .facet(facet)
                     .rangeBand(0.1)
@@ -101,7 +106,7 @@ d3.csv("../data/mtcars.csv", function(error, d) {
   var d2 = _.clone(d)
   areaData = d3.nest()
                     .key(function(d) { return d.cyl; })
-                    // .key(function(d) { return d.gear; })
+                    .key(function(d) { return d.gear; })
                     .rollup(function(d) {
                       var o = {},
                       arr = _.pluck(d, "mpg"),

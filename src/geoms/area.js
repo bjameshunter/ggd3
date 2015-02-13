@@ -123,6 +123,19 @@ Area.prototype.decorateScale = function(dir, s, sc, data) {
   }
 };
 
+Area.prototype.data_matcher = function(matches, layerNum){
+  console.log(matches);
+  return function(d, i) {
+    if(matches.length){
+      return matches.map(function(m) {
+        return d[m];
+      }).join(' ') + " " + i + " " + layerNum;
+    } else {
+      return i;
+    }
+  };
+};
+
 Area.prototype.check = function(aes, d) {
   if(!aes[d + 'min'] || !aes[d + 'max']){
     throw "You must specify, as a function, variable, or constant" +
@@ -190,9 +203,11 @@ Area.prototype.draw = function(sel, data, i, layerNum){
     }
   }
   var areaGen = that.generator(s.aes, x2, y2, o2, s.group);
-
-  var area = sel.selectAll(".g" + layerNum + ".geom-" + this.name())
-              .data(data); // one area per geom
+  var matched = this.merge_variables(_.keys(data[0][0]));
+  var data_matcher = _.bind(this.data_matcher(matched, layerNum), this);
+  console.log(data_matcher);
+  var area = sel.selectAll("path.geom.g" + layerNum + ".geom-" + this.name())
+              .data(data, data_matcher); // one area per geom
   area.transition()
     .each(function(d, i) {
       that.drawArea(d3.select(this), areaGen, s, layerNum);

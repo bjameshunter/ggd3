@@ -84,7 +84,8 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
                                this.drawX(), this.drawY()),
       vertical = scales.x.type() === "ordinal",
       factor = vertical ? "x": "y",
-      number = vertical ? "y": "x";
+      number = vertical ? "y": "x",
+      px, py, rx, ry, rw, rh;
 
   data = this.unNest(data.data);
   o = scales[factor].scale();

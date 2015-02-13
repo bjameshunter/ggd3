@@ -86,7 +86,8 @@ Stat.prototype.compute = function(data) {
             function(k){
               if(!this[k]()){ return null; }
               return this[k]()([]) === "identity";
-            }, this));
+            }, this)),
+      out;
   if(_.contains(specialStats, this.linearAgg()) ){
     return this["compute_" + this.linearAgg()](data);
   }
@@ -293,7 +294,7 @@ Stat.prototype.compute_density = function(data) {
       start = {},
       end = {},
       aes = this.layer().aes();
-  var g, k, r, p;
+  var g, k, r, p, d, n, kde;
   if(aes.y && aes.x) {
     // we've been through before and density exists on aes
     d = aes.y === "density" ? 'y': 'x';

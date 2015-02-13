@@ -1,17 +1,30 @@
-!function() {
-  var ggd3 = {version: "0.1.0",
-                tools: {},
-                geoms: {},
-                stats: {},
-                };
-  function createAccessor(attr){
-    function accessor(value){
-      if(!arguments.length){ return this.attributes[attr];}
-        this.attributes[attr] = value;
-      return this;
-    }
-    return accessor;
+(function(context, ggd3){
+  "use strict";
+  if(typeof module === "object" && module.exports){
+    // package loaded as node module
+    console.log('loaded as module');
+    module.exports = ggd3(require('d3'), require('lodash'));
+  } else {
+    // file is loaded in browser.
+    console.log('loaded in browser')
+    this.ggd3 = ggd3;
   }
+}(this, function(d3, _){
+    "use strict";
+
+    var ggd3 = {version: "0.1.0",
+                  tools: {},
+                  geoms: {},
+                  stats: {},
+                  };
+    function createAccessor(attr){
+      function accessor(value){
+        if(!arguments.length){ return this.attributes[attr];}
+          this.attributes[attr] = value;
+        return this;
+      }
+      return accessor;
+    }
 ggd3.tools.arrayOfArrays = function(data) {
   // first level are all arrays
   if(_.all(_.map(_.flatten(data, true), _.isPlainObject))) {
@@ -106,7 +119,8 @@ function DataList(data) {
       x = facet.x(),
       y = facet.y(),
       by = facet.by(),
-      selector;
+      selector,
+      out;
   if((x && !y) || (y && !x)){
     selector = x ? x + "-": y + "-";
     return _.map(data, function(d) {
@@ -247,7 +261,7 @@ ggd3.tools.round = function round(value, decimals) {
 };
 
 // generic nesting function
-Nest = function(data) {
+function Nest(data) {
   if(_.isNull(data)) { return data; }
   var isLayer = (this instanceof ggd3.layer),
       nest = d3.nest(),
@@ -264,7 +278,7 @@ Nest = function(data) {
   }
   data = nest.entries(data);
   return data; 
-};
+}
 
 function unNest(data, nestedArray) {
   // recurse and flatten nested dataset
@@ -461,10 +475,10 @@ Facet.prototype.updateFacet = function(sel) {
 Facet.prototype.makeDIV = function(sel, rowNum) {
   var ncols = this._ncols,
       remainder = this.nFacets % ncols,
-      that = this;
-  row = sel.selectAll('div.plot-div')
-           .data(_.range((this.nFacets - this.nSVGs) > remainder ? 
-                 ncols: remainder));
+      that = this,
+      row = sel.selectAll('div.plot-div')
+               .data(_.range((this.nFacets - this.nSVGs) > remainder ? 
+                     ncols: remainder));
   row
     .each(function(colNum) {
       that.makeSVG(d3.select(this), rowNum, colNum);
@@ -2119,12 +2133,12 @@ Geom.prototype.merge_variables = function(variables){
   return matched;
 };
 
-Geom.prototype.data_matcher = function(matches){
+Geom.prototype.data_matcher = function(matches, layerNum){
   return function(d, i) {
     if(matches.length){
       return _.map(matches, function(m) {
         return d[m];
-      }).join(' ');
+      }).join(' ') + " " + i + " " + layerNum;
     } else {
       return i;
     }
@@ -2183,7 +2197,8 @@ Geom.prototype.setup = function() {
 
 Geom.prototype.collectGroups = function() {
   var groups, grouped,
-      aes = this.layer().aes();
+      aes = this.layer().aes(),
+      group;
   if(aes.fill) {
     grouped = true;
     group = aes.fill;
@@ -2250,7 +2265,8 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
       parentSVG = d3.select(sel.node().parentNode.parentNode), 
       plot = this.layer().plot(),
       rowNum = parseInt(parentSVG.attr('row')),
-      colNum = parseInt(parentSVG.attr('col'));
+      colNum = parseInt(parentSVG.attr('col')),
+      xfree, yfree;
   // choosing scales based on facet rule
 
   if(!_.contains(["free", "free_x"], setup.facet.scales()) || 
@@ -2390,7 +2406,7 @@ Bar.prototype.fillEmptyStackGroups = function(data, v) {
     filler[k] = null;
   });
   _.each(data, function(d) {
-    var dkey, missing;
+    var dkeys, missing;
     dkeys = _.map(d.values, function(e) { return e[v]; });
     missing = _.compact(_.filter(keys, function(k) {
       return !_.contains(dkeys, k);
@@ -2469,7 +2485,8 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       sub,
       drawX     = this.drawX(),
       drawY     = this.drawY(),
-      vertical = this.vertical(s);
+      vertical = this.vertical(s),
+      size, width;
 
   if(_.contains(['wiggle', 'silhouette'], that.offset()) ){
     var parentSVG = d3.select(sel.node().parentNode.parentNode);
@@ -2760,6 +2777,7 @@ Line.prototype.lineType = function(l) {
 };
 
 Line.prototype.generator = function(aes, x, y, o2, group) {
+  var pos;
   if(this.name() === "linerange"){
     pos = function() { return o2.rangeBand()/2; };
   } else {
@@ -2844,6 +2862,7 @@ Line.prototype.draw = function(sel, data, i, layerNum){
       x = scales.x.scale(),
       y = scales.y.scale(),
       parentSVG = d3.select(sel.node().parentNode.parentNode),
+      line,
       o2 = function() { return 0; };
       o2.rangeBand = function() { return 0; };
       s.gradient = false;
@@ -3062,7 +3081,7 @@ Histogram.prototype.domain = function(data, v) {
   var s = this.setup(),
       group, stackby,
       groupSum, stackSum,
-      grouped;
+      grouped, extent, range;
 
   if(s.aes[v] === "binHeight") {
     grouped = _.groupBy(data, function(d) {
@@ -3121,7 +3140,7 @@ Histogram.prototype.fillEmptyStackGroups = function(data, v) {
   empty.binHeight = 0;
   empty.dx = data[0].dx;
   _.each(data, function(d) {
-    var dkey, missing;
+    var dkeys, missing;
     dkeys = _.map(d.values, 'x');
     missing = _.compact(_.filter(vals, function(k) {
       return !_.contains(dkeys, k);
@@ -3368,6 +3387,19 @@ Area.prototype.decorateScale = function(dir, s, sc, data) {
   }
 };
 
+Area.prototype.data_matcher = function(matches, layerNum){
+  console.log(matches);
+  return function(d, i) {
+    if(matches.length){
+      return matches.map(function(m) {
+        return d[m];
+      }).join(' ') + " " + i + " " + layerNum;
+    } else {
+      return i;
+    }
+  };
+};
+
 Area.prototype.check = function(aes, d) {
   if(!aes[d + 'min'] || !aes[d + 'max']){
     throw "You must specify, as a function, variable, or constant" +
@@ -3435,9 +3467,11 @@ Area.prototype.draw = function(sel, data, i, layerNum){
     }
   }
   var areaGen = that.generator(s.aes, x2, y2, o2, s.group);
-
-  var area = sel.selectAll(".g" + layerNum + ".geom-" + this.name())
-              .data(data); // one area per geom
+  var matched = this.merge_variables(_.keys(data[0][0]));
+  var data_matcher = _.bind(this.data_matcher(matched, layerNum), this);
+  console.log(data_matcher);
+  var area = sel.selectAll("path.geom.g" + layerNum + ".geom-" + this.name())
+              .data(data, data_matcher); // one area per geom
   area.transition()
     .each(function(d, i) {
       that.drawArea(d3.select(this), areaGen, s, layerNum);
@@ -3614,7 +3648,8 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
                                this.drawX(), this.drawY()),
       vertical = scales.x.type() === "ordinal",
       factor = vertical ? "x": "y",
-      number = vertical ? "y": "x";
+      number = vertical ? "y": "x",
+      px, py, rx, ry, rw, rh;
 
   data = this.unNest(data.data);
   o = scales[factor].scale();
@@ -4479,7 +4514,7 @@ Smooth.prototype.draw = function(sel, data, i, layerNum) {
                                 this.drawX(), this.drawY()),
       x = scales.x.scale(),
       y = scales.y.scale(),
-      y2,
+      y2, r,
       o2 = function() { return 0; };
       o2.rangeBand = function() { return 0;};
       r = ggd3.geoms.ribbon()
@@ -4790,7 +4825,8 @@ Stat.prototype.compute = function(data) {
             function(k){
               if(!this[k]()){ return null; }
               return this[k]()([]) === "identity";
-            }, this));
+            }, this)),
+      out;
   if(_.contains(specialStats, this.linearAgg()) ){
     return this["compute_" + this.linearAgg()](data);
   }
@@ -4997,7 +5033,7 @@ Stat.prototype.compute_density = function(data) {
       start = {},
       end = {},
       aes = this.layer().aes();
-  var g, k, r, p;
+  var g, k, r, p, d, n, kde;
   if(aes.y && aes.x) {
     // we've been through before and density exists on aes
     d = aes.y === "density" ? 'y': 'x';
@@ -5036,18 +5072,6 @@ Stat.prototype.compute_density = function(data) {
 };
 
 ggd3.stats = Stat;
-  if(typeof module === "object" && module.exports){
-    // package loaded as node module
-    this.ggd3 = ggd3;
-    module.exports = ggd3;
-    // I should probably learn what all this stuff does
-    // added the following two lines so this would work in
-    // vows
-    this._ = require('lodash');
-    this.d3 = require('d3');
-  } else {
-    // file is loaded in browser.
-    console.log('loaded in browser')
-    this.ggd3 = ggd3;
-  }
-}();
+  return ggd3;
+  })
+);

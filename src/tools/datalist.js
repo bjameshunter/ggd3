@@ -8,7 +8,8 @@ function DataList(data) {
       x = facet.x(),
       y = facet.y(),
       by = facet.by(),
-      selector;
+      selector,
+      out;
   if((x && !y) || (y && !x)){
     selector = x ? x + "-": y + "-";
     return _.map(data, function(d) {

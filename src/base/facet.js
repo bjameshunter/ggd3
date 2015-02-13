@@ -134,10 +134,10 @@ Facet.prototype.updateFacet = function(sel) {
 Facet.prototype.makeDIV = function(sel, rowNum) {
   var ncols = this._ncols,
       remainder = this.nFacets % ncols,
-      that = this;
-  row = sel.selectAll('div.plot-div')
-           .data(_.range((this.nFacets - this.nSVGs) > remainder ? 
-                 ncols: remainder));
+      that = this,
+      row = sel.selectAll('div.plot-div')
+               .data(_.range((this.nFacets - this.nSVGs) > remainder ? 
+                     ncols: remainder));
   row
     .each(function(colNum) {
       that.makeSVG(d3.select(this), rowNum, colNum);

@@ -40,6 +40,7 @@ Line.prototype.lineType = function(l) {
 };
 
 Line.prototype.generator = function(aes, x, y, o2, group) {
+  var pos;
   if(this.name() === "linerange"){
     pos = function() { return o2.rangeBand()/2; };
   } else {
@@ -124,6 +125,7 @@ Line.prototype.draw = function(sel, data, i, layerNum){
       x = scales.x.scale(),
       y = scales.y.scale(),
       parentSVG = d3.select(sel.node().parentNode.parentNode),
+      line,
       o2 = function() { return 0; };
       o2.rangeBand = function() { return 0; };
       s.gradient = false;

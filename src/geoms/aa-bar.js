@@ -46,7 +46,7 @@ Bar.prototype.fillEmptyStackGroups = function(data, v) {
     filler[k] = null;
   });
   _.each(data, function(d) {
-    var dkey, missing;
+    var dkeys, missing;
     dkeys = _.map(d.values, function(e) { return e[v]; });
     missing = _.compact(_.filter(keys, function(k) {
       return !_.contains(dkeys, k);
@@ -125,7 +125,8 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       sub,
       drawX     = this.drawX(),
       drawY     = this.drawY(),
-      vertical = this.vertical(s);
+      vertical = this.vertical(s),
+      size, width;
 
   if(_.contains(['wiggle', 'silhouette'], that.offset()) ){
     var parentSVG = d3.select(sel.node().parentNode.parentNode);

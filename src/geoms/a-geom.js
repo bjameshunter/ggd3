@@ -127,12 +127,12 @@ Geom.prototype.merge_variables = function(variables){
   return matched;
 };
 
-Geom.prototype.data_matcher = function(matches){
+Geom.prototype.data_matcher = function(matches, layerNum){
   return function(d, i) {
     if(matches.length){
       return _.map(matches, function(m) {
         return d[m];
-      }).join(' ');
+      }).join(' ') + " " + i + " " + layerNum;
     } else {
       return i;
     }
@@ -191,7 +191,8 @@ Geom.prototype.setup = function() {
 
 Geom.prototype.collectGroups = function() {
   var groups, grouped,
-      aes = this.layer().aes();
+      aes = this.layer().aes(),
+      group;
   if(aes.fill) {
     grouped = true;
     group = aes.fill;
@@ -258,7 +259,8 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
       parentSVG = d3.select(sel.node().parentNode.parentNode), 
       plot = this.layer().plot(),
       rowNum = parseInt(parentSVG.attr('row')),
-      colNum = parseInt(parentSVG.attr('col'));
+      colNum = parseInt(parentSVG.attr('col')),
+      xfree, yfree;
   // choosing scales based on facet rule
 
   if(!_.contains(["free", "free_x"], setup.facet.scales()) || 

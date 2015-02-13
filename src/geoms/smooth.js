@@ -185,7 +185,7 @@ Smooth.prototype.draw = function(sel, data, i, layerNum) {
                                 this.drawX(), this.drawY()),
       x = scales.x.scale(),
       y = scales.y.scale(),
-      y2,
+      y2, r,
       o2 = function() { return 0; };
       o2.rangeBand = function() { return 0;};
       r = ggd3.geoms.ribbon()
