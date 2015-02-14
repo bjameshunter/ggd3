@@ -103,28 +103,26 @@ function makeOneZero(o, v) {
 }
 d3.csv("../data/mtcars.csv", function(error, d) {
   data = d;
-  var d2 = _.clone(d)
   areaData = d3.nest()
-                    .key(function(d) { return d.cyl; })
-                    .key(function(d) { return d.gear; })
-                    .rollup(function(d) {
-                      var o = {},
-                      arr = _.pluck(d, "mpg"),
-                      max = _.filter(d, function(r) {
-                        return r.mpg === d3.max(arr);
-                      })[0],
-                      min = _.filter(d, function(r) {
-                        return r.mpg === d3.min(arr);
-                      })[0],
-                      mean = d[0];
-                      o.max = makeOneZero(max, 'mpg')
-                      o.min = makeOneZero(min, 'mpg');
-                      o.mean = makeOneZero(mean, 'mpg');
-                      return o;
-                    })
+              .key(function(d) { return d.cyl; })
+              .key(function(d) { return d.gear; })
+              .rollup(function(d) {
+                var o = {},
+                arr = _.pluck(d, "mpg"),
+                max = _.filter(d, function(r) {
+                  return r.mpg === d3.max(arr);
+                })[0],
+                min = _.filter(d, function(r) {
+                  return r.mpg === d3.min(arr);
+                })[0],
+                mean = d[0];
+                o.max = makeOneZero(max, 'mpg')
+                o.min = makeOneZero(min, 'mpg');
+                o.mean = makeOneZero(mean, 'mpg');
+                return o;
+              });
   chart.data(data);
   areaData = chart.unNest(areaData.entries(data));
-  console.log(areaData);
   area1.data(_.flatten(_.pluck(areaData, 'min')));
   area2.data(_.flatten(_.pluck(areaData, 'mean')));
   area3.data(_.flatten(_.pluck(areaData, 'max')));

@@ -5,7 +5,7 @@ function Layer(aes) {
   var attributes = {
     plot:     null,
     data:     null,
-    dtypes:   null,
+    dtypes:   {},
     geom:     null,
     stat:     null, // identity, sum, mean, percentile, etc.
     position: null, // jitter, dodge, stack, etc.
@@ -132,6 +132,7 @@ Layer.prototype.setStat = function() {
         aes[a] = "density";
       }
       this.aes(aes);
+      this.plot().aes(aes);
     }
   }, this);
 };
@@ -143,7 +144,15 @@ Layer.prototype.data = function(data, fromPlot) {
     this.attributes.data = data;
   } else {
     data = this.unNest(data);
+    if(this.geom().name() === 'area'){
+      console.log('after unnest');
+      console.log(data);
+    }
     data = ggd3.tools.clean(data, this);
+    if(this.geom().name() === 'area'){
+      console.log('after clean');
+      console.log(data);
+    }
     this.attributes.dtypes = _.merge(this.attributes.dtypes, data.dtypes);
     this.attributes.data = data.data;
   }

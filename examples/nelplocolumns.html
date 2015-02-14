@@ -62,9 +62,9 @@ var chart = ggd3.plot()
 
 d3.csv("../data/nelplo_columns.csv", function(error, d) {
   data = d;
-  chart.data(data)
-      .aes({x:"real.wages", y: "unemp",
-          label: "date", color: 'date'});
+  chart.aes({x:"real.wages", y: "unemp",
+          label: "date", color: 'date'})
+      .data(data);
   chart.draw(div);
 })
 

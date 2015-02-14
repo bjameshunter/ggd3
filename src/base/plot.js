@@ -401,11 +401,13 @@ Plot.prototype.draw = function(sel) {
                     return "g" + (n);
                   }, this);
 
+
   this.setScale('single', this.aes());
 
   _.each(this.layers(), function(l) {
     l.compute(sel);
-  });
+  }, this);
+
   // make global scales
   this.setFixedScale('x'); 
   this.setFixedScale('y'); 

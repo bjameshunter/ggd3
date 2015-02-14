@@ -43,14 +43,25 @@ function Clean(data, obj) {
   // coerce each records data to reasonable
   // type and get domains for all scales in aes.
   if(!data) { return {data: null, dtypes:null}; }
+  if(obj instanceof ggd3.layer && _.isEmpty(obj.dtypes())){
+    return {data:data, dtypes:null};
+  }
   var vars = {},
+      aes = obj.aes(),
       dtypeDict = {"number": parseFloat, 
                   "integer": parseInt,
                   "string": String},
       dtypes = _.merge({}, obj.dtypes()),
       keys = _.keys(dtypes),
       // assume all records have same keys
-      dkeys = _.keys(data[0]);
+      // dkeys = _.keys(data[0]);
+      dkeys = _.flatten(_.map(aes, function(v, k) {
+        if(v !== 'additional') {
+          return v;
+        } else {
+          return k;
+        }
+      }));
 
   dkeys.forEach(function(v){
     // if a data type has been declared, don't 
@@ -784,7 +795,7 @@ function Layer(aes) {
   var attributes = {
     plot:     null,
     data:     null,
-    dtypes:   null,
+    dtypes:   {},
     geom:     null,
     stat:     null, // identity, sum, mean, percentile, etc.
     position: null, // jitter, dodge, stack, etc.
@@ -911,6 +922,7 @@ Layer.prototype.setStat = function() {
         aes[a] = "density";
       }
       this.aes(aes);
+      this.plot().aes(aes);
     }
   }, this);
 };
@@ -922,7 +934,15 @@ Layer.prototype.data = function(data, fromPlot) {
     this.attributes.data = data;
   } else {
     data = this.unNest(data);
+    if(this.geom().name() === 'area'){
+      console.log('after unnest');
+      console.log(data);
+    }
     data = ggd3.tools.clean(data, this);
+    if(this.geom().name() === 'area'){
+      console.log('after clean');
+      console.log(data);
+    }
     this.attributes.dtypes = _.merge(this.attributes.dtypes, data.dtypes);
     this.attributes.data = data.data;
   }
@@ -1414,11 +1434,12 @@ Plot.prototype.draw = function(sel) {
                     return "g" + (n);
                   }, this);
 
-  this.setScale('single', this.aes());
 
   _.each(this.layers(), function(l) {
     l.compute(sel);
-  });
+  }, this);
+
+  this.setScale('single', this.aes());
   // make global scales
   this.setFixedScale('x'); 
   this.setFixedScale('y'); 
@@ -2066,6 +2087,8 @@ function Geom(aes) {
   this.attributes.tooltip = _.bind(tooltip, this);
 }
 
+
+
 Geom.prototype.tooltip = function(tooltip) {
   if(!arguments.length) { return this.attributes.tooltip; }
   var wrapper = function(sel, s, opts) {
@@ -2180,17 +2203,6 @@ Geom.prototype.setup = function() {
       s.grouped = true;
       s.group = s.aes.group;
     }
-    // not convinced this is a good idea.
-    // if(_.contains([s.facet.x(), s.facet.y()], 
-    //               s.group)) {
-    //   // uninteresting grouping, get rid of it.
-    //   s.grouped = false;
-    //   s.group = null;
-    //   s.groups = null;
-    //   // must get all groups from layer to do this
-    //   // meaningfully. Facets without a group 
-    //   // are throwing it off.
-    // }
   }
   return s;
 };
@@ -2327,21 +2339,26 @@ Geom.prototype.nest = function() {
       dtypes = plot.dtypes(),
       nestVars = _.unique(_.compact([aes.group, aes.fill, aes.color]));
 
+  // nest by groups
   _.each(nestVars, function(n) {
     if(dtypes[n][1] !== "many") {
-      nest.key(function(d) { return d[n]; });
+      nest.key(function(d) {
+        return d[n]; 
+      });
     }
-  });
-  _.map(['x', 'y'], function(a) {
+  }, this);
+  // nest by ordinal axes;
+  _.each(['x', 'y'], function(a) {
     if(plot[a + "Scale"]().single.type() === "ordinal"){
-      nest.key(function(d) { return d[aes[a]]; });
+      nest.key(function(d) { 
+        return d[aes[a]]; 
+      });
     }
-  });
+  }, this);
   return nest;
 };
 Geom.prototype.removeElements = function(sel, layerNum, clss) {
   var remove = sel
-                .select('.plot')
                 .selectAll('.geom.g' + layerNum)
                 .filter(function() {
                   return d3.select(this)[0][0].classList !== clss;
@@ -2351,9 +2368,7 @@ Geom.prototype.removeElements = function(sel, layerNum, clss) {
     .remove();
 };
 
-
 ggd3.geom = Geom;
-
 
 Geom.prototype.unNest = unNest;
 Geom.prototype.recurseNest = recurseNest;
@@ -3423,6 +3438,8 @@ Area.prototype.drawArea = function(area, gen, s, layerNum) {
 // have variables corresponding to ymin, ymax, xmin, xmax
 // or those aesthetics are numbers or functions 
 Area.prototype.draw = function(sel, data, i, layerNum){
+  console.log('inside area');
+  console.log(data);
   var s = this.setup(),
       that = this,
       scales = this.scalesAxes(sel, s, data.selector, layerNum,

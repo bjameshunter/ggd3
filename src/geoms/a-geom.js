@@ -60,6 +60,8 @@ function Geom(aes) {
   this.attributes.tooltip = _.bind(tooltip, this);
 }
 
+
+
 Geom.prototype.tooltip = function(tooltip) {
   if(!arguments.length) { return this.attributes.tooltip; }
   var wrapper = function(sel, s, opts) {
@@ -174,17 +176,6 @@ Geom.prototype.setup = function() {
       s.grouped = true;
       s.group = s.aes.group;
     }
-    // not convinced this is a good idea.
-    // if(_.contains([s.facet.x(), s.facet.y()], 
-    //               s.group)) {
-    //   // uninteresting grouping, get rid of it.
-    //   s.grouped = false;
-    //   s.group = null;
-    //   s.groups = null;
-    //   // must get all groups from layer to do this
-    //   // meaningfully. Facets without a group 
-    //   // are throwing it off.
-    // }
   }
   return s;
 };
@@ -321,21 +312,26 @@ Geom.prototype.nest = function() {
       dtypes = plot.dtypes(),
       nestVars = _.unique(_.compact([aes.group, aes.fill, aes.color]));
 
+  // nest by groups
   _.each(nestVars, function(n) {
     if(dtypes[n][1] !== "many") {
-      nest.key(function(d) { return d[n]; });
+      nest.key(function(d) {
+        return d[n]; 
+      });
     }
-  });
-  _.map(['x', 'y'], function(a) {
+  }, this);
+  // nest by ordinal axes;
+  _.each(['x', 'y'], function(a) {
     if(plot[a + "Scale"]().single.type() === "ordinal"){
-      nest.key(function(d) { return d[aes[a]]; });
+      nest.key(function(d) { 
+        return d[aes[a]]; 
+      });
     }
-  });
+  }, this);
   return nest;
 };
 Geom.prototype.removeElements = function(sel, layerNum, clss) {
   var remove = sel
-                .select('.plot')
                 .selectAll('.geom.g' + layerNum)
                 .filter(function() {
                   return d3.select(this)[0][0].classList !== clss;
@@ -345,9 +341,7 @@ Geom.prototype.removeElements = function(sel, layerNum, clss) {
     .remove();
 };
 
-
 ggd3.geom = Geom;
-
 
 Geom.prototype.unNest = unNest;
 Geom.prototype.recurseNest = recurseNest;

@@ -2,14 +2,25 @@ function Clean(data, obj) {
   // coerce each records data to reasonable
   // type and get domains for all scales in aes.
   if(!data) { return {data: null, dtypes:null}; }
+  if(obj instanceof ggd3.layer && _.isEmpty(obj.dtypes())){
+    return {data:data, dtypes:null};
+  }
   var vars = {},
+      aes = obj.aes(),
       dtypeDict = {"number": parseFloat, 
                   "integer": parseInt,
                   "string": String},
       dtypes = _.merge({}, obj.dtypes()),
       keys = _.keys(dtypes),
       // assume all records have same keys
-      dkeys = _.keys(data[0]);
+      // dkeys = _.keys(data[0]);
+      dkeys = _.flatten(_.map(aes, function(v, k) {
+        if(v !== 'additional') {
+          return v;
+        } else {
+          return k;
+        }
+      }));
 
   dkeys.forEach(function(v){
     // if a data type has been declared, don't 

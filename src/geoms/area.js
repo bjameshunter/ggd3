@@ -159,6 +159,8 @@ Area.prototype.drawArea = function(area, gen, s, layerNum) {
 // have variables corresponding to ymin, ymax, xmin, xmax
 // or those aesthetics are numbers or functions 
 Area.prototype.draw = function(sel, data, i, layerNum){
+  console.log('inside area');
+  console.log(data);
   var s = this.setup(),
       that = this,
       scales = this.scalesAxes(sel, s, data.selector, layerNum,
