@@ -18,7 +18,7 @@ ggd3 = require('./dist/ggd3.v.0.1.0.js');
   } else {
     // file is loaded in browser.
     console.log('loaded in browser')
-    this.ggd3 = ggd3;
+    context.ggd3 = ggd3(context.d3, context._);
   }
 }(this, function(d3, _){
     "use strict";
@@ -1956,7 +1956,8 @@ function setDomain(data, layer) {
           // if a plot doesn't use a particular
           // aesthetic, it will trip up here, 
           // test if it exists.
-          if(d[s.aes[g]]){
+          if(!_.isNull(d[s.aes[g]]) || 
+             !_.isUndefined(d[s.aes[g]])) {
             return this.scale()(d[s.aes[g]]);
           }
         }, scale);
@@ -5107,6 +5108,7 @@ Stat.prototype.compute_density = function(data) {
 };
 
 ggd3.stats = Stat;
+  // file is loaded in browser.
   return ggd3;
   })
 );

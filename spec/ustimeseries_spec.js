@@ -7,7 +7,7 @@ function count(id, selector, length) {
   expect(d3.select("#" + id)
           .selectAll(selector)[0].length).toEqual(length);
 }
-describe("name", function() {
+describe("line gradient", function() {
   var id = 'ustimeseries';
   var div = d3.select('body')
               .append('div')

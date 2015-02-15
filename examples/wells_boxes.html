@@ -1,0 +1,89 @@
+<html>
+<head>
+<link rel='stylesheet' href='../css/ggd3style.css'>
+<link rel='stylesheet' href='../node_modules/bootstrap/dist/css/bootstrap.css'>
+<script type='text/javascript' src='../ggd3.standalone.js'></script></head>
+</head>
+<style>
+.ygrid path, .xgrid path {
+  stroke-opacity: 0.2;
+}
+.axis>.tick>line, .axis path.domain {
+  stroke-opacity: 0 !important;
+} 
+</style>
+<body>
+<!-- <select id="xVar" class='btn btn-primary'>
+</select>    
+<select id="yVar" class='btn btn-primary'>
+</select>    
+ -->
+<!-- <select id="xAxisPos" class='btn btn-primary'>
+  <option value="bottom" selected>x axis bottom</option>
+  <option value="top">x axis top</option>
+</select>    
+<select id="yAxisPos" class='btn btn-primary'>
+  <option value="left" selected>y axis left</option>
+  <option value="right">y axis right</option>
+</select>    
+ -->
+</div>
+<div id='chart01' class='chart-frame' style="padding:30px"></div>
+<script>
+function collectData(layer) {
+  return d3.selectAll('.geom.' + layer).data();
+}
+var div = d3.select('#chart01'),
+    chart, data;
+
+var facet = ggd3.facet({x:"assoc", type:'grid',
+                       ncols:2,
+                      titleSize: [30, 0]});
+
+var chart = ggd3.plot()
+              .facet(facet)
+              .layers(['boxplot'])
+              .dtypes({educ: ['number', 'few']})
+              .height(500)
+              .dtypes({'dist': ['number', 'many']})
+              .width(300)
+              .yScale({axis:{position:'left',
+                      orient: 'left'},
+                      scale:{domain:d3.range(18)}})
+              .xScale({axis:{position:'bottom',
+                      ticks:4,
+                      orient: 'bottom'}})
+              .fillScale({scale:
+                {range:['darkseagreen', 'orange']}})
+              .margins({right: 10, left:45, top:20, bottom:50})
+              .color('none')
+              .aes({y:'educ', x: 'arsenic', fill:'switch'})
+
+d3.csv("../data/wells.csv", function(error, d) {
+  data = d;
+  chart.data(data).draw(div);
+  var xes = ['dist', 'arsenic'];
+  var i = 0;
+  setInterval(function() {
+    var x = xes[i % 2]
+    i++;
+    chart.layers().forEach(function(l) {
+      l.aes({x:x});
+    })
+    chart.aes({x:x})
+      .xScale(null)
+      .xScale({axis:{position:'bottom',
+              ticks:4,
+              orient: 'bottom'}})
+      .data(data)
+    chart.draw(div);
+  }, 4000);
+})
+
+function redraw() {
+  chart.draw(div);
+}
+
+</script>
+</body>
+</html>
