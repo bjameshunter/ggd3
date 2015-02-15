@@ -1945,7 +1945,8 @@ function setDomain(data, layer) {
           // if a plot doesn't use a particular
           // aesthetic, it will trip up here, 
           // test if it exists.
-          if(d[s.aes[g]]){
+          if(!_.isNull(d[s.aes[g]]) || 
+             !_.isUndefined(d[s.aes[g]])) {
             return this.scale()(d[s.aes[g]]);
           }
         }, scale);
