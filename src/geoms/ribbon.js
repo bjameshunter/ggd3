@@ -41,8 +41,8 @@ Ribbon.prototype.drawRibbon = function(sel, data, i, layerNum, areaGen,
   var ribbon = sel.selectAll(".geom.g" + layerNum + ".geom-" + this.name())
               .data(data),
       that = this;
-  ribbon.transition()
-    .each(function(d, i) {
+  var update = s.transition ? ribbon.transition(): ribbon;
+  update.each(function(d, i) {
       Area.prototype.drawArea.call(that, d3.select(this), areaGen(i), s, layerNum, i);
     });
   // makes sense that all area/ribbons go first.
@@ -50,9 +50,8 @@ Ribbon.prototype.drawRibbon = function(sel, data, i, layerNum, areaGen,
     .each(function(d, i) {
       Area.prototype.drawArea.call(that, d3.select(this), areaGen(i), s, layerNum, i);
     });
-  ribbon.exit()
-    .transition()
-    .style('opacity', 0)
+  var exit = s.transition ? ribbon.exit().transition(): ribbon.exit();
+  exit.style('opacity', 0)
     .remove();
 };
 

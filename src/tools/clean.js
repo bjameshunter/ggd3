@@ -1,3 +1,4 @@
+<<<<<<< HEAD
   function getRandomSubarray(arr, size) {
       var shuffled = arr.slice(0), i = arr.length, min = i - size, temp, index;
       while (i-- > min) {
@@ -5,6 +6,56 @@
           temp = shuffled[index];
           shuffled[index] = shuffled[i];
           shuffled[i] = temp;
+=======
+function Clean(data, obj) {
+  // coerce each records data to reasonable
+  // type and get domains for all scales in aes.
+  if(!data) { return {data: null, dtypes:null}; }
+  if(obj instanceof ggd3.layer && _.isEmpty(obj.dtypes())){
+    return {data:data, dtypes:null};
+  }
+  var vars = {},
+      aes = obj.aes(),
+      dtypeDict = {"number": parseFloat, 
+                  "integer": parseInt,
+                  "string": String},
+      dtypes = _.merge({}, obj.dtypes()),
+      keys = _.keys(dtypes),
+      // assume all records have same keys
+      // dkeys = _.keys(data[0]);
+      dkeys = _.flatten(_.map(aes, function(v, k) {
+        if(v !== 'additional') {
+          return v;
+        } else {
+          return k;
+        }
+      }));
+
+  dkeys.forEach(function(v){
+    // if a data type has been declared, don't 
+    // bother testing what it is.
+    // this is necessary for dates and such.
+    if(!_.contains(keys, v)) { vars[v] = []; }
+  });
+  data.forEach(function(d) {
+    _.mapValues(vars, function(v,k) {
+      return vars[k].push(d[k]);
+    });
+  });
+  _.mapValues(vars, function(v,k) {
+    vars[k] = dtype(v);
+  });
+  dtypes = _.merge(vars, dtypes);
+
+  data = _.map(data, function(d,i) {
+    return _.map(dtypes, function(v,k) {
+      if(v[0] === "date" || 
+         v[0] === "time"){
+        var format = v[2];
+        d[k] = ggd3.tools.dateFormatter(d[k], format);
+      } else {
+        d[k] = dtypeDict[dtypes[k][0]](d[k]);
+>>>>>>> lodash
       }
       return shuffled.slice(min);
   }
@@ -32,6 +83,7 @@
       return ["string", "few"];
     }
   }
+<<<<<<< HEAD
 
 function Clean(data, obj) {
   // coerce each records data to reasonable
@@ -80,6 +132,15 @@ function Clean(data, obj) {
     }
     return d;
   });
+=======
+  // always just tack on number dtypes for n.obs, density, and binHeight
+  var specialDtypes = {
+    "n. observations": ['number', 'many', ',.0d'],
+    density: ['number', 'many', ',.3d'],
+    binHeight: ['number', 'many', ',.3d']
+  };
+  dtypes = _.merge(specialDtypes, dtypes);
+>>>>>>> lodash
   return {data: data, dtypes: dtypes};
 }
 

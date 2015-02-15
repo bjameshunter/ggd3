@@ -44,12 +44,21 @@ Bar.prototype.fillEmptyStackGroups = function(data, v) {
   var filler = clone(data[0].values[0]);
   for(var k in filler){
     filler[k] = null;
+<<<<<<< HEAD
   }
   data.forEach(function(d) {
     var dkeys, missing;
     dkeys = pluck(d.values, v);
     missing = compact(keys.filter(function(k) {
       return !contains(dkeys, k);
+=======
+  });
+  _.each(data, function(d) {
+    var dkeys, missing;
+    dkeys = _.map(d.values, function(e) { return e[v]; });
+    missing = _.compact(_.filter(keys, function(k) {
+      return !_.contains(dkeys, k);
+>>>>>>> lodash
     }));
     if(missing.length !== 0) {
       missing.forEach(function(m) {
@@ -126,7 +135,8 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       sub,
       drawX     = this.drawX(),
       drawY     = this.drawY(),
-      vertical = this.vertical(s);
+      vertical = this.vertical(s),
+      size, width;
 
   if(contains(['wiggle', 'silhouette'], that.offset()) ){
     var parentSVG = d3.select(sel.node().parentNode.parentNode);
@@ -357,25 +367,30 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       .attr('fill-opacity', s.alpha);
   }
 
-  bars.transition().call(draw)
+  var update = s.transition ? bars.transition(): bars;
+  update.call(draw)
     .each(function(d) {
       tt.tooltip(d3.select(this));
     });
+  var enter; 
+  if(s.transition) {
+    enter = bars.enter()
+                  .append(this.geom())
+                  .attr(width.s, rb)
+                  .attr(width.p, placeBar)
+                  .attr(size.s, 0)
+                  .attr(size.p, function(d) {
+                    return n(0);
+                  })
+                  .transition();
+  } else {
+    enter = bars.enter()
+                .append(this.geom());
+  }
+  enter.call(draw);
   
-  bars.enter()
-    .append(this.geom())
-    .attr(width.s, rb)
-    .attr(width.p, placeBar)
-    .attr(size.s, 0)
-    .attr(size.p, function(d) {
-      return n(0);
-    })
-    .transition()
-    .call(draw);
-
-  bars.exit()
-    .transition()
-    .style('opacity', 0)
+  var exit = s.transition ? bars.exit().transition(): bars.exit();
+  exit.style('opacity', 0)
     .remove();
   bars.each(function(d) {
       tt.tooltip(d3.select(this));

@@ -78,18 +78,15 @@ Point.prototype.draw = function(sel, data, i, layerNum, s) {
     x = s.x;
     y = s.y;
   }
-
   var tt = ggd3.tooltip()
             .content(this.tooltip())
             .geom(this);
-
-
-  points.transition().call(this.drawGeom, x, y, s, layerNum);
+  var update = s.transition ? points.transition(): points;
+  update.call(this.drawGeom, x, y, s, layerNum);
   points.enter().append(this.geom())
     .call(this.drawGeom, x, y, s, layerNum);
-  points.exit()
-    .transition()
-    .style('opacity', 0)
+  var exit = s.transition ? points.exit().transition():points.exit();
+  exit.style('opacity', 0)
     .remove();
   points.each(function() {
       tt.tooltip(d3.select(this), s);

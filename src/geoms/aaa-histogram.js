@@ -76,7 +76,7 @@ Histogram.prototype.domain = function(data, v) {
   var s = this.setup(),
       group, stackby,
       groupSum, stackSum,
-      grouped;
+      grouped, extent, range;
 
   if(s.aes[v] === "binHeight") {
     grouped = d3.nest()
@@ -134,12 +134,20 @@ Histogram.prototype.fillEmptyStackGroups = function(data, v) {
   empty.y = 0;
   empty.binHeight = 0;
   empty.dx = data[0].dx;
+<<<<<<< HEAD
   console.log(vals);
   data.forEach(function(d) {
     var dkeys, missing;
     dkeys = pluck(d.values, 'x');
     missing = compact(vals.filter(function(k) {
       return !contains(dkeys, k);
+=======
+  _.each(data, function(d) {
+    var dkeys, missing;
+    dkeys = _.map(d.values, 'x');
+    missing = _.compact(_.filter(vals, function(k) {
+      return !_.contains(dkeys, k);
+>>>>>>> lodash
     }));
     if(missing.length !== 0) {
       missing.forEach(function(m) {

@@ -1,6 +1,11 @@
 // generic nesting function
+<<<<<<< HEAD
 Nest = function(data) {
   if(data === null) { return data; }
+=======
+function Nest(data) {
+  if(_.isNull(data)) { return data; }
+>>>>>>> lodash
   var isLayer = (this instanceof ggd3.layer),
       nest = d3.nest(),
       that = this,
@@ -16,7 +21,7 @@ Nest = function(data) {
   }
   data = nest.entries(data);
   return data; 
-};
+}
 
 function unNest(data, nestedArray) {
   // recurse and flatten nested dataset

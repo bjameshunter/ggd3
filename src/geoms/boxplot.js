@@ -92,7 +92,8 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
                                this.drawX(), this.drawY()),
       vertical = scales.x.type() === "ordinal",
       factor = vertical ? "x": "y",
-      number = vertical ? "y": "x";
+      number = vertical ? "y": "x",
+      px, py, rx, ry, rw, rh;
 
   data = this.unNest(data.data);
   o = scales[factor].scale();
@@ -217,8 +218,14 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
   var boxes = sel.selectAll('.geom g' + layerNum)
                 .data(data, data_matcher);
 
+<<<<<<< HEAD
   boxes.each(function(d) {
     d3.select(this).call(draw.bind(this));
+=======
+  var update = s.transition ? boxes.transition(): boxes;
+  update.each(function(d) {
+    d3.select(this).call(_.bind(draw, this));
+>>>>>>> lodash
   });
 
   boxes.enter().append('g').each(function(d) {
@@ -229,8 +236,8 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
     b.append('path').attr('class', 'median');
     b.call(draw);
   });
-  boxes.exit().transition()
-    .style("opacity", 0)
+  var exit = s.transition ? boxes.exit().transition():boxes.exit();
+  exit.style("opacity", 0)
     .remove();
 };
 

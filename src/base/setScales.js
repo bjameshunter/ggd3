@@ -1,18 +1,11 @@
-// only required by plot, no need to pass plot in.
-// geom will already have it's scale available to it,
-// regardless of whether it's layer has own data.
-// probably no need to pass data in either.
-// Plot knows it's facet, data and aes, therefore with 
-// dataList, can get a list of facet ids and relevent data
-// with which to make scales per facet if needed.
-// if an aes mapping or facet mapping does exist in data
-// throw error.
+
 var measureScales = ['x', 'y', 'color','size', 'fill' ,'alpha', 'size'],
     linearScales = ['log', 'linear', 'time', 'date'],
     globalScales = ['alpha','fill', 'color', 'size', 'shape'];
 
-// make or update a scale based on new info from layers
+
 function setScale(selector, aes) {
+<<<<<<< HEAD
   // gather user defined settings in opts object
   var opts = {},
       // user defined opts and the fixed scale domain
@@ -22,6 +15,16 @@ function setScale(selector, aes) {
     // there is a scale "single" that holds the 
     opts[a] = this[a + "Scale"]().single._userOpts;
   }, this);
+=======
+
+  var opts = _.zipObject(measureScales, 
+        _.map(measureScales, function(a) {
+        // there is a scale "single" that holds the 
+        // user defined opts and the fixed scale domain
+        return this[a + "Scale"]().single._userOpts;
+      }, this)),
+      scales = _.intersection(measureScales, ['x', 'y'].concat(_.keys(aes)));
+>>>>>>> lodash
 
   // must reset this if aes changes
   scales.forEach(function(a) {
@@ -29,10 +32,14 @@ function setScale(selector, aes) {
       this[a + "Scale"]()[selector].scale() === null){
       this.makeScale(selector, a, opts[a], aes[a]);
     }
+<<<<<<< HEAD
   }, this);
   scales.forEach(function(a) {
     // give user-specified scale settings to single facet
     this[a + "Scale"]().single._userOpts = clone(opts[a], true);
+=======
+    this[a + "Scale"]().single._userOpts = _.cloneDeep(opts[a]);
+>>>>>>> lodash
   }, this);
 }
 

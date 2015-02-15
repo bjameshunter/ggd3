@@ -40,6 +40,7 @@ Line.prototype.lineType = function(l) {
 };
 
 Line.prototype.generator = function(aes, x, y, o2, group) {
+  var pos;
   if(this.name() === "linerange"){
     pos = function() { return o2.rangeBand()/2; };
   } else {
@@ -124,6 +125,7 @@ Line.prototype.draw = function(sel, data, i, layerNum){
       x = scales.x.scale(),
       y = scales.y.scale(),
       parentSVG = d3.select(sel.node().parentNode.parentNode),
+      line,
       o2 = function() { return 0; };
       o2.rangeBand = function() { return 0; };
       s.gradient = false;
@@ -178,12 +180,21 @@ Line.prototype.draw = function(sel, data, i, layerNum){
   var lines = sel.selectAll("." + 
                             this.selector(layerNum).replace(/ /g, '.'))
               .data(data, data_matcher);
+<<<<<<< HEAD
   lines.transition().call(this.drawLines.bind(this), line, s, layerNum);
   lines.enter().append(this.geom(), ".geom")
     .call(this.drawLines.bind(this), line, s, layerNum);
   lines.exit()
     .transition()
     .style('opacity', 0)
+=======
+  var update = s.transition ? lines.transition(): lines;
+  update.call(_.bind(this.drawLines, this), line, s, layerNum);
+  lines.enter().append(this.geom(), ".geom")
+    .call(_.bind(this.drawLines, this), line, s, layerNum);
+  var exit = s.transition ? lines.exit().transition(): lines.exit();
+  exit.style('opacity', 0)
+>>>>>>> lodash
     .remove();
   return data;
 };

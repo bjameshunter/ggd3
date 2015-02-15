@@ -66,6 +66,8 @@ function Geom(aes) {
   this.attributes.tooltip = tooltip.bind(this);
 }
 
+
+
 Geom.prototype.tooltip = function(tooltip) {
   if(!arguments.length) { return this.attributes.tooltip; }
   var wrapper = function(sel, s, opts) {
@@ -134,12 +136,12 @@ Geom.prototype.merge_variables = function(variables){
   return matched;
 };
 
-Geom.prototype.data_matcher = function(matches){
+Geom.prototype.data_matcher = function(matches, layerNum){
   return function(d, i) {
     if(matches.length){
       return matches.map(function(m) {
         return d[m];
-      }).join(' ');
+      }).join(' ') + " " + i + " " + layerNum;
     } else {
       return i;
     }
@@ -157,6 +159,7 @@ Geom.prototype.setup = function() {
   if(s.layer){
     s.grouped   = false;
     s.plot      = s.layer.plot();
+    s.transition = s.plot.transition();
     s.stat      = s.layer.stat();
     s.nest      = this.nest();
     s.dtypes    = s.plot.dtypes();
@@ -181,6 +184,7 @@ Geom.prototype.setup = function() {
       s.grouped = true;
       s.group = s.aes.group;
     }
+<<<<<<< HEAD
     // not convinced this is a good idea.
     // if(contains([s.facet.x(), s.facet.y()], 
     //               s.group)) {
@@ -192,13 +196,16 @@ Geom.prototype.setup = function() {
     //   // meaningfully. Facets without a group 
     //   // are throwing it off.
     // }
+=======
+>>>>>>> lodash
   }
   return s;
 };
 
 Geom.prototype.collectGroups = function() {
   var groups, grouped,
-      aes = this.layer().aes();
+      aes = this.layer().aes(),
+      group;
   if(aes.fill) {
     grouped = true;
     group = aes.fill;
@@ -258,38 +265,52 @@ Geom.prototype.domain = function(data, a) {
 };
 
 
-Geom.prototype.scalesAxes = function(sel, setup, selector, 
+Geom.prototype.scalesAxes = function(sel, s, selector, 
                                      layerNum, drawX, drawY){
 
   var x, y,
       parentSVG = d3.select(sel.node().parentNode.parentNode), 
       plot = this.layer().plot(),
       rowNum = parseInt(parentSVG.attr('row')),
-      colNum = parseInt(parentSVG.attr('col'));
+      colNum = parseInt(parentSVG.attr('col')),
+      xfree, yfree;
   // choosing scales based on facet rule
 
+<<<<<<< HEAD
   if(!contains(["free", "free_x"], setup.facet.scales()) || 
      setup.plot.xScale()[selector] === undefined){
     x = setup.plot.xScale().single;
+=======
+  if(!_.contains(["free", "free_x"], s.facet.scales()) || 
+     _.isUndefined(s.plot.xScale()[selector])){
+    x = s.plot.xScale().single;
+>>>>>>> lodash
     xfree = false;
   } else {
-    x = setup.plot.xScale()[selector];
+    x = s.plot.xScale()[selector];
     xfree = true;
   }
+<<<<<<< HEAD
   if(!contains(["free", "free_y"], setup.facet.scales()) || 
      setup.plot.xScale()[selector] === undefined){
     y = setup.plot.yScale().single;
+=======
+  if(!_.contains(["free", "free_y"], s.facet.scales()) || 
+     _.isUndefined(s.plot.xScale()[selector])){
+    y = s.plot.yScale().single;
+>>>>>>> lodash
     yfree = false;
   } else {
-    y = setup.plot.yScale()[selector];
+    y = s.plot.yScale()[selector];
     yfree = true;
   }
 
   if(layerNum === 0 && drawX){
     var xax = parentSVG.select('.x.axis')
               .attr("transform", "translate(" + x.positionAxis(rowNum, colNum) + ")")
-              .attr('opacity', 1)
-              .call(x.axis);
+              .attr('opacity', 1);
+    xax = s.transition ? xax.transition():xax;
+    xax.call(x.axis);
     x.style(xax);
     xax.attr('opacity', 1);
     if(x.label()){
@@ -300,8 +321,9 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
   if(layerNum === 0 && drawY){
     var yax = parentSVG.select('.y.axis')
               .attr("transform", "translate(" + y.positionAxis(rowNum, colNum) + ")")
-              .attr('opacity', 1)
-              .transition().call(y.axis);
+              .attr('opacity', 1);
+    yax = s.transition ? yax.transition(): yax;
+    yax.call(y.axis);
     y.style(yax);
     yax.attr('opacity', 1);
     if(y.label()){
@@ -326,16 +348,31 @@ Geom.prototype.nest = function() {
       dtypes = plot.dtypes(),
       nestVars = unique(compact([aes.group, aes.fill, aes.color]));
 
+<<<<<<< HEAD
   nestVars.forEach(function(n) {
+=======
+  // nest by groups
+  _.each(nestVars, function(n) {
+>>>>>>> lodash
     if(dtypes[n][1] !== "many") {
-      nest.key(function(d) { return d[n]; });
+      nest.key(function(d) {
+        return d[n]; 
+      });
     }
+<<<<<<< HEAD
   });
   ['x', 'y'].forEach(function(a) {
+=======
+  }, this);
+  // nest by ordinal axes;
+  _.each(['x', 'y'], function(a) {
+>>>>>>> lodash
     if(plot[a + "Scale"]().single.type() === "ordinal"){
-      nest.key(function(d) { return d[aes[a]]; });
+      nest.key(function(d) { 
+        return d[aes[a]]; 
+      });
     }
-  });
+  }, this);
   return nest;
 };
 
@@ -349,10 +386,12 @@ Geom.prototype.removeElements = function(sel, layerNum, clss) {
     .style('opacity', 0)
     .remove();
 
+<<<<<<< HEAD
 };
 
+=======
+>>>>>>> lodash
 ggd3.geom = Geom;
-
 
 Geom.prototype.unNest = unNest;
 Geom.prototype.recurseNest = recurseNest;

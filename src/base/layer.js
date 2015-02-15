@@ -5,7 +5,7 @@ function Layer(aes) {
   var attributes = {
     plot:     null,
     data:     null,
-    dtypes:   null,
+    dtypes:   {},
     geom:     null,
     stat:     null, // identity, sum, mean, percentile, etc.
     position: null, // jitter, dodge, stack, etc.
@@ -100,6 +100,7 @@ Layer.prototype.setStat = function() {
       plot = this.plot(),
       scaleType, dtype, diff;
 
+<<<<<<< HEAD
   diff = Object.keys(aes).filter(function(d) {
     return !contains(stat.exclude, d);
   });
@@ -119,13 +120,32 @@ Layer.prototype.setStat = function() {
           stat[a]('unique');
         } else {
           stat[a](dtype);
+=======
+  _.each(_.difference(_.keys(aes), stat.exclude), 
+    function(a) {
+      dtype = dtypes[aes[a]];
+      if(!stat[a]() && _.contains(measureScales, a)){
+      scaleType = plot[a + "Scale"]().single.type();
+        if(_.contains(linearScales, scaleType) && 
+           _.contains(['x', 'y'], a)){
+          if(this.geom() instanceof ggd3.geoms.hline){
+            stat[a]('range');
+          } else {
+            stat[a](stat.linearAgg());
+          }
+        } else {
+          if(this.geom() instanceof ggd3.geoms.hline){
+            stat[a]('unique');
+          } else {
+            stat[a](dtype);
+          }
+>>>>>>> lodash
         }
       }
-    }
-    if(a === "group") {
-      // group always get's the "first" function
-      stat[a]('first');
-    }
+      if(a === "group") {
+        // group always get's the "first" function
+        stat[a]('first');
+      }
   }, this);
   // if a stat has not been set, 
   // ie. not passed in aes, it is x or y
@@ -159,8 +179,16 @@ Layer.prototype.data = function(data, fromPlot) {
     this.attributes.data = data;
   } else {
     data = this.unNest(data);
+    if(this.geom().name() === 'area'){
+    }
     data = ggd3.tools.clean(data, this);
+<<<<<<< HEAD
     this.attributes.dtypes = merge(this.attributes.dtypes, data.dtypes);
+=======
+    if(this.geom().name() === 'area'){
+    }
+    this.attributes.dtypes = _.merge(this.attributes.dtypes, data.dtypes);
+>>>>>>> lodash
     this.attributes.data = data.data;
   }
   return this;

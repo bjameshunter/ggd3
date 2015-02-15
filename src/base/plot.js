@@ -69,7 +69,11 @@ function Plot() {
     colorRange: ["white", "black"],
     shapeRange: d3.superformulaTypes,
     opts: {},
+<<<<<<< HEAD
     axisLabels: false,
+=======
+    transition: true,
+>>>>>>> lodash
     theme: "ggd3",
     // currently just used to ensure clip-paths are unique
     // on pages with more than one single faceted plot.
@@ -105,7 +109,11 @@ function Plot() {
     "alphaRange", "lineWidth",
     "xGrid", "yGrid", "gridLineType",
     "highlightXZero", "highlightYZero",
+<<<<<<< HEAD
     "axisLabels"];
+=======
+    'transition'];
+>>>>>>> lodash
 
   for(var attr in attributes){
     if((!this[attr] && 
@@ -401,6 +409,7 @@ Plot.prototype.draw = function(sel) {
   
   // reset nSVGs after they're drawn.
   this.facet().nSVGs = 0;
+
   // get the layer classes that should
   // be present in the plot to remove 
   // layers that no longer exist.
@@ -408,10 +417,25 @@ Plot.prototype.draw = function(sel) {
                     return "g" + n;
                   }, this);
 
+  
+  // if(!this.aes().x || !this.aes().y){
+  //   var missing = this.aes().x ? 'y':'x';
+  //   var k = ['bar', 'histogram', 'density'];
+  // // if either histogram, density or bar - count are used
+  // // we need to set that variable in dtypes as ['number', 'many']
+  //   _.each(this.layers(), function(l) {
+
+  //   });
+    
+  // }
   this.setScale('single', this.aes());
   this.layers().forEach(function(l) {
     l.compute(sel);
+<<<<<<< HEAD
   });
+=======
+  }, this);
+>>>>>>> lodash
 
   // make global scales
   this.setFixedScale('x'); 

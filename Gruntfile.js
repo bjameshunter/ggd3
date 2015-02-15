@@ -105,20 +105,13 @@ module.exports = function(grunt){
         },  
       }
     },
-    vows: {
-      all: {
-        options: {reporter: 'spec'},
-        src: ["test/*.js", "!test/test-setup.js"],
-      }
-    }
-  })
+  });
   grunt.loadNpmTasks('grunt-contrib-uglify');
   grunt.loadNpmTasks('grunt-contrib-concat');
   grunt.loadNpmTasks('grunt-contrib-jshint');
   grunt.loadNpmTasks('grunt-browserify');
   grunt.loadNpmTasks('grunt-extract-sourcemap');
   grunt.loadNpmTasks('grunt-contrib-watch');
-  grunt.loadNpmTasks('grunt-vows');
 
   // default tasks
   grunt.registerTask('default', ["jshint", 'concat', 'watch']);

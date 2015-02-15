@@ -89,8 +89,14 @@ Stat.prototype.compute = function(data) {
             function(k){
               if(!this[k]()){ return null; }
               return this[k]()([]) === "identity";
+<<<<<<< HEAD
             }, that));
   if(contains(specialStats, this.linearAgg()) ){
+=======
+            }, this)),
+      out;
+  if(_.contains(specialStats, this.linearAgg()) ){
+>>>>>>> lodash
     return this["compute_" + this.linearAgg()](data);
   }
   // most situations will need these two
@@ -259,13 +265,14 @@ Stat.prototype.compute_bin = function(data) {
 
   var aes = this.layer().aes(),
       g = this.layer().geom(),
+      possibleHeights = [undefined, 'density', 'binHeight'],
       h, n;
   
-  if(aes.y && aes.x) {
-    // we've been through before and density exists on aes
+  if(_.contains([aes.y, aes.x], 'binHeight')) {
+    // we've been through before and binHeight exists on aes
     h = aes.y === "binHeight" ? 'y': 'x';
   } else {
-    h = aes.y ? 'x': 'y';
+    h = _.contains(possibleHeights, aes.y) ? 'y': 'x';
     aes[h] = "binHeight";
   }
   n = h === "y" ? "x": "y";
@@ -299,17 +306,23 @@ Stat.prototype.compute_density = function(data) {
   var out = {},
       start = {},
       end = {},
-      aes = this.layer().aes();
-  var g, k, r, p;
-  if(aes.y && aes.x) {
+      aes = this.layer().aes(),
+      possibleHeights = [undefined, 'density', 'binHeight'];
+  var g, k, r, p, h, n, kde;
+  if(_.contains([aes.y, aes.x], 'density')) {
     // we've been through before and density exists on aes
-    d = aes.y === "density" ? 'y': 'x';
+    h = aes.y === "density" ? 'y': 'x';
   } else {
-    d = aes.y ? 'x': 'y';
-    aes[d] = "density";
+    h = _.contains(possibleHeights, aes.y) ? 'y': 'x';
+    aes[h] = "density";
   }
+<<<<<<< HEAD
   n = d === "y" ? "x": "y";
   ['color', 'group', "fill"].forEach(function(a) {
+=======
+  n = h === "y" ? "x": "y";
+  _.map(['color', 'group', "fill"], function(a) {
+>>>>>>> lodash
     if(aes[a]){
       out[aes[a]] = data[0][aes[a]];
       start[aes[a]] = data[0][aes[a]];
