@@ -67,7 +67,6 @@ var bar = ggd3.geoms.bar()
             .alpha(1);
 var layers = [ggd3.layer()
                 .geom(bar)
-                .aes({x:'cyl', y:'mpg', fill:'gear'})
                 .stat({y:'median'}),
               ggd3.layer().geom(mean).stat({y: 'mean'}),
               ggd3.layer().geom(max).stat({y: 'max'}),
@@ -84,7 +83,7 @@ var chart = ggd3.plot()
                             orient:'left'},
                             scale: {domain:[0, 40]}})
                     .xScale({axis: {ticks: 4, position: "top"},
-                            offset: 25})
+                            offset: 60})
                     .dtypes({
                       cyl: ['number', 'few', ',.0d'],
                       gear:['number', 'few', ',.0d'],
@@ -93,7 +92,7 @@ var chart = ggd3.plot()
                     .rangePadding(0)
                     .facet(facet)
                     .rangeBand(0.1)
-                    .margins({top: 50, bottom:10, left:50, right:10})
+                    .margins({top: 100, bottom:10, left:50, right:10})
                     .layers(layers);
 
 function makeOneZero(o, v) {
@@ -101,32 +100,65 @@ function makeOneZero(o, v) {
   o2[v] = 0;
   return [o, o2];
 }
+function areaNest(k1, k2, v) {
+  return d3.nest()
+            .key(function(d) { return d[k1]; })
+            .key(function(d) { return d[k2]; })
+            .rollup(function(d) {
+              console.log(d);
+              var o = {},
+              arr = _.pluck(d, v),
+              max = _.filter(d, function(r) {
+                return r[v] === d3.max(arr);
+              })[0],
+              min = _.filter(d, function(r) {
+                return r[v] === d3.min(arr);
+              })[0],
+              mean = d[0];
+              o.max = makeOneZero(max, v)
+              o.min = makeOneZero(min, v);
+              o.mean = makeOneZero(mean, v);
+              return o;
+            });
+}
 d3.csv("../data/mtcars.csv", function(error, d) {
   data = d;
-  areaData = d3.nest()
-              .key(function(d) { return d.cyl; })
-              .key(function(d) { return d.gear; })
-              .rollup(function(d) {
-                var o = {},
-                arr = _.pluck(d, "mpg"),
-                max = _.filter(d, function(r) {
-                  return r.mpg === d3.max(arr);
-                })[0],
-                min = _.filter(d, function(r) {
-                  return r.mpg === d3.min(arr);
-                })[0],
-                mean = d[0];
-                o.max = makeOneZero(max, 'mpg')
-                o.min = makeOneZero(min, 'mpg');
-                o.mean = makeOneZero(mean, 'mpg');
-                return o;
-              });
+  var areaData = areaNest('cyl', 'gear', 'mpg')
   chart.data(data);
   areaData = chart.unNest(areaData.entries(data));
   area1.data(_.flatten(_.pluck(areaData, 'min')));
   area2.data(_.flatten(_.pluck(areaData, 'mean')));
   area3.data(_.flatten(_.pluck(areaData, 'max')));
   chart.layers([area1, area2, area3]).draw(div);
+  var ys = ['wt', 'disp', 'mpg'];
+  var xs = ['cyl', 'gear', 'am'];
+  var fills = ['gear', 'cyl', 'am'];
+  var i = 0;
+  setInterval(function() {
+    var y = ys[Math.floor(Math.random()*3)];
+    var x = xs[Math.floor(Math.random()*3)];
+    var fill = fills[Math.floor(Math.random()*3)];
+    chart.layers().forEach(function(l) {
+      l.aes({x:x, y: y, fill:fill});
+    });
+    chart
+      .aes({x:x, y: y, fill:fill})
+      .data(data, true)
+      .yScale(null)
+      .yScale({axis:{ position:'left', 
+              orient:'left'},
+              label: y})
+      .xScale(null)
+      .xScale({axis: {position: "top"},
+              offset: 60,
+              label: x});
+    var areaData = areaNest(x, fill, y);
+    areaData = chart.unNest(areaData.entries(data));
+    area1.data(_.flatten(_.pluck(areaData, 'min')));
+    area2.data(_.flatten(_.pluck(areaData, 'mean')));
+    area3.data(_.flatten(_.pluck(areaData, 'max')));
+    chart.draw(div);
+  }, 4000);
 });
 
 function redraw() {

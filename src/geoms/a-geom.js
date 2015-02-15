@@ -152,6 +152,7 @@ Geom.prototype.setup = function() {
   if(s.layer){
     s.grouped   = false;
     s.plot      = s.layer.plot();
+    s.transition = s.plot.transition();
     s.stat      = s.layer.stat();
     s.nest      = this.nest();
     s.dtypes    = s.plot.dtypes();
@@ -243,7 +244,7 @@ Geom.prototype.domain = function(data, a) {
 };
 
 
-Geom.prototype.scalesAxes = function(sel, setup, selector, 
+Geom.prototype.scalesAxes = function(sel, s, selector, 
                                      layerNum, drawX, drawY){
 
   var x, y,
@@ -254,28 +255,29 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
       xfree, yfree;
   // choosing scales based on facet rule
 
-  if(!_.contains(["free", "free_x"], setup.facet.scales()) || 
-     _.isUndefined(setup.plot.xScale()[selector])){
-    x = setup.plot.xScale().single;
+  if(!_.contains(["free", "free_x"], s.facet.scales()) || 
+     _.isUndefined(s.plot.xScale()[selector])){
+    x = s.plot.xScale().single;
     xfree = false;
   } else {
-    x = setup.plot.xScale()[selector];
+    x = s.plot.xScale()[selector];
     xfree = true;
   }
-  if(!_.contains(["free", "free_y"], setup.facet.scales()) || 
-     _.isUndefined(setup.plot.xScale()[selector])){
-    y = setup.plot.yScale().single;
+  if(!_.contains(["free", "free_y"], s.facet.scales()) || 
+     _.isUndefined(s.plot.xScale()[selector])){
+    y = s.plot.yScale().single;
     yfree = false;
   } else {
-    y = setup.plot.yScale()[selector];
+    y = s.plot.yScale()[selector];
     yfree = true;
   }
 
   if(layerNum === 0 && drawX){
     var xax = parentSVG.select('.x.axis')
               .attr("transform", "translate(" + x.positionAxis(rowNum, colNum) + ")")
-              .attr('opacity', 1)
-              .call(x.axis);
+              .attr('opacity', 1);
+    xax = s.transition ? xax.transition():xax;
+    xax.call(x.axis);
     x.style(xax);
     xax.attr('opacity', 1);
     if(x.label()){
@@ -286,8 +288,9 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
   if(layerNum === 0 && drawY){
     var yax = parentSVG.select('.y.axis')
               .attr("transform", "translate(" + y.positionAxis(rowNum, colNum) + ")")
-              .attr('opacity', 1)
-              .transition().call(y.axis);
+              .attr('opacity', 1);
+    yax = s.transition ? yax.transition(): yax;
+    yax.call(y.axis);
     y.style(yax);
     yax.attr('opacity', 1);
     if(y.label()){

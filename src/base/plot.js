@@ -69,6 +69,7 @@ function Plot() {
     colorRange: ["white", "black"],
     shapeRange: d3.superformulaTypes,
     opts: {},
+    transition: true,
     theme: "ggd3",
     // currently just used to ensure clip-paths are unique
     // on pages with more than one single faceted plot.
@@ -103,7 +104,8 @@ function Plot() {
     'subRangeBand', 'subRangePadding', 'subDomain',
     "alphaRange", "lineWidth",
     "xGrid", "yGrid", "gridLineType",
-    "highlightXZero", "highlightYZero"];
+    "highlightXZero", "highlightYZero",
+    'transition'];
 
   for(var attr in attributes){
     if((!this[attr] && 
@@ -343,7 +345,6 @@ Plot.prototype.setFixedScale = function(a) {
 };
 
 Plot.prototype.plotDim = function() {
-  var margins = this.margins();
   return {x: this.width(),
    y: this.height()};
 };
@@ -393,6 +394,7 @@ Plot.prototype.draw = function(sel) {
   
   // reset nSVGs after they're drawn.
   this.facet().nSVGs = 0;
+
   // get the layer classes that should
   // be present in the plot to remove 
   // layers that no longer exist.
@@ -401,7 +403,17 @@ Plot.prototype.draw = function(sel) {
                     return "g" + (n);
                   }, this);
 
+  
+  // if(!this.aes().x || !this.aes().y){
+  //   var missing = this.aes().x ? 'y':'x';
+  //   var k = ['bar', 'histogram', 'density'];
+  // // if either histogram, density or bar - count are used
+  // // we need to set that variable in dtypes as ['number', 'many']
+  //   _.each(this.layers(), function(l) {
 
+  //   });
+    
+  // }
   this.setScale('single', this.aes());
 
   _.each(this.layers(), function(l) {

@@ -95,29 +95,30 @@ Layer.prototype.setStat = function() {
       plot = this.plot(),
       scaleType, dtype;
 
-  _.each(_.difference(_.keys(aes), stat.exclude), function(a) {
-    dtype = dtypes[aes[a]];
-    if(!stat[a]() && _.contains(measureScales, a)){
-    scaleType = plot[a + "Scale"]().single.type();
-      if(_.contains(linearScales, scaleType) && 
-         _.contains(['x', 'y'], a)){
-        if(this.geom() instanceof ggd3.geoms.hline){
-          stat[a]('range');
+  _.each(_.difference(_.keys(aes), stat.exclude), 
+    function(a) {
+      dtype = dtypes[aes[a]];
+      if(!stat[a]() && _.contains(measureScales, a)){
+      scaleType = plot[a + "Scale"]().single.type();
+        if(_.contains(linearScales, scaleType) && 
+           _.contains(['x', 'y'], a)){
+          if(this.geom() instanceof ggd3.geoms.hline){
+            stat[a]('range');
+          } else {
+            stat[a](stat.linearAgg());
+          }
         } else {
-          stat[a](stat.linearAgg());
-        }
-      } else {
-        if(this.geom() instanceof ggd3.geoms.hline){
-          stat[a]('unique');
-        } else {
-          stat[a](dtype);
+          if(this.geom() instanceof ggd3.geoms.hline){
+            stat[a]('unique');
+          } else {
+            stat[a](dtype);
+          }
         }
       }
-    }
-    if(a === "group") {
-      // group always get's the "first" function
-      stat[a]('first');
-    }
+      if(a === "group") {
+        // group always get's the "first" function
+        stat[a]('first');
+      }
   }, this);
   // if a stat has not been set, it is x or y
   // and should be set
@@ -132,7 +133,6 @@ Layer.prototype.setStat = function() {
         aes[a] = "density";
       }
       this.aes(aes);
-      this.plot().aes(aes);
     }
   }, this);
 };
@@ -145,13 +145,9 @@ Layer.prototype.data = function(data, fromPlot) {
   } else {
     data = this.unNest(data);
     if(this.geom().name() === 'area'){
-      console.log('after unnest');
-      console.log(data);
     }
     data = ggd3.tools.clean(data, this);
     if(this.geom().name() === 'area'){
-      console.log('after clean');
-      console.log(data);
     }
     this.attributes.dtypes = _.merge(this.attributes.dtypes, data.dtypes);
     this.attributes.data = data.data;

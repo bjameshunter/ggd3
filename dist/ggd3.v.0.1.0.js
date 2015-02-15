@@ -116,6 +116,13 @@ function Clean(data, obj) {
       return ["string", "few"];
     }
   }
+  // always just tack on number dtypes for n.obs, density, and binHeight
+  var specialDtypes = {
+    "n. observations": ['number', 'many', ',.0d'],
+    density: ['number', 'many', ',.3d'],
+    binHeight: ['number', 'many', ',.3d']
+  };
+  dtypes = _.merge(specialDtypes, dtypes);
   return {data: data, dtypes: dtypes};
 }
 
@@ -885,29 +892,30 @@ Layer.prototype.setStat = function() {
       plot = this.plot(),
       scaleType, dtype;
 
-  _.each(_.difference(_.keys(aes), stat.exclude), function(a) {
-    dtype = dtypes[aes[a]];
-    if(!stat[a]() && _.contains(measureScales, a)){
-    scaleType = plot[a + "Scale"]().single.type();
-      if(_.contains(linearScales, scaleType) && 
-         _.contains(['x', 'y'], a)){
-        if(this.geom() instanceof ggd3.geoms.hline){
-          stat[a]('range');
+  _.each(_.difference(_.keys(aes), stat.exclude), 
+    function(a) {
+      dtype = dtypes[aes[a]];
+      if(!stat[a]() && _.contains(measureScales, a)){
+      scaleType = plot[a + "Scale"]().single.type();
+        if(_.contains(linearScales, scaleType) && 
+           _.contains(['x', 'y'], a)){
+          if(this.geom() instanceof ggd3.geoms.hline){
+            stat[a]('range');
+          } else {
+            stat[a](stat.linearAgg());
+          }
         } else {
-          stat[a](stat.linearAgg());
-        }
-      } else {
-        if(this.geom() instanceof ggd3.geoms.hline){
-          stat[a]('unique');
-        } else {
-          stat[a](dtype);
+          if(this.geom() instanceof ggd3.geoms.hline){
+            stat[a]('unique');
+          } else {
+            stat[a](dtype);
+          }
         }
       }
-    }
-    if(a === "group") {
-      // group always get's the "first" function
-      stat[a]('first');
-    }
+      if(a === "group") {
+        // group always get's the "first" function
+        stat[a]('first');
+      }
   }, this);
   // if a stat has not been set, it is x or y
   // and should be set
@@ -922,7 +930,6 @@ Layer.prototype.setStat = function() {
         aes[a] = "density";
       }
       this.aes(aes);
-      this.plot().aes(aes);
     }
   }, this);
 };
@@ -935,13 +942,9 @@ Layer.prototype.data = function(data, fromPlot) {
   } else {
     data = this.unNest(data);
     if(this.geom().name() === 'area'){
-      console.log('after unnest');
-      console.log(data);
     }
     data = ggd3.tools.clean(data, this);
     if(this.geom().name() === 'area'){
-      console.log('after clean');
-      console.log(data);
     }
     this.attributes.dtypes = _.merge(this.attributes.dtypes, data.dtypes);
     this.attributes.data = data.data;
@@ -1102,6 +1105,7 @@ function Plot() {
     colorRange: ["white", "black"],
     shapeRange: d3.superformulaTypes,
     opts: {},
+    transition: true,
     theme: "ggd3",
     // currently just used to ensure clip-paths are unique
     // on pages with more than one single faceted plot.
@@ -1136,7 +1140,8 @@ function Plot() {
     'subRangeBand', 'subRangePadding', 'subDomain',
     "alphaRange", "lineWidth",
     "xGrid", "yGrid", "gridLineType",
-    "highlightXZero", "highlightYZero"];
+    "highlightXZero", "highlightYZero",
+    'transition'];
 
   for(var attr in attributes){
     if((!this[attr] && 
@@ -1376,7 +1381,6 @@ Plot.prototype.setFixedScale = function(a) {
 };
 
 Plot.prototype.plotDim = function() {
-  var margins = this.margins();
   return {x: this.width(),
    y: this.height()};
 };
@@ -1426,6 +1430,7 @@ Plot.prototype.draw = function(sel) {
   
   // reset nSVGs after they're drawn.
   this.facet().nSVGs = 0;
+
   // get the layer classes that should
   // be present in the plot to remove 
   // layers that no longer exist.
@@ -1434,12 +1439,23 @@ Plot.prototype.draw = function(sel) {
                     return "g" + (n);
                   }, this);
 
+  
+  // if(!this.aes().x || !this.aes().y){
+  //   var missing = this.aes().x ? 'y':'x';
+  //   var k = ['bar', 'histogram', 'density'];
+  // // if either histogram, density or bar - count are used
+  // // we need to set that variable in dtypes as ['number', 'many']
+  //   _.each(this.layers(), function(l) {
+
+  //   });
+    
+  // }
+  this.setScale('single', this.aes());
 
   _.each(this.layers(), function(l) {
     l.compute(sel);
   }, this);
 
-  this.setScale('single', this.aes());
   // make global scales
   this.setFixedScale('x'); 
   this.setFixedScale('y'); 
@@ -1741,29 +1757,21 @@ Scale.prototype.positionAxis = function(rowNum, colNum) {
 };
 
 ggd3.scale = Scale;
-// only required by plot, no need to pass plot in.
-// geom will already have it's scale available to it,
-// regardless of whether it's layer has own data.
-// probably no need to pass data in either.
-// Plot knows it's facet, data and aes, therefore with 
-// dataList, can get a list of facet ids and relevent data
-// with which to make scales per facet if needed.
-// if an aes mapping or facet mapping does exist in data
-// throw error.
+
 var measureScales = ['x', 'y', 'color','size', 'fill' ,'alpha', 'size'],
     linearScales = ['log', 'linear', 'time', 'date'],
     globalScales = ['alpha','fill', 'color', 'size', 'shape'];
 
-// make or update a scale based on new info from layers
+
 function setScale(selector, aes) {
-  // gather user defined settings in opts object
+
   var opts = _.zipObject(measureScales, 
         _.map(measureScales, function(a) {
         // there is a scale "single" that holds the 
         // user defined opts and the fixed scale domain
         return this[a + "Scale"]().single._userOpts;
       }, this)),
-      scales = _.intersection(measureScales, _.keys(aes));
+      scales = _.intersection(measureScales, ['x', 'y'].concat(_.keys(aes)));
 
   // must reset this if aes changes
   _.each(scales, function(a) {
@@ -1771,9 +1779,6 @@ function setScale(selector, aes) {
       _.isNull(this[a + "Scale"]()[selector].scale())){
       this.makeScale(selector, a, opts[a], aes[a]);
     }
-  }, this);
-  _.each(scales, function(a) {
-    // give user-specified scale settings to single facet
     this[a + "Scale"]().single._userOpts = _.cloneDeep(opts[a]);
   }, this);
 }
@@ -2179,6 +2184,7 @@ Geom.prototype.setup = function() {
   if(s.layer){
     s.grouped   = false;
     s.plot      = s.layer.plot();
+    s.transition = s.plot.transition();
     s.stat      = s.layer.stat();
     s.nest      = this.nest();
     s.dtypes    = s.plot.dtypes();
@@ -2270,7 +2276,7 @@ Geom.prototype.domain = function(data, a) {
 };
 
 
-Geom.prototype.scalesAxes = function(sel, setup, selector, 
+Geom.prototype.scalesAxes = function(sel, s, selector, 
                                      layerNum, drawX, drawY){
 
   var x, y,
@@ -2281,28 +2287,29 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
       xfree, yfree;
   // choosing scales based on facet rule
 
-  if(!_.contains(["free", "free_x"], setup.facet.scales()) || 
-     _.isUndefined(setup.plot.xScale()[selector])){
-    x = setup.plot.xScale().single;
+  if(!_.contains(["free", "free_x"], s.facet.scales()) || 
+     _.isUndefined(s.plot.xScale()[selector])){
+    x = s.plot.xScale().single;
     xfree = false;
   } else {
-    x = setup.plot.xScale()[selector];
+    x = s.plot.xScale()[selector];
     xfree = true;
   }
-  if(!_.contains(["free", "free_y"], setup.facet.scales()) || 
-     _.isUndefined(setup.plot.xScale()[selector])){
-    y = setup.plot.yScale().single;
+  if(!_.contains(["free", "free_y"], s.facet.scales()) || 
+     _.isUndefined(s.plot.xScale()[selector])){
+    y = s.plot.yScale().single;
     yfree = false;
   } else {
-    y = setup.plot.yScale()[selector];
+    y = s.plot.yScale()[selector];
     yfree = true;
   }
 
   if(layerNum === 0 && drawX){
     var xax = parentSVG.select('.x.axis')
               .attr("transform", "translate(" + x.positionAxis(rowNum, colNum) + ")")
-              .attr('opacity', 1)
-              .call(x.axis);
+              .attr('opacity', 1);
+    xax = s.transition ? xax.transition():xax;
+    xax.call(x.axis);
     x.style(xax);
     xax.attr('opacity', 1);
     if(x.label()){
@@ -2313,8 +2320,9 @@ Geom.prototype.scalesAxes = function(sel, setup, selector,
   if(layerNum === 0 && drawY){
     var yax = parentSVG.select('.y.axis')
               .attr("transform", "translate(" + y.positionAxis(rowNum, colNum) + ")")
-              .attr('opacity', 1)
-              .transition().call(y.axis);
+              .attr('opacity', 1);
+    yax = s.transition ? yax.transition(): yax;
+    yax.call(y.axis);
     y.style(yax);
     yax.attr('opacity', 1);
     if(y.label()){
@@ -2723,25 +2731,30 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       .attr('fill-opacity', s.alpha);
   }
 
-  bars.transition().call(draw)
+  var update = s.transition ? bars.transition(): bars;
+  update.call(draw)
     .each(function(d) {
       tt.tooltip(d3.select(this));
     });
+  var enter; 
+  if(s.transition) {
+    enter = bars.enter()
+                  .append(this.geom())
+                  .attr(width.s, rb)
+                  .attr(width.p, placeBar)
+                  .attr(size.s, 0)
+                  .attr(size.p, function(d) {
+                    return n(0);
+                  })
+                  .transition();
+  } else {
+    enter = bars.enter()
+                .append(this.geom());
+  }
+  enter.call(draw);
   
-  bars.enter()
-    .append(this.geom())
-    .attr(width.s, rb)
-    .attr(width.p, placeBar)
-    .attr(size.s, 0)
-    .attr(size.p, function(d) {
-      return n(0);
-    })
-    .transition()
-    .call(draw);
-
-  bars.exit()
-    .transition()
-    .style('opacity', 0)
+  var exit = s.transition ? bars.exit().transition(): bars.exit();
+  exit.style('opacity', 0)
     .remove();
   bars.each(function(d) {
       tt.tooltip(d3.select(this));
@@ -2932,12 +2945,12 @@ Line.prototype.draw = function(sel, data, i, layerNum){
   var lines = sel.selectAll("." + 
                             this.selector(layerNum).replace(/ /g, '.'))
               .data(data, data_matcher);
-  lines.transition().call(_.bind(this.drawLines, this), line, s, layerNum);
+  var update = s.transition ? lines.transition(): lines;
+  update.call(_.bind(this.drawLines, this), line, s, layerNum);
   lines.enter().append(this.geom(), ".geom")
     .call(_.bind(this.drawLines, this), line, s, layerNum);
-  lines.exit()
-    .transition()
-    .style('opacity', 0)
+  var exit = s.transition ? lines.exit().transition(): lines.exit();
+  exit.style('opacity', 0)
     .remove();
   return data;
 };
@@ -3403,7 +3416,6 @@ Area.prototype.decorateScale = function(dir, s, sc, data) {
 };
 
 Area.prototype.data_matcher = function(matches, layerNum){
-  console.log(matches);
   return function(d, i) {
     if(matches.length){
       return matches.map(function(m) {
@@ -3438,8 +3450,6 @@ Area.prototype.drawArea = function(area, gen, s, layerNum) {
 // have variables corresponding to ymin, ymax, xmin, xmax
 // or those aesthetics are numbers or functions 
 Area.prototype.draw = function(sel, data, i, layerNum){
-  console.log('inside area');
-  console.log(data);
   var s = this.setup(),
       that = this,
       scales = this.scalesAxes(sel, s, data.selector, layerNum,
@@ -3486,20 +3496,18 @@ Area.prototype.draw = function(sel, data, i, layerNum){
   var areaGen = that.generator(s.aes, x2, y2, o2, s.group);
   var matched = this.merge_variables(_.keys(data[0][0]));
   var data_matcher = _.bind(this.data_matcher(matched, layerNum), this);
-  console.log(data_matcher);
   var area = sel.selectAll("path.geom.g" + layerNum + ".geom-" + this.name())
               .data(data, data_matcher); // one area per geom
-  area.transition()
-    .each(function(d, i) {
+  var update = s.transition ? area.transition(): area;
+  update.each(function(d, i) {
       that.drawArea(d3.select(this), areaGen, s, layerNum);
     });
   area.enter().append(this.geom(), "*")
     .each(function(d, i) {
       that.drawArea(d3.select(this), areaGen, s, layerNum);
     });
-  area.exit()
-    .transition()
-    .style('opacity', 0)
+  var exit = s.transition ? area.exit().transition(): area.exit();
+  exit.style('opacity', 0)
     .remove();
 };
 
@@ -3790,7 +3798,8 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
   var boxes = sel.selectAll('.geom g' + layerNum)
                 .data(data, data_matcher);
 
-  boxes.each(function(d) {
+  var update = s.transition ? boxes.transition(): boxes;
+  update.each(function(d) {
     d3.select(this).call(_.bind(draw, this));
   });
 
@@ -3802,8 +3811,8 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
     b.append('path').attr('class', 'median');
     b.call(draw);
   });
-  boxes.exit().transition()
-    .style("opacity", 0)
+  var exit = s.transition ? boxes.exit().transition():boxes.exit();
+  exit.style("opacity", 0)
     .remove();
 };
 
@@ -3913,11 +3922,11 @@ Density.prototype.draw = function(sel, data, i, layerNum){
   this.removeElements(sel, layerNum, this.geom());
   var path = sel.selectAll('.geom.g' + layerNum)
                 .data(data);
-  path.transition().call(drawDensity);
+  var update = s.transition ? path.transition(): path;
+  update.call(drawDensity);
   path.enter().append(this.geom()).call(drawDensity);
-  path.exit()
-    .transition()
-    .style('opacity', 0)
+  var exit = s.transition ? path.exit().transition(): path.exit();
+  exit.style('opacity', 0)
     .remove();
 };
 
@@ -4227,18 +4236,15 @@ Point.prototype.draw = function(sel, data, i, layerNum, s) {
     x = s.x;
     y = s.y;
   }
-
   var tt = ggd3.tooltip()
             .content(this.tooltip())
             .geom(this);
-
-
-  points.transition().call(this.drawGeom, x, y, s, layerNum);
+  var update = s.transition ? points.transition(): points;
+  update.call(this.drawGeom, x, y, s, layerNum);
   points.enter().append(this.geom())
     .call(this.drawGeom, x, y, s, layerNum);
-  points.exit()
-    .transition()
-    .style('opacity', 0)
+  var exit = s.transition ? points.exit().transition():points.exit();
+  exit.style('opacity', 0)
     .remove();
   points.each(function() {
       tt.tooltip(d3.select(this), s);
@@ -4307,8 +4313,8 @@ Ribbon.prototype.drawRibbon = function(sel, data, i, layerNum, areaGen,
   var ribbon = sel.selectAll(".g" + layerNum + "geom-" + this.name())
               .data(data),
       that = this;
-  ribbon.transition()
-    .each(function(d, i) {
+  var update = s.transition ? ribbon.transition(): ribbon;
+  update.each(function(d, i) {
       Area.prototype.drawArea.call(that, d3.select(this), areaGen(i), s, layerNum, i);
     });
   // makes sense that all area/ribbons go first.
@@ -4316,9 +4322,8 @@ Ribbon.prototype.drawRibbon = function(sel, data, i, layerNum, areaGen,
     .each(function(d, i) {
       Area.prototype.drawArea.call(that, d3.select(this), areaGen(i), s, layerNum, i);
     });
-  ribbon.exit()
-    .transition()
-    .style('opacity', 0)
+  var exit = s.transition ? ribbon.exit().transition(): ribbon.exit();
+  exit.style('opacity', 0)
     .remove();
 };
 
@@ -4714,11 +4719,11 @@ Text.prototype.draw = function (sel, data, i, layerNum) {
 
   var text = sel.selectAll('text.geom.g' + layerNum)
                 .data(data.data);
-  text.transition().call(drawText);
+  var update = s.transition ? text.transition(): text;
+  update.call(drawText);
   text.enter().append('text').call(drawText);
-  text.exit()
-    .transition()
-    .style('opacity', 0)
+  var exit = s.transition ? text.exit().transition():text.exit();
+  exit.style('opacity', 0)
     .remove();
   text.each(function() {
       tt.tooltip(d3.select(this), s);
@@ -5011,13 +5016,14 @@ Stat.prototype.compute_bin = function(data) {
 
   var aes = this.layer().aes(),
       g = this.layer().geom(),
+      possibleHeights = [undefined, 'density', 'binHeight'],
       h, n;
   
-  if(aes.y && aes.x) {
-    // we've been through before and density exists on aes
+  if(_.contains([aes.y, aes.x], 'binHeight')) {
+    // we've been through before and binHeight exists on aes
     h = aes.y === "binHeight" ? 'y': 'x';
   } else {
-    h = aes.y ? 'x': 'y';
+    h = _.contains(possibleHeights, aes.y) ? 'y': 'x';
     aes[h] = "binHeight";
   }
   n = h === "y" ? "x": "y";
@@ -5049,16 +5055,17 @@ Stat.prototype.compute_density = function(data) {
   var out = {},
       start = {},
       end = {},
-      aes = this.layer().aes();
-  var g, k, r, p, d, n, kde;
-  if(aes.y && aes.x) {
+      aes = this.layer().aes(),
+      possibleHeights = [undefined, 'density', 'binHeight'];
+  var g, k, r, p, h, n, kde;
+  if(_.contains([aes.y, aes.x], 'density')) {
     // we've been through before and density exists on aes
-    d = aes.y === "density" ? 'y': 'x';
+    h = aes.y === "density" ? 'y': 'x';
   } else {
-    d = aes.y ? 'x': 'y';
-    aes[d] = "density";
+    h = _.contains(possibleHeights, aes.y) ? 'y': 'x';
+    aes[h] = "density";
   }
-  n = d === "y" ? "x": "y";
+  n = h === "y" ? "x": "y";
   _.map(['color', 'group', "fill"], function(a) {
     if(aes[a]){
       out[aes[a]] = data[0][aes[a]];

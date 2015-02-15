@@ -180,12 +180,12 @@ Line.prototype.draw = function(sel, data, i, layerNum){
   var lines = sel.selectAll("." + 
                             this.selector(layerNum).replace(/ /g, '.'))
               .data(data, data_matcher);
-  lines.transition().call(_.bind(this.drawLines, this), line, s, layerNum);
+  var update = s.transition ? lines.transition(): lines;
+  update.call(_.bind(this.drawLines, this), line, s, layerNum);
   lines.enter().append(this.geom(), ".geom")
     .call(_.bind(this.drawLines, this), line, s, layerNum);
-  lines.exit()
-    .transition()
-    .style('opacity', 0)
+  var exit = s.transition ? lines.exit().transition(): lines.exit();
+  exit.style('opacity', 0)
     .remove();
   return data;
 };

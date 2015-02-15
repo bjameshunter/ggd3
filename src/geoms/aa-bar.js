@@ -348,25 +348,30 @@ Bar.prototype.draw = function(sel, data, i, layerNum) {
       .attr('fill-opacity', s.alpha);
   }
 
-  bars.transition().call(draw)
+  var update = s.transition ? bars.transition(): bars;
+  update.call(draw)
     .each(function(d) {
       tt.tooltip(d3.select(this));
     });
+  var enter; 
+  if(s.transition) {
+    enter = bars.enter()
+                  .append(this.geom())
+                  .attr(width.s, rb)
+                  .attr(width.p, placeBar)
+                  .attr(size.s, 0)
+                  .attr(size.p, function(d) {
+                    return n(0);
+                  })
+                  .transition();
+  } else {
+    enter = bars.enter()
+                .append(this.geom());
+  }
+  enter.call(draw);
   
-  bars.enter()
-    .append(this.geom())
-    .attr(width.s, rb)
-    .attr(width.p, placeBar)
-    .attr(size.s, 0)
-    .attr(size.p, function(d) {
-      return n(0);
-    })
-    .transition()
-    .call(draw);
-
-  bars.exit()
-    .transition()
-    .style('opacity', 0)
+  var exit = s.transition ? bars.exit().transition(): bars.exit();
+  exit.style('opacity', 0)
     .remove();
   bars.each(function(d) {
       tt.tooltip(d3.select(this));

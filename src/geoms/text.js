@@ -50,11 +50,11 @@ Text.prototype.draw = function (sel, data, i, layerNum) {
 
   var text = sel.selectAll('text.geom.g' + layerNum)
                 .data(data.data);
-  text.transition().call(drawText);
+  var update = s.transition ? text.transition(): text;
+  update.call(drawText);
   text.enter().append('text').call(drawText);
-  text.exit()
-    .transition()
-    .style('opacity', 0)
+  var exit = s.transition ? text.exit().transition():text.exit();
+  exit.style('opacity', 0)
     .remove();
   text.each(function() {
       tt.tooltip(d3.select(this), s);

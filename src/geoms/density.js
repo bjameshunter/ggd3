@@ -103,11 +103,11 @@ Density.prototype.draw = function(sel, data, i, layerNum){
   this.removeElements(sel, layerNum, this.geom());
   var path = sel.selectAll('.geom.g' + layerNum)
                 .data(data);
-  path.transition().call(drawDensity);
+  var update = s.transition ? path.transition(): path;
+  update.call(drawDensity);
   path.enter().append(this.geom()).call(drawDensity);
-  path.exit()
-    .transition()
-    .style('opacity', 0)
+  var exit = s.transition ? path.exit().transition(): path.exit();
+  exit.style('opacity', 0)
     .remove();
 };
 

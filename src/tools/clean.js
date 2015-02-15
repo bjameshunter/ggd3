@@ -75,6 +75,13 @@ function Clean(data, obj) {
       return ["string", "few"];
     }
   }
+  // always just tack on number dtypes for n.obs, density, and binHeight
+  var specialDtypes = {
+    "n. observations": ['number', 'many', ',.0d'],
+    density: ['number', 'many', ',.3d'],
+    binHeight: ['number', 'many', ',.3d']
+  };
+  dtypes = _.merge(specialDtypes, dtypes);
   return {data: data, dtypes: dtypes};
 }
 

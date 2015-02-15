@@ -124,7 +124,6 @@ Area.prototype.decorateScale = function(dir, s, sc, data) {
 };
 
 Area.prototype.data_matcher = function(matches, layerNum){
-  console.log(matches);
   return function(d, i) {
     if(matches.length){
       return matches.map(function(m) {
@@ -159,8 +158,6 @@ Area.prototype.drawArea = function(area, gen, s, layerNum) {
 // have variables corresponding to ymin, ymax, xmin, xmax
 // or those aesthetics are numbers or functions 
 Area.prototype.draw = function(sel, data, i, layerNum){
-  console.log('inside area');
-  console.log(data);
   var s = this.setup(),
       that = this,
       scales = this.scalesAxes(sel, s, data.selector, layerNum,
@@ -207,20 +204,18 @@ Area.prototype.draw = function(sel, data, i, layerNum){
   var areaGen = that.generator(s.aes, x2, y2, o2, s.group);
   var matched = this.merge_variables(_.keys(data[0][0]));
   var data_matcher = _.bind(this.data_matcher(matched, layerNum), this);
-  console.log(data_matcher);
   var area = sel.selectAll("path.geom.g" + layerNum + ".geom-" + this.name())
               .data(data, data_matcher); // one area per geom
-  area.transition()
-    .each(function(d, i) {
+  var update = s.transition ? area.transition(): area;
+  update.each(function(d, i) {
       that.drawArea(d3.select(this), areaGen, s, layerNum);
     });
   area.enter().append(this.geom(), "*")
     .each(function(d, i) {
       that.drawArea(d3.select(this), areaGen, s, layerNum);
     });
-  area.exit()
-    .transition()
-    .style('opacity', 0)
+  var exit = s.transition ? area.exit().transition(): area.exit();
+  exit.style('opacity', 0)
     .remove();
 };
 

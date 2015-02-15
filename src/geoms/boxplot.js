@@ -209,7 +209,8 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
   var boxes = sel.selectAll('.geom g' + layerNum)
                 .data(data, data_matcher);
 
-  boxes.each(function(d) {
+  var update = s.transition ? boxes.transition(): boxes;
+  update.each(function(d) {
     d3.select(this).call(_.bind(draw, this));
   });
 
@@ -221,8 +222,8 @@ Boxplot.prototype.draw = function(sel, data, i, layerNum) {
     b.append('path').attr('class', 'median');
     b.call(draw);
   });
-  boxes.exit().transition()
-    .style("opacity", 0)
+  var exit = s.transition ? boxes.exit().transition():boxes.exit();
+  exit.style("opacity", 0)
     .remove();
 };
 
