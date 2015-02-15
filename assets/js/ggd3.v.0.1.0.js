@@ -7,7 +7,7 @@
   } else {
     // file is loaded in browser.
     console.log('loaded in browser')
-    this.ggd3 = ggd3;
+    context.ggd3 = ggd3(context.d3, context._);
   }
 }(this, function(d3, _){
     "use strict";
@@ -5096,6 +5096,7 @@ Stat.prototype.compute_density = function(data) {
 };
 
 ggd3.stats = Stat;
+  // file is loaded in browser.
   return ggd3;
   })
 );
