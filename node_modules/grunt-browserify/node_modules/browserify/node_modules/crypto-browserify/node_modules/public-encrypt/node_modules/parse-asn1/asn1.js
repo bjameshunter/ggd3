@@ -2,7 +2,6 @@
 // Fedor, you are amazing.
 
 var asn1 = require('asn1.js');
-var rfc3280 = require('asn1.js-rfc3280');
 
 var RSAPrivateKey = asn1.define('RSAPrivateKey', function() {
   this.seq().obj(
@@ -27,34 +26,31 @@ var RSAPublicKey = asn1.define('RSAPublicKey', function() {
 });
 exports.RSAPublicKey = RSAPublicKey;
 
-var PublicKey = rfc3280.SubjectPublicKeyInfo;
+var PublicKey = asn1.define('SubjectPublicKeyInfo', function() {
+  this.seq().obj(
+    this.key('algorithm').use(AlgorithmIdentifier),
+    this.key('subjectPublicKey').bitstr()
+  );
+});
 exports.PublicKey = PublicKey;
-var ECPublicKey =  asn1.define('ECPublicKey', function() {
+
+var AlgorithmIdentifier = asn1.define('AlgorithmIdentifier', function() {
   this.seq().obj(
-    this.key('algorithm').seq().obj(
-      this.key('id').objid(),
-      this.key('curve').objid()
-    ),
-    this.key('subjectPrivateKey').bitstr()
+    this.key('algorithm').objid(),
+    this.key('none').null_().optional(),
+    this.key('curve').objid().optional(),
+    this.key('params').seq().obj(
+        this.key('p').int(),
+        this.key('q').int(),
+        this.key('g').int()
+      ).optional()
   );
 });
-exports.ECPublicKey = ECPublicKey;
-var ECPrivateWrap =  asn1.define('ECPrivateWrap', function() {
-  this.seq().obj(
-    this.key('version').int(),
-    this.key('algorithm').seq().obj(
-      this.key('id').objid(),
-      this.key('curve').objid()
-    ),
-    this.key('subjectPrivateKey').octstr()
-  );
-});
-exports.ECPrivateWrap = ECPrivateWrap;
 
 var PrivateKeyInfo = asn1.define('PrivateKeyInfo', function() {
   this.seq().obj(
     this.key('version').int(),
-    this.key('algorithm').use(rfc3280.AlgorithmIdentifier),
+    this.key('algorithm').use(AlgorithmIdentifier),
     this.key('subjectPrivateKey').octstr()
   );
 });
@@ -80,39 +76,9 @@ var EncryptedPrivateKeyInfo = asn1.define('EncryptedPrivateKeyInfo', function() 
     this.key('subjectPrivateKey').octstr()
   );
 });
-var dsaParams = asn1.define('dsaParams', function() {
-  this.seq().obj(
-    this.key('algorithm').objid(),
-    this.key('parameters').seq().obj(
-        this.key('p').int(),
-        this.key('q').int(),
-        this.key('g').int()
-      )
-  );
-});
+
 exports.EncryptedPrivateKey = EncryptedPrivateKeyInfo;
-var DSAPublicKey = asn1.define('DSAPublicKey', function() {
-  this.seq().obj(
-    this.key('algorithm').use(dsaParams),
-    this.key('subjectPublicKey').bitstr()
-  );
-});
-exports.DSAPublicKey = DSAPublicKey;
-var DSAPrivateWrap =  asn1.define('DSAPrivateWrap', function() {
-  this.seq().obj(
-    this.key('version').int(),
-    this.key('algorithm').seq().obj(
-      this.key('id').objid(),
-      this.key('parameters').seq().obj(
-        this.key('p').int(),
-        this.key('q').int(),
-        this.key('g').int()
-      )
-    ),
-    this.key('subjectPrivateKey').octstr()
-  );
-});
-exports.DSAPrivateWrap = DSAPrivateWrap;
+
 var DSAPrivateKey = asn1.define('DSAPrivateKey', function() {
   this.seq().obj(
     this.key('version').int(),
@@ -142,17 +108,6 @@ var ECParameters = asn1.define('ECParameters', function() {
     namedCurve: this.objid()
   });
 });
-
-var ECPrivateKey2 = asn1.define('ECPrivateKey2', function() {
-  this.seq().obj(
-    this.key('version').int(),
-    this.key('privateKey').octstr(),
-    this.key('publicKey').seq().obj(
-      this.key('key').bitstr()
-    )
-  );
-});
-exports.ECPrivateKey2 = ECPrivateKey2;
 
 exports.signature = asn1.define('signature', function() {
   this.seq().obj(

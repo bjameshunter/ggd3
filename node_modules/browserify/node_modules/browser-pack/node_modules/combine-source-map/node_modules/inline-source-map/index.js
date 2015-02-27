@@ -116,7 +116,7 @@ Generator.prototype.toString = function () {
 };
 
 Generator.prototype._mappings = function () {
-  return this.generator._mappings;
+  return this.generator._mappings._array;
 };
 
 Generator.prototype.gen = function () {

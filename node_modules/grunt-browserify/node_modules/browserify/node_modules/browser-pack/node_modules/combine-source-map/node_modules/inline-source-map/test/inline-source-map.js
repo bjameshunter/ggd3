@@ -65,12 +65,12 @@ test('generated mappings', function (t) {
 
     t.deepEqual(
         decode(gen.base64Encode()) 
-      , '{"version":3,"file":"","sources":["foo.js"],"names":[],"mappings":"AAAA;AACA;AACA;AACA;AACA"}'
+      , '{"version":3,"sources":["foo.js"],"names":[],"mappings":"AAAA;AACA;AACA;AACA;AACA","file":"","sourceRoot":""}'
       , 'encodes generated mappings'
     )
     t.equal(
         gen.inlineMappingUrl()
-      , '//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiIiwic291cmNlcyI6WyJmb28uanMiXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6IkFBQUE7QUFDQTtBQUNBO0FBQ0E7QUFDQSJ9'
+      , '//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbImZvby5qcyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiQUFBQTtBQUNBO0FBQ0E7QUFDQTtBQUNBIiwiZmlsZSI6IiIsInNvdXJjZVJvb3QiOiIifQ=='
       , 'returns correct inline mapping url'
     )
     t.end()
@@ -135,12 +135,12 @@ test('generated mappings', function (t) {
     )
     t.deepEqual(
         decode(gen.base64Encode()) 
-      , '{"version":3,"file":"","sources":["foo.js","bar.js"],"names":[],"mappings":"ACAA,ADAA;ACCA,ADAA;ACCA,ADAA;AACA;AACA"}'
+      , '{"version":3,"sources":["foo.js","bar.js"],"names":[],"mappings":"ACAA,ADAA;ACCA,ADAA;ACCA,ADAA;AACA;AACA","file":"","sourceRoot":""}'
       , 'encodes generated mappings'
     )
     t.equal(
         gen.inlineMappingUrl()
-      , '//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiIiwic291cmNlcyI6WyJmb28uanMiLCJiYXIuanMiXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6IkFDQUEsQURBQTtBQ0NBLEFEQUE7QUNDQSxBREFBO0FBQ0E7QUFDQSJ9'
+      , '//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbImZvby5qcyIsImJhci5qcyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiQUNBQSxBREFBO0FDQ0EsQURBQTtBQ0NBLEFEQUE7QUFDQTtBQUNBIiwiZmlsZSI6IiIsInNvdXJjZVJvb3QiOiIifQ=='
       , 'returns correct inline mapping url'
     )
     t.end()
@@ -220,7 +220,7 @@ test('generated mappings', function (t) {
     )
     t.equal(
         decode(gen.base64Encode())
-      , '{"version":3,"file":"","sources":["foo.js","bar.js"],"names":[],"mappings":";;;;;;;;;;;;;;;;;;;;AAAA;AACA;AACA;AACA,sBCHA;ADIA,sBCHA;sBACA"}'
+      , '{"version":3,"sources":["foo.js","bar.js"],"names":[],"mappings":";;;;;;;;;;;;;;;;;;;;AAAA;AACA;AACA;AACA,sBCHA;ADIA,sBCHA;sBACA","file":"","sourceRoot":""}'
       , 'encodes generated mappings with offset'
     )
     t.end()
@@ -266,12 +266,12 @@ test('given mappings, with one having no original', function (t) {
     )
     t.deepEqual(
         decode(gen.base64Encode()) 
-      , '{"version":3,"file":"","sources":["foo.js","bar.js"],"names":[],"mappings":";;;;UACG;;oBCIH;8B"}'
+      , '{"version":3,"sources":["foo.js","bar.js"],"names":[],"mappings":";;;;UACG;;oBCIH;8B","file":"","sourceRoot":""}'
       , 'encodes generated mappings'
     )
     t.equal(
         gen.inlineMappingUrl()
-      , '//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiIiwic291cmNlcyI6WyJmb28uanMiLCJiYXIuanMiXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6Ijs7OztVQUNHOztvQkNJSDs4QiJ9'
+      , '//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbImZvby5qcyIsImJhci5qcyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiOzs7O1VBQ0c7O29CQ0lIOzhCIiwiZmlsZSI6IiIsInNvdXJjZVJvb3QiOiIifQ=='
       , 'returns correct inline mapping url'
     )
     t.end()
@@ -306,7 +306,7 @@ test('given mappings, with one having no original', function (t) {
     )
     t.equal(
         decode(gen.base64Encode())
-      , '{\"version\":3,\"file\":\"\",\"sources\":[\"foo.js\",\"bar.js\"],\"names\":[],\"mappings\":\";;;;;;;;;UACG;;;;;;uBCIH;iC\"}'
+      , '{\"version\":3,\"sources\":[\"foo.js\",\"bar.js\"],\"names\":[],\"mappings\":\";;;;;;;;;UACG;;;;;;uBCIH;iC\",\"file\":\"\",\"sourceRoot\":\"\"}'
       , 'encodes mappings with offset'
     )
     t.end()

@@ -1,5 +1,5 @@
-
-module.exports = function evp(crypto, password, salt, keyLen) {
+var createHash = require('create-hash');
+module.exports = function evp(password, salt, keyLen) {
   keyLen = keyLen/8;
   var ki = 0;
   var ii = 0;
@@ -8,7 +8,7 @@ module.exports = function evp(crypto, password, salt, keyLen) {
   var md, md_buf;
   var i;
   while (true) {
-    md = crypto.createHash('md5');
+    md = createHash('md5');
     if(addmd++ > 0) {
        md.update(md_buf);
     }

@@ -54,11 +54,13 @@ describe("baseball bars", function() {
     chart.draw(div);
     setTimeout(function() {
       done();
-    }, 500);
+    }, 1000);
   })
   afterAll(function() {
     d3.select('#' + id).remove();
   })
+
+
   it("has 90 bars", function() {
     count(id, '.geom-bar', 90);
   });

@@ -1,18 +1,21 @@
 var test = require('tape');
-var nodeCrypto = require('crypto');
-var myCrypto = require('./');
+var nodeCrypto  = require('./browser');
+var myCrypto = require('./browser');
 
 var mods = [
-   'secp256k1'
+   'secp256k1',
+   'secp224r1',
+   'prime256v1',
+   'prime192v1'
 ];
 
 function run(i) {
 	mods.forEach(function (mod) {
 		test(mod + ' run ' + i + ' uncompressed', function (t){
 			t.plan(2);
-			var dh1 = nodeCrypto.createECDH(mod);
+			var dh1 = nodeCrypto(mod);
 			dh1.generateKeys();
-			var dh2 = myCrypto.createECDH(mod);
+			var dh2 = myCrypto(mod);
 			dh2.generateKeys();
 			var pubk1 = dh1.getPublicKey();
 			var pubk2 = dh2.getPublicKey();
@@ -23,9 +26,9 @@ function run(i) {
 		});
 		test(mod + ' run ' + i + ' compressed', function (t){
 			t.plan(2);
-			var dh1 = nodeCrypto.createECDH(mod);
+			var dh1 = nodeCrypto(mod);
 			dh1.generateKeys();
-			var dh2 = myCrypto.createECDH(mod);
+			var dh2 = myCrypto(mod);
 			dh2.generateKeys();
 			var pubk1 = dh1.getPublicKey(null, 'compressed');
 			var pubk2 = dh2.getPublicKey(null, 'compressed');
@@ -36,8 +39,8 @@ function run(i) {
 		});
 		test(mod + ' run ' + i + ' set stuff', function (t){
 			t.plan(5);
-			var dh1 = nodeCrypto.createECDH(mod);
-			var dh2 = myCrypto.createECDH(mod);
+			var dh1 = nodeCrypto(mod);
+			var dh2 = myCrypto(mod);
 			dh1.generateKeys();
 			dh2.generateKeys();
 			dh1.setPrivateKey(dh2.getPrivateKey());
@@ -59,6 +62,6 @@ function run(i) {
 
 
 var i = 0;
-while (++i < 10) {
+while (++i < 100) {
 	run(i);
 }

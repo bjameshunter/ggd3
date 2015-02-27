@@ -233,7 +233,7 @@ Plot.prototype.layers = function(layers) {
       }
       l.plot(this).dtypes(this.dtypes());
       this.attributes.layers.push(l);
-      // this.aes(_.merge(_.clone(l.aes()), _.clone(origAes)));
+      this.aes(_.merge(_.clone(l.aes()), _.clone(origAes)));
     }, this);
   } else if (layers instanceof ggd3.layer) {
     if(!layers.data()) { 
